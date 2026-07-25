@@ -1,0 +1,759 @@
+// app/(app)/dashboard/index.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Main compliance dashboard screen.
+// Reads from Zustand store (which mirrors Firestore in real-time).
+// This is where the dashboard component from our prototype plugs in.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import {
+  View, Text, ScrollView, TouchableOpacity,
+StyleSheet, Platform, ActivityIndicator, Button, Linking,
+} from "react-native";
+import { useComplianceStore }            from "../../../store/useComplianceStore";
+import {
+  buildReqs,
+  urgency,
+  fmtDate,
+  daysFrom,
+  addYears,
+} from "../../../lib/requirements";
+import { useEffect, useState  }                      from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { signOut } from "firebase/auth";
+import DashboardHeader from "./components/DashboardHeader";
+import SignalCards from "./components/SignalCards";
+import RequirementRow from "./components/RequirementRow";
+import CompanyRequirements from "./components/CompanyRequirements";
+import DriversPanel from "./components/DriversPanel";
+import {
+  collection,
+  onSnapshot,
+  doc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { auth, db } from "../../../lib/firebase";
+import PaywallCard from "./components/PaywallCard";
+
+
+export default function DashboardScreen() {
+  const router = useRouter();
+  const params = useLocalSearchParams<{
+  alertType?: string;
+  itemIds?: string;
+}>();
+
+  const {
+  compliance,
+  usdotNumber,
+  loading,
+  saveDate,
+  markComplete,
+  markIncomplete,
+  setUsdot,
+  setApplicable,
+} = useComplianceStore();
+
+  const [filter, setFilter] = useState<"od"|"sn"|"up"|null>(null);
+  const [tab, setTab] =
+  useState<"overview" | "company" | "drivers">("overview");
+  useEffect(() => {
+    if (params.alertType || params.itemIds) {
+      setTab("overview");
+      setFilter(null);
+    }
+  }, [params.alertType, params.itemIds]);
+
+  const [drivers, setDrivers] = useState<any[]>([]);
+  const [companyName, setCompanyName] = useState("");
+  const [showPaywallTest, setShowPaywallTest] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<"active" | "inactive">("active");
+
+  const [showNextStep, setShowNextStep] = useState(false);
+  const hasDrivers = drivers.length > 0;
+
+  useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const carrierRef = doc(db, "carriers", user.uid);
+
+  const unsubCarrier = onSnapshot(carrierRef, (snap) => {
+    const data = snap.data();
+
+    setCompanyName(data?.companyName || "");
+    setShowNextStep(data?.nextStepDismissed !== true);
+  });
+
+  const unsubCompliance =
+    useComplianceStore.getState().init(user.uid);
+
+  const driversRef = collection(
+    db,
+    "carriers",
+    user.uid,
+    "drivers"
+  );
+
+  const unsubDrivers = onSnapshot(driversRef, (snapshot) => {
+    const loadedDrivers = snapshot.docs.map((docSnap) => ({
+      id: docSnap.id,
+      ...docSnap.data(),
+    }));
+
+    const activeDrivers = loadedDrivers.filter(
+      (driver: any) => driver.status !== "inactive"
+    );
+
+    setDrivers(activeDrivers);
+  });
+
+  return () => {
+    unsubCompliance();
+    unsubDrivers();
+    unsubCarrier();
+  };
+}, []);
+
+  const dismissNextStep = async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  // Hide immediately so the button feels responsive.
+  setShowNextStep(false);
+
+  try {
+    await setDoc(
+      doc(db, "carriers", user.uid),
+      {
+        nextStepDismissed: true,
+        nextStepDismissedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    console.error("Failed to save Next Step dismissal:", error);
+
+    // Restore the card if Firestore did not save the preference.
+    setShowNextStep(true);
+  }
+};
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.replace("/(auth)/login");
+  };
+
+  if (subscriptionStatus !== "active") {
+  return (
+    <PaywallCard
+      onSubscribe={() => {
+        alert("Stripe Checkout will connect here.");
+        setSubscriptionStatus("active");
+      }}
+      onContactManaged={() =>
+        alert("Managed compliance contact flow will connect here.")
+      }
+    />
+  );
+}
+
+  if (loading) return (
+    <View style={styles.center}>
+      <ActivityIndicator size="large" color="#185FA5" />
+      <Text style={styles.loadingText}>Loading compliance data…</Text>
+    </View>
+  );
+
+  const reqs = buildReqs(compliance, usdotNumber);
+  
+  const driverReqs = drivers.flatMap((driver: any) => [
+  {
+    id: `driver-${driver.id}-cdl`,
+    n: `CDL expiration — ${driver.name}`,
+    f: "Driver",
+    due: driver.cdlExpiration || null,
+    de: false,
+    notes: "Driver CDL expiration date.",
+    cons: "Expired CDL means the driver cannot legally operate a CMV.",
+    act: "Update CDL expiration",
+    completed: false,
+  },
+  {
+    id: `driver-${driver.id}-medical`,
+    n: `Medical card — ${driver.name}`,
+    f: "Driver",
+    due: addYears(driver.medicalExpiration, 2),
+    de: false,
+    notes: "Driver medical card expiration.",
+    cons: "Expired medical card can disqualify the driver.",
+    act: "Update medical card",
+    completed: false,
+  },
+  {
+    id: `driver-${driver.id}-mvr`,
+    n: `Annual MVR — ${driver.name}`,
+    f: "Driver",
+    due: addYears(driver.mvrDue, 1),
+    de: false,
+    notes: "Annual MVR review deadline.",
+    cons: "Missing annual MVR review can create DQ file violations.",
+    act: "Complete annual MVR review",
+    completed: false,
+  },
+  {
+    id: `driver-${driver.id}-clearinghouse`,
+    n: `Clearinghouse query — ${driver.name}`,
+    f: "Driver",
+    due: addYears(driver.clearinghouseDue, 1),
+    de: false,
+    notes: "Annual Clearinghouse query deadline.",
+    cons: "Missing annual Clearinghouse query is a DOT compliance issue.",
+    act: "Run Clearinghouse query",
+    completed: false,
+  },
+]);
+  const visibleDriverReqs = driverReqs.filter((r: any) => {
+  const u = urgency(r);
+  return u === "od" || u === "sn" || u === "up";
+});
+
+const allReqs = [...reqs, ...visibleDriverReqs];
+  const od   = allReqs.filter(r => urgency(r) === "od");
+  const sn   = allReqs.filter(r => urgency(r) === "sn");
+  const up   = allReqs.filter(r => urgency(r) === "up");
+  const exc  = [...od, ...sn, ...up];
+  const active = filter === "od" ? od : filter === "sn" ? sn : filter === "up" ? up : exc;
+
+    const companyItemsMissingDates = reqs.filter(
+  (item: any) =>
+    item.applicable !== false &&
+    !item.due &&
+    !item.completed
+).length;
+
+  const hasCompanyProfile = Boolean(companyName || usdotNumber);
+ 
+
+  const nextStep = (() => {
+    if (!hasCompanyProfile) {
+      return {
+        eyebrow: "Finish setup",
+        title: "Add your company information",
+        description:
+          "Start with your company name and USDOT number so your compliance dashboard is tied to the correct carrier.",
+        buttonLabel: "Open Company",
+        destination: "company" as const,
+      };
+    }
+
+    if (companyItemsMissingDates > 0) {
+      return {
+        eyebrow: "Recommended next step",
+        title: "Add your compliance dates",
+        description: `${companyItemsMissingDates} company ${
+          companyItemsMissingDates === 1 ? "item needs" : "items need"
+        } a date before we can accurately track deadlines.`,
+        buttonLabel: "Review Company",
+        destination: "company" as const,
+      };
+    }
+
+        if (!hasDrivers) {
+      return {
+        eyebrow: "Recommended next step",
+        title: "Add your first driver",
+        description:
+           "Track CDL, medical card, MVR, and Clearinghouse deadlines here. If you only want to manage company requirements, you can skip this step.",
+        buttonLabel: "Add a Driver",
+        destination: "drivers" as const,
+      };
+    }
+  
+
+    if (exc.length > 0) {
+      return {
+        eyebrow: "Needs attention",
+        title: `${exc.length} ${
+          exc.length === 1 ? "item needs" : "items need"
+        } your attention`,
+        description:
+          "Review the items below, then open the correct section to update or complete them.",
+        buttonLabel: "Review Items",
+        destination: "overview" as const,
+      };
+    }
+
+    return {
+      eyebrow: "You're in good shape",
+      title: "Nothing currently needs attention",
+      description:
+        "Your entered compliance dates are outside the current alert windows. We’ll keep watching them for you.",
+      buttonLabel: "View Company",
+      destination: "company" as const,
+    };
+  })();
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {/* Header */}
+          <DashboardHeader
+      companyName={companyName}
+      usdotNumber={usdotNumber}
+      onLogout={handleLogout}
+    />
+
+      {showNextStep && (
+  <View style={styles.nextStepCard}>
+    <TouchableOpacity
+      onPress={dismissNextStep}
+      accessibilityRole="button"
+      accessibilityLabel="Dismiss next step guidance"
+      style={styles.nextStepCloseButton}
+    >
+      <Text style={styles.nextStepCloseText}>×</Text>
+    </TouchableOpacity>
+
+    <Text style={styles.nextStepEyebrow}>
+      {nextStep.eyebrow}
+    </Text>
+
+    <Text style={styles.nextStepTitle}>
+      {nextStep.title}
+    </Text>
+
+    <Text style={styles.nextStepDescription}>
+      {nextStep.description}
+    </Text>
+
+    <TouchableOpacity
+      onPress={() => {
+        setFilter(null);
+        setTab(nextStep.destination);
+      }}
+      style={styles.nextStepButton}
+    >
+      <Text style={styles.nextStepButtonText}>
+        {nextStep.buttonLabel}
+      </Text>
+    </TouchableOpacity>
+  </View>
+)}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
+ 
+  <TouchableOpacity
+    onPress={() => setTab("overview")}
+    style={{
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: tab === "overview" ? "#EAF3DE" : "#fff",
+      borderWidth: 1,
+      borderColor: "#D3D1C7",
+    }}
+  >
+    <Text>overview</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => setTab("company")}
+    style={{
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: tab === "company" ? "#EAF3DE" : "#fff",
+      borderWidth: 1,
+      borderColor: "#D3D1C7",
+    }}
+  >
+    <Text>Company</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => setTab("drivers")}
+    style={{
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: tab === "drivers" ? "#EAF3DE" : "#fff",
+      borderWidth: 1,
+      borderColor: "#D3D1C7",
+    }}
+  >
+    <Text>Drivers</Text>
+  </TouchableOpacity>
+</View>
+
+       
+{tab === "overview" ? (
+  <>
+    <SignalCards
+      overdueCount={od.length}
+      soonCount={sn.length}
+      upcomingCount={up.length}
+      filter={filter}
+      setFilter={setFilter}
+    />
+
+    <View
+      style={{
+        backgroundColor: "#FFFFFF",
+        borderWidth: 1,
+        borderColor: "#E5E3DA",
+        borderRadius: 12,
+        overflow: "hidden",
+      }}
+    >
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingVertical: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: "#E5E3DA",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            fontWeight: "700",
+            color: "#1A1915",
+          }}
+        >
+          Items needing attention
+        </Text>
+
+        <Text
+          style={{
+            marginTop: 4,
+            fontSize: 13,
+            lineHeight: 18,
+            color: "#706E68",
+          }}
+        >
+          Review the item here, then open Company or Drivers to update it.
+        </Text>
+      </View>
+
+      {(filter ? active : exc).length === 0 ? (
+        <View
+          style={{
+            padding: 20,
+            alignItems: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: "#27500A",
+            }}
+          >
+            Nothing needs attention
+          </Text>
+
+          <Text
+            style={{
+              marginTop: 4,
+              fontSize: 13,
+              color: "#706E68",
+              textAlign: "center",
+            }}
+          >
+            Your current compliance items are outside the alert windows.
+          </Text>
+        </View>
+      ) : (
+        (filter ? active : exc).map((item, index) => {
+          const isDriverItem = String(item.id).startsWith("driver-");
+          const itemUrgency = urgency(item);
+
+          const daysRemaining =
+        item.due ? daysFrom(item.due) : null;
+
+                const statusText =
+        itemUrgency === "od"
+          ? "Overdue"
+          : daysRemaining === 0
+            ? "Due today"
+            : itemUrgency === "sn"
+              ? "Due soon"
+              : "Upcoming";
+
+          const statusColor =
+            itemUrgency === "od"
+              ? "#A32D2D"
+              : itemUrgency === "sn"
+                ? "#854F0B"
+                : "#185FA5";
+
+          const statusBackground =
+            itemUrgency === "od"
+              ? "#FCEBEB"
+              : itemUrgency === "sn"
+                ? "#FAEEDA"
+                : "#E6F1FB";
+
+          return (
+            <View
+              key={String(item.id)}
+              style={{
+                padding: 16,
+                borderBottomWidth:
+                  index < (filter ? active : exc).length - 1 ? 1 : 0,
+                borderBottomColor: "#E5E3DA",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  gap: 12,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 15,
+                      fontWeight: "600",
+                      color: "#1A1915",
+                      lineHeight: 20,
+                    }}
+                  >
+                    {item.n}
+                  </Text>
+
+                  <Text
+                    style={{
+                      marginTop: 3,
+                      fontSize: 12,
+                      color: "#706E68",
+                    }}
+                  >
+                    {isDriverItem ? "Driver requirement" : "Company requirement"}
+                    {item.due ? ` · Due ${fmtDate(item.due)}` : ""}
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    paddingHorizontal: 9,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                    backgroundColor: statusBackground,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: "700",
+                      color: statusColor,
+                    }}
+                  >
+                    {statusText}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() =>
+                  setTab(isDriverItem ? "drivers" : "company")
+                }
+                style={{
+                  alignSelf: "flex-start",
+                  marginTop: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#D3D1C7",
+                  backgroundColor: "#FFFFFF",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#27500A",
+                  }}
+                >
+                  {isDriverItem
+                    ? "Review in Drivers"
+                    : "Review in Company"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          );
+        })
+      )}
+    </View>
+  </>
+) : tab === "company" ? (
+      <CompanyRequirements
+      items={reqs}
+      onSave={saveDate}
+      onComplete={markComplete}
+      onUndo={markIncomplete}
+      onSetUsdot={setUsdot}
+      onSetApplicable={setApplicable}
+    />
+) : (
+  <DriversPanel />
+)}
+    <TouchableOpacity
+  onPress={() => Linking.openURL("https://docs.google.com/forms/d/e/1FAIpQLSecfl3bMNdqnF1ifBjPui_ftyz1MFz8vudtqcIuXVTghkugbQ/viewform?usp=dialog")}
+  style={{
+    alignSelf: "center",
+    marginTop: 20,
+    marginBottom: 30,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D3D1C7",
+    backgroundColor: "#fff",
+  }}
+>
+  <Text style={{ fontSize: 13, color: "#706E68", fontWeight: "500" }}>
+    Send Feedback
+  </Text>
+</TouchableOpacity>
+    </ScrollView>
+
+  );
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+type SignalCardProps = {
+  count: number;
+  label: string;
+  color: string;
+  bg: string;
+  active: boolean;
+  onPress: () => void;
+};
+
+function SignalCard({
+  count,
+  label,
+  color,
+  bg,
+  active,
+  onPress,
+}: SignalCardProps) {
+  return (
+    <TouchableOpacity onPress={onPress}
+      style={[styles.sigCard, { backgroundColor: bg, borderColor: active ? color : "transparent", borderWidth: active ? 1.5 : 0.5 }]}>
+      <Text style={[styles.sigCount, { color }]}>{count}</Text>
+      <Text style={[styles.sigLabel, { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  container:      { flex:1, backgroundColor:"#FAFAF8" },
+  content:        { padding:16, paddingBottom:40 },
+  center:         { flex:1, alignItems:"center", justifyContent:"center" },
+  loadingText:    { marginTop:12, fontSize:14, color:"#706E68" },
+  header:         { marginBottom:16 },
+  title:          { fontSize:22, fontWeight:"600", color:"#1A1915" },
+  subtitle:       { fontSize:13, color:"#B0AEA8", marginTop:2 },
+  signalRow:      { flexDirection:"row", gap:8, marginBottom:16 },
+  sigCard:        { flex:1, borderRadius:10, padding:12, alignItems:"center", borderWidth:0.5 },
+  sigCount:       { fontSize:26, fontWeight:"600" },
+  sigLabel:       { fontSize:11, fontWeight:"500", marginTop:2 },
+  allClear:       { backgroundColor:"#F1EFF8", borderRadius:10, padding:20, alignItems:"center" },
+  allClearTitle:  { fontSize:16, fontWeight:"600", color:"#1A1915" },
+  allClearSub:    { fontSize:13, color:"#706E68", marginTop:4 },
+  list:           { gap:1, borderRadius:10, overflow:"hidden", borderWidth:0.5, borderColor:"#E0DDD5" },
+  row:            { backgroundColor:"#fff" },
+  rowHeader:      { flexDirection:"row", alignItems:"flex-start", padding:12, gap:12 },
+  rowLeft:        { flex:1 },
+  rowName:        { fontSize:13, fontWeight:"500", color:"#1A1915", lineHeight:18 },
+  rowMeta:        { fontSize:12, color:"#8A8880", marginTop:2 },
+  badge:          { paddingHorizontal:9, paddingVertical:3, borderRadius:10 },
+  badgeText:      { fontSize:12, fontWeight:"500" },
+  detail:         { paddingHorizontal:12, paddingBottom:14, borderTopWidth:0.5, borderColor:"#F0EDE6" },
+  detailNotes:    { fontSize:12, color:"#706E68", lineHeight:18, paddingVertical:8 },
+  detailRow:      { flexDirection:"row", justifyContent:"space-between", paddingVertical:5 },
+  detailLabel:    { fontSize:12, color:"#706E68" },
+  detailValue:    { fontSize:12, fontWeight:"500", color:"#1A1915" },
+  consequence:    { backgroundColor:"#FCEBEB", borderRadius:6, padding:10, marginVertical:8 },
+  consequenceText:{ fontSize:12, color:"#791F1F", lineHeight:17 },
+  completeBtn:    { backgroundColor:"#EAF3DE", borderRadius:6, padding:10, alignItems:"center", marginTop:4 },
+  completeBtnText:{ fontSize:13, fontWeight:"500", color:"#27500A" },
+  undoBtn:        { padding:8, alignItems:"center" },
+  undoBtnText:    { fontSize:12, color:"#3B6D11", textDecorationLine:"underline" },
+    
+  nextStepEyebrow: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#3B6D11",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  nextStepTitle: {
+    marginTop: 6,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: "700",
+    color: "#1A1915",
+  },
+
+  nextStepDescription: {
+    marginTop: 7,
+    fontSize: 14,
+    lineHeight: 20,
+    color: "#5F5D57",
+  },
+
+  nextStepButton: {
+    alignSelf: "flex-start",
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#27500A",
+  },
+
+  nextStepButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  nextStepCard: {
+    backgroundColor: "#F1F6EC",
+    borderWidth: 1,
+    borderColor: "#D6E4C9",
+    borderRadius: 14,
+    padding: 18,
+    paddingRight: 48,
+    marginBottom: 16,
+    position: "relative",
+},
+  nextStepCloseButton: {
+  position: "absolute",
+  top: 8,
+  right: 8,
+  width: 34,
+  height: 34,
+  borderRadius: 17,
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1,
+},
+
+nextStepCloseText: {
+  fontSize: 24,
+  lineHeight: 26,
+  fontWeight: "400",
+  color: "#706E68",
+},
+
+});

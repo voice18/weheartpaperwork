@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "We Heart Paperwork",
+    "slug": "weheartpaperwork",
+    "version": "1.0.0",
+    "scheme": "weheartpaperwork",
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "output": "static"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.weheartpaperwork.app",
+      "googleServicesFile": "./GoogleService-Info.plist"
+    },
+    "android": {
+      "package": "com.weheartpaperwork.app",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#27500A"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#27500A",
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a80da581-6fc9-4032-bdb8-150154d3c72e"
+      }
+    },
+    "owner": "weheartpaperwork",
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/a80da581-6fc9-4032-bdb8-150154d3c72e"
+    }
+  }
+}

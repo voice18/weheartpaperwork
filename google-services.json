@@ -1,0 +1,82 @@
+{
+  "project_info": {
+    "project_number": "1037743970765",
+    "project_id": "dot-compliance-dashboard",
+    "storage_bucket": "dot-compliance-dashboard.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1037743970765:android:77fd01025ae21689a18c84",
+        "android_client_info": {
+          "package_name": "com.dotcompliance.dotdash"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1037743970765-etk0a9guih5ttc41s87ftqblmurd2mtq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACeakq3pEbm_9JcDv0u1cK9kU2hXs5eV8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1037743970765-etk0a9guih5ttc41s87ftqblmurd2mtq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1037743970765-8c7oe3lhiup87qos54majuiocdpvp01h.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dotcompliance.dotdashboard"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1037743970765:android:1fabd2c879fb73a6a18c84",
+        "android_client_info": {
+          "package_name": "com.weheartpaperwork.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1037743970765-etk0a9guih5ttc41s87ftqblmurd2mtq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACeakq3pEbm_9JcDv0u1cK9kU2hXs5eV8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1037743970765-etk0a9guih5ttc41s87ftqblmurd2mtq.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1037743970765-8c7oe3lhiup87qos54majuiocdpvp01h.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dotcompliance.dotdashboard"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
