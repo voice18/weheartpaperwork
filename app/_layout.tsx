@@ -2,6 +2,7 @@
 // Root layout — initializes Firebase auth listener and notification routing.
 
 import { useCallback, useEffect, useRef } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import {
   Stack,
   useRootNavigationState,
@@ -173,9 +174,10 @@ export default function RootLayout() {
   }, [navigationReady, openDashboard]);
 
   return (
+  <SafeAreaProvider>
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(app)" />
     </Stack>
-  );
-}
+  </SafeAreaProvider>
+);
