@@ -9,6 +9,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
 StyleSheet, Platform, ActivityIndicator, Button, Linking,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useComplianceStore }            from "../../../store/useComplianceStore";
 import {
   buildReqs,
@@ -289,8 +290,12 @@ const allReqs = [...reqs, ...visibleDriverReqs];
     };
   })();
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.content}
+        >
       {/* Header */}
           <DashboardHeader
       companyName={companyName}
@@ -613,6 +618,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
   </Text>
 </TouchableOpacity>
     </ScrollView>
+    </SafeAreaView>
 
   );
 }
@@ -651,7 +657,7 @@ function SignalCard({
 
 const styles = StyleSheet.create({
   container:      { flex:1, backgroundColor:"#FAFAF8" },
-  content:        { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 28},
+  content:        { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 12},
   center:         { flex:1, alignItems:"center", justifyContent:"center" },
   loadingText:    { marginTop:12, fontSize:14, color:"#706E68" },
   header:         { marginBottom:16 },
