@@ -37,10 +37,9 @@ import PaywallCard from "./components/PaywallCard";
 
 
 export default function DashboardScreen() {
-  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-  console.log("DASHBOARD SAFE AREA:", insets);
   const params = useLocalSearchParams<{
   alertType?: string;
   itemIds?: string;
@@ -294,13 +293,16 @@ const allReqs = [...reqs, ...visibleDriverReqs];
   })();
 
       return (
-          <ScrollView
-      style={styles.container}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: insets.top + 12 },
-      ]}
-    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + 12,
+            paddingBottom: insets.bottom + 40,
+          },
+        ]}
+      >
       {/* Header */}
           <DashboardHeader
       companyName={companyName}
@@ -661,7 +663,7 @@ function SignalCard({
 
 const styles = StyleSheet.create({
   container:      { flex:1, backgroundColor:"#FAFAF8" },
-  content:        { paddingHorizontal: 16, paddingBottom: 40 },
+  content:        { paddingHorizontal: 16, },
   center:         { flex:1, alignItems:"center", justifyContent:"center" },
   loadingText:    { marginTop:12, fontSize:14, color:"#706E68" },
   header:         { marginBottom:16 },
