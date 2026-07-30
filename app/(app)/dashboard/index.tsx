@@ -39,6 +39,8 @@ import PaywallCard from "./components/PaywallCard";
 export default function DashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  console.log("DASHBOARD SAFE AREA:", insets);
   const params = useLocalSearchParams<{
   alertType?: string;
   itemIds?: string;
