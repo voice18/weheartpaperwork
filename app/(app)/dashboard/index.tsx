@@ -19,7 +19,6 @@ import {
 } from "../../../lib/requirements";
 import { useEffect, useState  }                      from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { signOut } from "firebase/auth";
 import DashboardHeader from "./components/DashboardHeader";
 import SignalCards from "./components/SignalCards";
 import RequirementRow from "./components/RequirementRow";
@@ -139,10 +138,6 @@ export default function DashboardScreen() {
   }
 };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/(auth)/login");
-  };
 
   if (subscriptionStatus !== "active") {
   return (
@@ -300,7 +295,6 @@ const allReqs = [...reqs, ...visibleDriverReqs];
           <DashboardHeader
       companyName={companyName}
       usdotNumber={usdotNumber}
-      onLogout={handleLogout}
     />
 
       {showNextStep && (
@@ -657,7 +651,7 @@ function SignalCard({
 
 const styles = StyleSheet.create({
   container:      { flex:1, backgroundColor:"#FAFAF8" },
-  content:        { padding:16, paddingBottom:40 },
+  content:        { paddingHorizontal: 16, paddingBottom: 40, paddingTop: 28},
   center:         { flex:1, alignItems:"center", justifyContent:"center" },
   loadingText:    { marginTop:12, fontSize:14, color:"#706E68" },
   header:         { marginBottom:16 },

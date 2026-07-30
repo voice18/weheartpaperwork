@@ -1,6 +1,18 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity } from "react-native";
-import { formatDateInput } from "../../../../lib/dateUtils";
+import {
+  Alert,
+  Platform,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+} from "react-native";
+import {
+  formatDateInput,
+  inputToIso,
+  isoToInput,
+} from "../../../../lib/dateUtils";
+import { useComplianceHistory } from "../../../../store/useComplianceHistory";
 import {
   addDays,
   addYears,
@@ -10,10 +22,15 @@ import {
 type Props = {
   label: string;
   value: string;
+  driverId: string;
+  requirementId: "medical" | "mvr" | "clearinghouse";
   years?: number;
   days?: number;
   onChange: (value: string) => void;
-  onMarkComplete?: (nextDue: string) => void;
+  onMarkComplete?: (
+    completionDate: string,
+    nextDueDate: string
+  ) => void;
 };
 
 
@@ -77,6 +94,8 @@ function getBadge(daysLeft: number | null) {
 export default function DriverRenewalField({
   label,
   value,
+  driverId,
+  requirementId,
   years = 0,
   days = 0,
   onChange,
@@ -88,7 +107,91 @@ export default function DriverRenewalField({
   const badge = getBadge(daysLeft);
   const today = localDateString();
   const [confirming, setConfirming] = useState(false);
-  const [completionDate, setCompletionDate] = useState(today);
+
+const [completionDate, setCompletionDate] = useState(
+  isoToInput(today)
+);
+
+const [historyOpen, setHistoryOpen] = useState(false);
+
+const [deletingRecordId, setDeletingRecordId] =
+  useState<string | null>(null);
+
+const {
+  records: historyRecords,
+  loading: historyLoading,
+  error: historyError,
+  deleteRecord,
+} = useComplianceHistory(
+  requirementId,
+  driverId
+);
+
+  async function handleHistoryRecordMenu(
+  recordId: string,
+  displayDate: string
+) {
+  if (Platform.OS === "web") {
+    const confirmed = window.confirm(
+      `Delete the completion record dated ${displayDate}? This cannot be undone.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingRecordId(recordId);
+      await deleteRecord(recordId);
+    } catch (error) {
+      console.log(
+        "Delete driver compliance record failed:",
+        error
+      );
+
+      window.alert(
+        "Could not delete the compliance record. Please try again."
+      );
+    } finally {
+      setDeletingRecordId(null);
+    }
+
+    return;
+  }
+
+  Alert.alert(
+    "Compliance record",
+    displayDate,
+    [
+      {
+        text: "Delete record",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeletingRecordId(recordId);
+            await deleteRecord(recordId);
+          } catch (error) {
+            console.log(
+              "Delete driver compliance record failed:",
+              error
+            );
+
+            Alert.alert(
+              "Could not delete record",
+              "Please try again."
+            );
+          } finally {
+            setDeletingRecordId(null);
+          }
+        },
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+    ]
+  );
+}
 
   return (
     <View style={{ marginBottom: 14 }}>
@@ -106,9 +209,14 @@ export default function DriverRenewalField({
   }}
 >
         <TextInput
-          placeholder="YYYY-MM-DD"
-          value={value}
-          onChangeText={(text) => onChange(formatDateInput(text))}
+        placeholder="MM-DD-YYYY"
+        value={isoToInput(value)}
+        onChangeText={(text) => {
+          const formatted = formatDateInput(text);
+          const isoDate = inputToIso(formatted);
+
+          onChange(isoDate || formatted);
+        }}
           style={{
             width: 160,
             backgroundColor: "#fff",
@@ -135,13 +243,15 @@ export default function DriverRenewalField({
       </View>
 
       <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
-        Format: YYYY-MM-DD
-        {nextDue ? ` · Next due: ${nextDue}` : ""}
+        Format: MM-DD-YYYY
+{nextDue ? ` · Next due: ${isoToInput(nextDue)}` : ""}
       </Text>
       {nextDue && onMarkComplete ? (
   <TouchableOpacity
     onPress={() => {
-  setCompletionDate(today);
+      setCompletionDate(
+      isoToInput(today)
+    );
   setConfirming(true);
     }}
     style={{
@@ -167,7 +277,7 @@ export default function DriverRenewalField({
     </Text>
 
     <TextInput
-      placeholder="YYYY-MM-DD"
+      placeholder="MM-DD-YYYY"
       value={completionDate}
       onChangeText={(text) => setCompletionDate(formatDateInput(text))}
       style={{
@@ -198,11 +308,34 @@ export default function DriverRenewalField({
 
       <TouchableOpacity
         onPress={() => {
-          if (!completionDate || !onMarkComplete) return;
-          const confirmedNextDue = addInterval(completionDate, years, days);
-          if (!confirmedNextDue) return;
-          onMarkComplete(completionDate);
-          setConfirming(false);
+          if (!completionDate || !onMarkComplete) {
+            return;
+          }
+
+          const isoCompletionDate =
+            inputToIso(completionDate);
+
+          if (!isoCompletionDate) {
+            return;
+          }
+
+          const confirmedNextDue =
+            addInterval(
+              isoCompletionDate,
+              years,
+              days
+            );
+
+          if (!confirmedNextDue) {
+            return;
+          }
+
+          onMarkComplete(
+          isoCompletionDate,
+          confirmedNextDue
+        );
+
+        setConfirming(false);
         }}
         style={{
           paddingHorizontal: 12,
@@ -220,6 +353,246 @@ export default function DriverRenewalField({
     </View>
   </View>
 ) : null}
+<TouchableOpacity
+  onPress={() =>
+    setHistoryOpen(
+      current => !current
+    )
+  }
+  activeOpacity={0.8}
+  style={{
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D3D1C7",
+    backgroundColor: "#FFFFFF",
+  }}
+>
+  <Text
+    style={{
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#27500A",
+    }}
+  >
+    {historyOpen
+      ? "Hide compliance record"
+      : `Compliance record${
+          historyRecords.length > 0
+            ? ` (${historyRecords.length})`
+            : ""
+        }`}
+  </Text>
+</TouchableOpacity>
+
+{historyOpen && (
+  <View
+    style={{
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "#E2E0D8",
+      backgroundColor: "#FAFAF8",
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#1A1915",
+        marginBottom: 10,
+      }}
+    >
+      Compliance record
+    </Text>
+
+    {historyLoading && (
+      <Text
+        style={{
+          fontSize: 12,
+          color: "#706E68",
+        }}
+      >
+        Loading records...
+      </Text>
+    )}
+
+    {!historyLoading &&
+      historyError && (
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#A32D2D",
+          }}
+        >
+          Could not load the compliance record.
+        </Text>
+      )}
+
+    {!historyLoading &&
+      !historyError &&
+      historyRecords.length === 0 && (
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#706E68",
+          }}
+        >
+          No completion records yet.
+        </Text>
+      )}
+
+    {!historyLoading &&
+      !historyError &&
+      historyRecords.map(
+        (record, index) => {
+          const displayDate =
+            record.completionDate
+              ? isoToInput(
+                  record.completionDate
+                )
+              : record.completedAt
+                ? record.completedAt.toLocaleDateString(
+                    "en-US"
+                  )
+                : "Completion date unavailable";
+
+          return (
+            <View
+              key={record.id}
+              style={{
+                paddingTop:
+                  index === 0 ? 0 : 10,
+                paddingBottom: 10,
+                borderTopWidth:
+                  index === 0 ? 0 : 1,
+                borderTopColor:
+                  "#E2E0D8",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent:
+                    "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: "#1A1915",
+                    flex: 1,
+                  }}
+                >
+                  {displayDate}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() =>
+                    handleHistoryRecordMenu(
+                      record.id,
+                      displayDate
+                    )
+                  }
+                  disabled={
+                    deletingRecordId ===
+                    record.id
+                  }
+                  activeOpacity={0.7}
+                  style={{
+                    width: 32,
+                    height: 32,
+                    marginLeft: 8,
+                    borderRadius: 16,
+                    alignItems: "center",
+                    justifyContent:
+                      "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 22,
+                      lineHeight: 24,
+                      color: "#706E68",
+                      opacity:
+                        deletingRecordId ===
+                        record.id
+                          ? 0.4
+                          : 1,
+                    }}
+                  >
+                    ⋮
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text
+                style={{
+                  marginTop: 3,
+                  fontSize: 12,
+                  color: "#706E68",
+                }}
+              >
+                Completed by{" "}
+                {record.completedByName}
+              </Text>
+
+              {record.nextDueDate && (
+                <Text
+                  style={{
+                    marginTop: 3,
+                    fontSize: 12,
+                    color: "#706E68",
+                  }}
+                >
+                  Next due:{" "}
+                  {isoToInput(
+                    record.nextDueDate
+                  )}
+                </Text>
+              )}
+
+              {record.note && (
+                <Text
+                  style={{
+                    marginTop: 5,
+                    fontSize: 12,
+                    color: "#45433F",
+                  }}
+                >
+                  {record.note}
+                </Text>
+              )}
+
+              {record.files &&
+                Array.isArray(
+                  record.files
+                ) &&
+                record.files.length > 0 && (
+                  <Text
+                    style={{
+                      marginTop: 5,
+                      fontSize: 12,
+                      color: "#185FA5",
+                      fontWeight: "600",
+                    }}
+                  >
+                    Attachments:{" "}
+                    {record.files.length}
+                  </Text>
+                )}
+            </View>
+          );
+        }
+      )}
+  </View>
+)}
     </View>
     
   );

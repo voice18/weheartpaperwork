@@ -6,11 +6,18 @@
 
 import { create }            from "zustand";
 import {
-  doc, getDoc, setDoc, updateDoc,
-  collection, getDocs, onSnapshot,
-  serverTimestamp, Timestamp,
-}                            from "firebase/firestore";
-import { db }                from "../lib/firebase";
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  collection,
+  getDocs,
+  onSnapshot,
+  serverTimestamp,
+  Timestamp,
+  writeBatch,
+} from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
 import type { ComplianceRecord, RequirementId } from "../lib/types";
 import { calcUsdotDue } from "../lib/requirements";
 
@@ -43,7 +50,10 @@ interface StoreState {
   init:             (carrierId: string) => () => void;
   setUsdot:        (num: string) => void;
   saveDate:        (reqId: RequirementId, enteredDate: string, dueDate: string) => Promise<void>;
-  markComplete: (reqId: RequirementId, visibleDue?: string | null) => Promise<void>;
+  markComplete: (
+  reqId: RequirementId,
+  completionDate?: string | null
+) => Promise<void>;
   markIncomplete:  (reqId: RequirementId) => Promise<void>;
   setApplicable: ( reqId: RequirementId, applicable: boolean) => Promise<void>;
 }
@@ -55,6 +65,7 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
   compliance:  {},
   loading:     true,
   error:       null,
+
 
   // ── init ───────────────────────────────────────────────────────────────────
   // Call once after auth — sets up a real-time Firestore listener so the UI
@@ -166,143 +177,277 @@ async setApplicable(
 },
 
   // ── markComplete ───────────────────────────────────────────────────────────
- async markComplete(reqId, visibleDue = null) {
+ // ── markComplete ───────────────────────────────────────────────────────────
+async markComplete(reqId, completionDate = null) {
   const { carrierId, compliance } = get();
-  if (!carrierId) return;
 
-  const ref = doc(db, "carriers", carrierId, "compliance", reqId);
-  
-
-if (reqId === "mcs150") {
-  const currentDue =
-    compliance[reqId]?.dueDate ||
-    visibleDue;
-
-  if (currentDue) {
-    const d = new Date(currentDue + "T00:00:00");
-    d.setFullYear(d.getFullYear() + 2);
-
-    await setDoc(ref, {
-      enteredDate: visibleDue,
-      dueDate: d.toISOString().split("T")[0],
-      completed: false,
-      completedAt: null,
-      lastUpdated: serverTimestamp(),
-    }, { merge: true });
-
+  if (!carrierId) {
     return;
   }
-}
 
+  const user = auth.currentUser;
 
-if (reqId === "irp") {
-  const currentDue =
-    compliance[reqId]?.dueDate ||
-    compliance[reqId]?.enteredDate;
+  const complianceRef = doc(
+    db,
+    "carriers",
+    carrierId,
+    "compliance",
+    reqId
+  );
 
-  if (!currentDue) return;
+  const recordRef = doc(
+  collection(
+    db,
+    "carriers",
+    carrierId,
+    "complianceRecords",
+    reqId,
+    "history"
+  )
+);
 
-  const d = new Date(currentDue + "T00:00:00");
-  d.setFullYear(d.getFullYear() + 1);
+  let complianceUpdate: Record<string, unknown>;
+  let previousDueDate: string | null = null;
+  let nextDueDate: string | null = null;
 
-  await setDoc(ref, {
-    enteredDate: currentDue,
-    dueDate: d.toISOString().split("T")[0],
-    completed: false,
-    completedAt: null,
-    lastUpdated: serverTimestamp(),
-  }, { merge: true });
+  if (reqId === "mcs150") {
+    const currentDue =
+      compliance[reqId]?.dueDate ||
+      completionDate;
 
-  return;
-}
+    if (!currentDue) {
+      return;
+    }
 
-const fixedCalendarIds: RequirementId[] = [
-  "tax2290",
-  "ucr",
-  "ifta",
-];
+    const d = new Date(
+      currentDue + "T00:00:00"
+    );
 
-if (fixedCalendarIds.includes(reqId)) {
-  const currentDue =
-    compliance[reqId]?.dueDate ||
-    compliance[reqId]?.enteredDate;
+    d.setFullYear(
+      d.getFullYear() + 2
+    );
 
-  if (!currentDue) return;
+    previousDueDate = currentDue;
+    nextDueDate =
+      d.toISOString().split("T")[0];
 
-  const [year, month, day] = currentDue
-    .split("-")
-    .map(Number);
-
-  const nextDueDate =
-    `${year + 1}-` +
-    `${String(month).padStart(2, "0")}-` +
-    `${String(day).padStart(2, "0")}`;
-
-  await setDoc(
-    ref,
-    {
-      previousDueDate: currentDue,
+    complianceUpdate = {
+      enteredDate: completionDate,
       dueDate: nextDueDate,
-
-      completed: true,
-      completedDate: visibleDue || null,
-      completedAt: serverTimestamp(),
-
+      completed: false,
+      completedAt: null,
       lastUpdated: serverTimestamp(),
       notified30: false,
       notified90: false,
-    },
-    { merge: true }
-  );
+    };
+  } else if (reqId === "irp") {
+    const currentDue =
+      compliance[reqId]?.dueDate ||
+      compliance[reqId]?.enteredDate;
 
-  return;
-}
-  const renewalRules: Record<
-  string,
-  { years?: number; days?: number }
-> = {
-  clearinghouse: { years: 1 },
-  mvr: { years: 1 },
-  "fmcsa-portal": { days: 90 },
-  inspection: { years: 1 },
-  medical: { years: 2 },
-  drug: { years: 1 },
-};
-
-  const rule = renewalRules[reqId];
-
-  const currentDue =
-    visibleDue ||
-    compliance[reqId]?.dueDate ||
-    compliance[reqId]?.enteredDate;
-
-  if (rule && currentDue) {
-    const d = new Date(currentDue + "T00:00:00");
-
-    if (rule.years) {
-      d.setFullYear(d.getFullYear() + rule.years);
+    if (!currentDue) {
+      return;
     }
 
-    if (rule.days) {
-      d.setDate(d.getDate() + rule.days);
-    }
+    const d = new Date(
+      currentDue + "T00:00:00"
+    );
 
-    await setDoc(ref, {
+    d.setFullYear(
+      d.getFullYear() + 1
+    );
+
+    previousDueDate = currentDue;
+    nextDueDate =
+      d.toISOString().split("T")[0];
+
+    complianceUpdate = {
       enteredDate: currentDue,
-      dueDate: d.toISOString().split("T")[0],
+      dueDate: nextDueDate,
       completed: false,
       completedAt: null,
       lastUpdated: serverTimestamp(),
-    }, { merge: true });
+      notified30: false,
+      notified90: false,
+    };
+  } else {
+    const fixedCalendarIds: RequirementId[] = [
+      "tax2290",
+      "ucr",
+      "ifta",
+    ];
 
-    return;
+          if (fixedCalendarIds.includes(reqId)) {
+        const currentDue =
+          compliance[reqId]?.dueDate ||
+          compliance[reqId]?.enteredDate ||
+          fixedCalendarDueDate(reqId);
+
+        if (!currentDue) {
+          return;
+        }
+
+      const [year, month, day] =
+        currentDue
+          .split("-")
+          .map(Number);
+
+      nextDueDate =
+        `${year + 1}-` +
+        `${String(month).padStart(2, "0")}-` +
+        `${String(day).padStart(2, "0")}`;
+
+      previousDueDate = currentDue;
+
+      complianceUpdate = {
+        previousDueDate: currentDue,
+        dueDate: nextDueDate,
+
+        completed: true,
+        completedDate:
+          completionDate || null,
+        completedAt:
+          serverTimestamp(),
+
+        lastUpdated:
+          serverTimestamp(),
+        notified30: false,
+        notified90: false,
+      };
+    } else {
+      const renewalRules: Record<
+        string,
+        {
+          years?: number;
+          days?: number;
+        }
+      > = {
+        clearinghouse: {
+          years: 1,
+        },
+        mvr: {
+          years: 1,
+        },
+        "fmcsa-portal": {
+          days: 90,
+        },
+        inspection: {
+          years: 1,
+        },
+        medical: {
+          years: 2,
+        },
+        drug: {
+          years: 1,
+        },
+      };
+
+      const rule =
+        renewalRules[reqId];
+
+      const currentDue =
+        completionDate ||
+        compliance[reqId]?.dueDate ||
+        compliance[reqId]?.enteredDate;
+
+      if (rule && currentDue) {
+        const d = new Date(
+          currentDue + "T00:00:00"
+        );
+
+        if (rule.years) {
+          d.setFullYear(
+            d.getFullYear() +
+              rule.years
+          );
+        }
+
+        if (rule.days) {
+          d.setDate(
+            d.getDate() +
+              rule.days
+          );
+        }
+
+        previousDueDate =
+          compliance[reqId]?.dueDate ||
+          compliance[reqId]?.enteredDate ||
+          null;
+
+        nextDueDate =
+          d.toISOString().split("T")[0];
+
+        complianceUpdate = {
+          enteredDate: currentDue,
+          dueDate: nextDueDate,
+          completed: false,
+          completedAt: null,
+          lastUpdated:
+            serverTimestamp(),
+          notified30: false,
+          notified90: false,
+        };
+      } else {
+        previousDueDate =
+          compliance[reqId]?.dueDate ||
+          null;
+
+        complianceUpdate = {
+          completed: true,
+          completedDate:
+            completionDate || null,
+          completedAt:
+            serverTimestamp(),
+          lastUpdated:
+            serverTimestamp(),
+        };
+      }
+    }
   }
 
-  await setDoc(ref, {
-    completed: true,
-    completedAt: serverTimestamp(),
-    lastUpdated: serverTimestamp(),
-  }, { merge: true });
+  const batch = writeBatch(db);
+
+  batch.set(
+    recordRef,
+    {
+      recordType: "completion",
+      requirementId: reqId,
+      carrierId,
+
+      completionDate:
+        completionDate || null,
+      completedAt:
+        serverTimestamp(),
+
+      completedByUserId:
+        user?.uid || null,
+      completedByName:
+        user?.displayName ||
+        user?.email ||
+        "Account owner",
+
+      previousDueDate,
+      nextDueDate,
+
+      note: null,
+      file: null,
+
+
+      source: "company",
+      createdAt:
+        serverTimestamp(),
+    }
+  );
+
+  batch.set(
+    complianceRef,
+    complianceUpdate,
+    {
+      merge: true,
+    }
+  );
+
+  await batch.commit();
 },
   // ── markIncomplete (undo) ──────────────────────────────────────────────────
  async markIncomplete(reqId) {

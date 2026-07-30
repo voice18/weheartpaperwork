@@ -1,5 +1,8 @@
 import { useState } from "react";
 import {
+  useComplianceHistory,
+} from "../../../../store/useComplianceHistory";
+import {
   Alert,
   Platform,
   Text,
@@ -16,7 +19,11 @@ import {
   localDateString,
   urgency,
 } from "../../../../lib/requirements";
-import { formatDateInput } from "../../../../lib/dateUtils";
+import {
+  formatDateInput,
+  inputToIso,
+  isoToInput,
+} from "../../../../lib/dateUtils";
 
 type RequirementRowProps = {
   r: any;
@@ -51,6 +58,23 @@ export default function RequirementRow({
 }: RequirementRowProps) {
   const [open, setOpen] =
     useState(false);
+const [
+  historyOpen,
+  setHistoryOpen,
+] = useState(false);
+const [
+  deletingRecordId,
+  setDeletingRecordId,
+] = useState<string | null>(null);
+
+const {
+  records: historyRecords,
+  loading: historyLoading,
+  error: historyError,
+  deleteRecord,
+} = useComplianceHistory(
+  String(r.id)
+);
 
   const [
     confirmingComplete,
@@ -58,18 +82,18 @@ export default function RequirementRow({
   ] = useState(false);
 
   const [
-    completionDate,
-    setCompletionDate,
-  ] = useState(() =>
-    localDateString()
-  );
+  completionDate,
+  setCompletionDate,
+] = useState(() =>
+  isoToInput(localDateString())
+);
 
   const [
-    enteredDate,
-    setEnteredDate,
-  ] = useState(
-    r.enteredDate || ""
-  );
+  enteredDate,
+  setEnteredDate,
+] = useState(
+  isoToInput(r.enteredDate || "")
+);
 
   const [
     usdotInput,
@@ -181,42 +205,170 @@ export default function RequirementRow({
 }
 
   function handleSaveDate() {
-    if (!enteredDate) {
-      return;
-    }
+  const isoDate = inputToIso(enteredDate);
 
-    const nextDue =
-      calculateNextDue(
-        r.id,
-        enteredDate
-      );
-
-    if (!nextDue) {
-      return;
-    }
-
-    onSave(
-      r.id,
-      enteredDate,
-      nextDue
-    );
+  if (!isoDate) {
+    return;
   }
+
+  const nextDue =
+    calculateNextDue(
+      r.id,
+      isoDate
+    );
+
+  if (!nextDue) {
+    return;
+  }
+
+  onSave(
+    r.id,
+    isoDate,
+    nextDue
+  );
+}
+
+function handleDeleteHistoryRecord(
+  recordId: string,
+  displayDate: string
+) {
+  Alert.alert(
+    "Delete compliance record?",
+    `Delete the completion record dated ${displayDate}? This cannot be undone.`,
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            setDeletingRecordId(
+              recordId
+            );
+
+            await deleteRecord(
+              recordId
+            );
+          } catch (error) {
+            console.log(
+              "Delete compliance record failed:",
+              error
+            );
+
+            Alert.alert(
+              "Could not delete record",
+              "Please try again."
+            );
+          } finally {
+            setDeletingRecordId(
+              null
+            );
+          }
+        },
+      },
+    ]
+  );
+}
 
   function handleConfirmCompletion() {
-    if (!completionDate) {
+  const isoDate = inputToIso(completionDate);
+
+  if (!isoDate) {
+    return;
+  }
+
+  onComplete(
+    r.id,
+    isoDate
+  );
+
+  setConfirmingComplete(false);
+}
+async function handleHistoryRecordMenu(
+  recordId: string,
+  displayDate: string
+) {
+  if (Platform.OS === "web") {
+    const confirmed = window.confirm(
+      `Delete the completion record dated ${displayDate}? This cannot be undone.`
+    );
+
+    if (!confirmed) {
       return;
     }
 
-    onComplete(
-      r.id,
-      completionDate
-    );
+    try {
+      setDeletingRecordId(recordId);
+      await deleteRecord(recordId);
+    } catch (error) {
+      console.log(
+        "Delete compliance record failed:",
+        error
+      );
 
-    setConfirmingComplete(
-      false
-    );
+      window.alert(
+        "Could not delete the compliance record. Please try again."
+      );
+    } finally {
+      setDeletingRecordId(null);
+    }
+
+    return;
   }
 
+  Alert.alert(
+    "Compliance record",
+    displayDate,
+    [
+      {
+        text: "Delete record",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            "Delete compliance record?",
+            `Delete the completion record dated ${displayDate}? This cannot be undone.`,
+            [
+              {
+                text: "Cancel",
+                style: "cancel",
+              },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    setDeletingRecordId(recordId);
+                    await deleteRecord(recordId);
+                  } catch (error) {
+                    console.log(
+                      "Delete compliance record failed:",
+                      error
+                    );
+
+                    Alert.alert(
+                      "Could not delete record",
+                      "Please try again."
+                    );
+                  } finally {
+                    setDeletingRecordId(null);
+                  }
+                },
+              },
+            ]
+          );
+        },
+      },
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+    ]
+  );
+}
+ 
   return (
     <View
       style={{
@@ -611,7 +763,7 @@ export default function RequirementRow({
                     </Text>
 
                     <TextInput
-                      placeholder="YYYY-MM-DD"
+                      placeholder="MM-DD-YYYY"
                       value={
                         enteredDate
                       }
@@ -643,7 +795,7 @@ export default function RequirementRow({
                       }}
                     >
                       Format:
-                      YYYY-MM-DD
+                      MM-DD-YYYY
                     </Text>
 
                     <TouchableOpacity
@@ -737,7 +889,7 @@ export default function RequirementRow({
                   </Text>
 
                   <TextInput
-                    placeholder="YYYY-MM-DD"
+                    placeholder="MM-DD-YYYY"
                     value={
                       completionDate
                     }
@@ -843,11 +995,11 @@ export default function RequirementRow({
                   <TouchableOpacity
                     onPress={() => {
                       setCompletionDate(
-                        localDateString()
-                      );
-                      setConfirmingComplete(
-                        true
-                      );
+                      isoToInput(localDateString())
+                    );
+                    setConfirmingComplete(
+                      true
+                    );
                     }}
                     activeOpacity={0.8}
                     style={{
@@ -935,6 +1087,231 @@ export default function RequirementRow({
                   </TouchableOpacity>
                 </View>
               )}
+
+              <TouchableOpacity
+  onPress={() =>
+    setHistoryOpen(
+      current => !current
+    )
+  }
+  activeOpacity={0.8}
+  style={{
+    alignSelf: "flex-start",
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#D3D1C7",
+    backgroundColor: "#FFFFFF",
+  }}
+>
+  <Text
+    style={{
+      fontSize: 12,
+      fontWeight: "700",
+      color: "#27500A",
+    }}
+  >
+    {historyOpen
+      ? "Hide compliance record"
+      : `Compliance record${
+          historyRecords.length > 0
+            ? ` (${historyRecords.length})`
+            : ""
+        }`}
+  </Text>
+</TouchableOpacity>
+
+{historyOpen && (
+  <View
+    style={{
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "#E2E0D8",
+      backgroundColor: "#FAFAF8",
+    }}
+  >
+    <Text
+      style={{
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#1A1915",
+        marginBottom: 10,
+      }}
+    >
+      Compliance record
+    </Text>
+
+    {historyLoading && (
+      <Text
+        style={{
+          fontSize: 12,
+          color: "#706E68",
+        }}
+      >
+        Loading records...
+      </Text>
+    )}
+
+    {!historyLoading &&
+      historyError && (
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#A32D2D",
+          }}
+        >
+          Could not load the
+          compliance record.
+        </Text>
+      )}
+
+    {!historyLoading &&
+      !historyError &&
+      historyRecords.length === 0 && (
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#706E68",
+          }}
+        >
+          No completion records yet.
+        </Text>
+      )}
+
+    {!historyLoading &&
+      !historyError &&
+      historyRecords.map(
+        (record, index) => {
+          const displayDate =
+            record.completionDate
+              ? fmtDate(
+                  record.completionDate
+                )
+              : record.completedAt
+                ? record.completedAt.toLocaleDateString(
+                    "en-US",
+                    {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    }
+                  )
+                : "Completion date unavailable";
+
+          return (
+            <View
+              key={record.id}
+              style={{
+                paddingTop:
+                  index === 0 ? 0 : 10,
+                paddingBottom: 10,
+                borderTopWidth:
+                  index === 0 ? 0 : 1,
+                borderTopColor:
+                  "#E2E0D8",
+              }}
+            >
+              <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "700",
+              color: "#1A1915",
+              flex: 1,
+            }}
+          >
+            {displayDate}
+          </Text>
+
+          <TouchableOpacity
+            onPress={() =>
+              handleHistoryRecordMenu(
+                record.id,
+                displayDate
+              )
+            }
+            disabled={
+              deletingRecordId === record.id
+            }
+            activeOpacity={0.7}
+            style={{
+              width: 32,
+              height: 32,
+              marginLeft: 8,
+              borderRadius: 16,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 22,
+                lineHeight: 24,
+                color: "#706E68",
+                opacity:
+                  deletingRecordId === record.id
+                    ? 0.4
+                    : 1,
+              }}
+            >
+              ⋮
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text
+          style={{
+            marginTop: 3,
+            fontSize: 12,
+            color: "#706E68",
+          }}
+        >
+          Completed by{" "}
+          {record.completedByName}
+        </Text>
+
+              {record.note && (
+                <Text
+                  style={{
+                    marginTop: 5,
+                    fontSize: 12,
+                    color: "#45433F",
+                  }}
+                >
+                  {record.note}
+                </Text>
+              )}
+
+              {record.file?.name && (
+                <Text
+                  style={{
+                    marginTop: 5,
+                    fontSize: 12,
+                    color: "#185FA5",
+                    fontWeight: "600",
+                  }}
+                >
+                  Attached:{" "}
+                  {record.file.name}
+                </Text>
+              )}
+              
+            </View>
+          );
+        }
+      )}
+  </View>
+)}
 
               {r.canBeNotApplicable &&
                 !String(

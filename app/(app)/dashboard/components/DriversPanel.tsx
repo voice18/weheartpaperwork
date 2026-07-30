@@ -14,10 +14,14 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
+  writeBatch,
 } from "firebase/firestore";
 
 import { auth, db } from "../../../../lib/firebase";
-import { formatDateInput } from "../../../../lib/dateUtils";
+import { 
+formatDateInput,
+inputToIso,
+isoToInput, } from "../../../../lib/dateUtils";
 import DriverRenewalField from "./DriverRenewalField";
 import { daysFrom } from "../../../../lib/requirements";
 
@@ -83,6 +87,86 @@ export default function DriversPanel() {
       { merge: true }
     );
   };
+
+    const markDriverRequirementComplete = async (
+  driver: Driver,
+  requirementId: "medical" | "mvr" | "clearinghouse",
+  fieldName: "medicalExpiration" | "mvrDue" | "clearinghouseDue",
+  completionDate: string,
+  nextDueDate: string
+) => {
+  const user = auth.currentUser;
+
+  if (!user) {
+    return;
+  }
+
+  const driverRef = doc(
+    db,
+    "carriers",
+    user.uid,
+    "drivers",
+    driver.id
+  );
+
+  const historyRef = doc(
+    collection(
+      db,
+      "carriers",
+      user.uid,
+      "drivers",
+      driver.id,
+      "complianceRecords",
+      requirementId,
+      "history"
+    )
+  );
+
+  const previousCompletionDate =
+    driver[fieldName] || null;
+
+  const batch = writeBatch(db);
+
+  batch.set(
+    driverRef,
+    {
+      [fieldName]: completionDate,
+      lastUpdated: serverTimestamp(),
+    },
+    {
+      merge: true,
+    }
+  );
+
+  batch.set(historyRef, {
+    recordType: "completion",
+    source: "driver",
+
+    carrierId: user.uid,
+    driverId: driver.id,
+    driverName: driver.name,
+
+    requirementId,
+    completionDate,
+    completedAt: serverTimestamp(),
+
+    completedByUserId: user.uid,
+    completedByName:
+      user.displayName ||
+      user.email ||
+      "Account owner",
+
+    previousCompletionDate,
+    nextDueDate,
+
+    note: null,
+    files: [],
+
+    createdAt: serverTimestamp(),
+  });
+
+  await batch.commit();
+};
 
   const archiveDriver = async (driver: Driver) => {
         const removeDriver = async () => {
@@ -385,40 +469,69 @@ export default function DriversPanel() {
                 <DriverRenewalField
                   label="Medical Card - date of last DOT physical"
                   value={driver.medicalExpiration}
+                  driverId={driver.id}
+                  requirementId="medical"
                   years={2}
                   onChange={(value: string) =>
                     updateDriver(driver.id, { medicalExpiration: value })
                   }
-                  onMarkComplete={(completionDate: string) =>
-                    updateDriver(driver.id, {
-                      medicalExpiration: completionDate,
-                    })
-                  }
+                  onMarkComplete={(
+                  completionDate: string,
+                  nextDueDate: string
+                ) =>
+                  markDriverRequirementComplete(
+                    driver,
+                    "medical",
+                    "medicalExpiration",
+                    completionDate,
+                    nextDueDate
+                  )
+                }
                 />
 
                 <DriverRenewalField
                   label="Annual MVR - date of last review"
                   value={driver.mvrDue}
+                  driverId={driver.id}
+                  requirementId="mvr"
                   years={1}
                   onChange={(value: string) =>
                     updateDriver(driver.id, { mvrDue: value })
                   }
-                  onMarkComplete={(completionDate: string) =>
-                    updateDriver(driver.id, { mvrDue: completionDate })
+                  onMarkComplete={(
+                    completionDate: string,
+                    nextDueDate: string
+                  ) =>
+                    markDriverRequirementComplete(
+                      driver,
+                      "mvr",
+                      "mvrDue",
+                      completionDate,
+                      nextDueDate
+                    )
                   }
                 />
 
                 <DriverRenewalField
                   label="Clearinghouse - date of last annual query"
                   value={driver.clearinghouseDue}
+                  driverId={driver.id}
+                  requirementId="clearinghouse"
                   years={1}
                   onChange={(value: string) =>
                     updateDriver(driver.id, { clearinghouseDue: value })
                   }
-                  onMarkComplete={(completionDate: string) =>
-                    updateDriver(driver.id, {
-                      clearinghouseDue: completionDate,
-                    })
+                  onMarkComplete={(
+                    completionDate: string,
+                    nextDueDate: string
+                  ) =>
+                    markDriverRequirementComplete(
+                      driver,
+                      "clearinghouse",
+                      "clearinghouseDue",
+                      completionDate,
+                      nextDueDate
+                    )
                   }
                 />
 
@@ -632,9 +745,14 @@ function DriverDateField({
       </View>
 
       <TextInput
-        placeholder="YYYY-MM-DD"
-        value={value}
-        onChangeText={(text) => onChange(formatDateInput(text))}
+        placeholder="MM-DD-YYYY"
+        value={isoToInput(value)}
+        onChangeText={(text) => {
+          const formatted = formatDateInput(text);
+          const isoDate = inputToIso(formatted);
+
+          onChange(isoDate || formatted);
+        }}
         style={{
           width: 160,
           backgroundColor: "#fff",
@@ -647,7 +765,7 @@ function DriverDateField({
       />
 
       <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
-        Format: YYYY-MM-DD
+        Format: MM-DD-YYYY
       </Text>
     </View>
   );

@@ -9,24 +9,15 @@ import { router } from "expo-router";
 type Props = {
   companyName: string;
   usdotNumber: string;
-  onLogout: () => void;
 };
 
 export default function DashboardHeader({
   companyName,
   usdotNumber,
-  onLogout,
 }: Props) {
   return (
     <View style={{ marginBottom: 20 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <View style={{ flex: 1, paddingRight: 12 }}>
+      <View style={{ flex: 1 }}>
         <Text
           numberOfLines={1}
           style={{
@@ -49,52 +40,68 @@ export default function DashboardHeader({
             ? `USDOT ${usdotNumber}`
             : "USDOT not entered"}
         </Text>
-      </View>
 
         <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <TouchableOpacity
-            onPress={() => router.push("/(app)/settings")}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderWidth: 1,
-              borderColor: "#D3D1C7",
-              borderRadius: 6,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: "#706E68" }}>
-              Settings
-            </Text>
-          </TouchableOpacity>
+  style={{
+    alignSelf: "flex-start",
+    height: 44,
+    justifyContent: "center",
+    marginTop: 8,
+  }}
+>
+  <TouchableOpacity
+    onPress={() => router.push("/(app)/settings")}
+    accessibilityRole="button"
+    accessibilityLabel="Open settings"
+    activeOpacity={0.75}
+    hitSlop={{
+      top: 7,
+      bottom: 7,
+      left: 6,
+      right: 6,
+    }}
+    style={{
+      height: 30,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: "#D3D1C7",
+      borderRadius: 15,
+      backgroundColor: "#FFFFFF",
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    <Text
+      style={{
+        marginRight: 5,
+        fontSize: 14,
+        lineHeight: 16,
+        color: "#27500A",
+      }}
+    >
+      ⚙
+    </Text>
 
-          <TouchableOpacity
-            onPress={onLogout}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderWidth: 1,
-              borderColor: "#D3D1C7",
-              borderRadius: 6,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: "#706E68" }}>
-              Logout
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+    <Text
+      style={{
+        fontSize: 13,
+        lineHeight: 16,
+        fontWeight: "600",
+        color: "#27500A",
+      }}
+    >
+      Settings
+    </Text>
+  </TouchableOpacity>
+  </View>
+</View>
 
       <Text
         style={{
           fontSize: 13,
           color: "#B0AEA8",
-          marginTop: 4,
+          marginTop: 8,
         }}
       >
         {new Date().toLocaleDateString("en-US", {
