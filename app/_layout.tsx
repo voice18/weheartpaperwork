@@ -3,8 +3,10 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Platform } from "react-native";
 import {
   Stack,
+  usePathname,
   useRootNavigationState,
   useRouter,
 } from "expo-router";
@@ -30,6 +32,11 @@ type PendingNotification = {
 
 export default function RootLayout() {
   const router = useRouter();
+  const pathname = usePathname();
+
+const isPublicWebRoute =
+  Platform.OS === "web" &&
+  ["/", "/privacy", "/support"].includes(pathname);
   const rootNavigationState = useRootNavigationState();
   const init = useComplianceStore((state) => state.init);
 
@@ -72,9 +79,9 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (!navigationReady) {
-      return;
-    }
+  if (!navigationReady || isPublicWebRoute) {
+    return;
+  }
 
     let effectActive = true;
 
@@ -114,7 +121,13 @@ export default function RootLayout() {
       effectActive = false;
       unsubscribe();
     };
-  }, [init, navigationReady, openDashboard, router]);
+      }, [
+      init,
+      navigationReady,
+      openDashboard,
+      router,
+      isPublicWebRoute,
+    ]);
 
   useEffect(() => {
     if (!navigationReady) {
