@@ -179,7 +179,7 @@ async setApplicable(
   // ── markComplete ───────────────────────────────────────────────────────────
  // ── markComplete ───────────────────────────────────────────────────────────
 async markComplete(reqId, completionDate = null) {
-  const { carrierId, compliance } = get();
+  const { carrierId, compliance, usdotNumber } = get();
 
   if (!carrierId) {
     return;
@@ -213,7 +213,7 @@ async markComplete(reqId, completionDate = null) {
   if (reqId === "mcs150") {
     const currentDue =
       compliance[reqId]?.dueDate ||
-      completionDate;
+      calcUsdotDue(usdotNumber);
 
     if (!currentDue) {
       return;

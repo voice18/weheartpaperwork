@@ -50,10 +50,21 @@ type DailyNotificationSummary = {
   dueIn5DaysIds: string[];
 };
 
-function getAlertType(days: number): AlertType | null {
+function getAlertType(
+  days: number,
+  requirementId?: string
+): AlertType | null {
+  // FMCSA portal maintenance is intentionally quieter:
+  // one push notification at 5 days remaining only.
+  if (requirementId === "fmcsa-portal") {
+    return days === 5 ? "5_days" : null;
+  }
+
+  // Standard notification schedule for all other requirements.
   if (days === 30) return "30_days";
   if (days === 15) return "15_days";
-  if (days === -3) return "5_days";
+  if (days === 5) return "5_days";
+
   return null;
 }
 
@@ -309,7 +320,7 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
       completed: data.completed,
       daysUntilDue: days,
     });
-        const alertType = getAlertType(days);
+        const alertType = getAlertType(days, compDoc.id);
 
         if (!alertType) {
           continue;

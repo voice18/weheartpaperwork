@@ -46,6 +46,64 @@ function normalizeCdlNumber(value: string) {
   return value.trim().toUpperCase().replace(/[\s-]/g, "");
 }
 
+type DriverEntryFieldProps = {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  width: number;
+  autoCapitalize?: "none" | "sentences" | "words" | "characters";
+  autoCorrect?: boolean;
+  maxLength?: number;
+};
+
+function DriverEntryField({
+  label,
+  placeholder,
+  value,
+  onChangeText,
+  width,
+  autoCapitalize,
+  autoCorrect = false,
+  maxLength,
+}: DriverEntryFieldProps) {
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text
+        style={{
+          fontSize: 12,
+          color: "#706E68",
+          marginBottom: 4,
+          fontWeight: "500",
+        }}
+      >
+        {label}
+      </Text>
+
+      <TextInput
+        accessibilityLabel={label}
+        placeholder={placeholder}
+        placeholderTextColor="#706E68"
+        value={value}
+        onChangeText={onChangeText}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
+        maxLength={maxLength}
+        style={{
+          width,
+          backgroundColor: "#fff",
+          color: "#2B2A27",
+          borderWidth: 1,
+          borderColor: "#D3D1C7",
+          borderRadius: 8,
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+        }}
+      />
+    </View>
+  );
+}
+
 export default function DriversPanel() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [newDriverName, setNewDriverName] = useState("");
@@ -53,6 +111,7 @@ export default function DriversPanel() {
   const [newDriverClass, setNewDriverClass] = useState("");
   const [newDriverState, setNewDriverState] = useState("");
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
+  const [isAddingDriver, setIsAddingDriver] = useState(false);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -226,7 +285,7 @@ export default function DriversPanel() {
 
   const addDriver = async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user || isAddingDriver) return;
 
     const driverName = newDriverName.trim();
     const normalizedCdlNumber = normalizeCdlNumber(newDriverNumber);
@@ -239,7 +298,26 @@ export default function DriversPanel() {
     }
 
     if (!normalizedCdlNumber) {
-      Alert.alert("CDL license number required", "Enter the driver's CDL license number.");
+      Alert.alert(
+        "CDL license number required",
+        "Enter the driver's CDL license number."
+      );
+      return;
+    }
+
+    if (!["A", "B", "C"].includes(normalizedCdlClass)) {
+      Alert.alert(
+        "Valid CDL class required",
+        "Enter CDL class A, B, or C."
+      );
+      return;
+    }
+
+    if (!/^[A-Z]{2}$/.test(normalizedCdlState)) {
+      Alert.alert(
+        "Valid CDL state required",
+        "Enter the 2-letter issuing state abbreviation, such as WA."
+      );
       return;
     }
 
@@ -251,131 +329,150 @@ export default function DriversPanel() {
     };
 
     const driversRef = collection(db, "carriers", user.uid, "drivers");
-    const snapshot = await getDocs(driversRef);
 
-    const matchingDriverDoc = snapshot.docs.find((driverDoc) => {
-      const driverData = driverDoc.data();
+    setIsAddingDriver(true);
 
-    return (
-      normalizeCdlNumber(driverData.cdlNumber ?? "") ===
-        normalizedCdlNumber &&
-      String(driverData.cdlState ?? "").trim().toUpperCase() ===
-        normalizedCdlState
-    );
-    });
+    try {
+      // Keep the local normalized comparison for now so older driver records
+      // with spaces/hyphens in stored CDL numbers are still detected.
+      const snapshot = await getDocs(driversRef);
 
-    if (matchingDriverDoc) {
-      const matchingDriver = matchingDriverDoc.data() as Driver;
+      const matchingDriverDoc = snapshot.docs.find((driverDoc) => {
+        const driverData = driverDoc.data();
 
-      if (matchingDriver.status !== "inactive") {
-        Alert.alert(
-          "Driver already exists",
-          `A driver with CDL number ${normalizedCdlNumber} is already on your active driver list.`
+        return (
+          normalizeCdlNumber(driverData.cdlNumber ?? "") ===
+            normalizedCdlNumber &&
+          String(driverData.cdlState ?? "").trim().toUpperCase() ===
+            normalizedCdlState
         );
-        return;
-      }
-      if (!normalizedCdlState) {
-        Alert.alert("CDL state required", "Enter the state that issued the CDL.");
-        return;
-      }
-      if (!normalizedCdlClass) {
-          Alert.alert("CDL class required", "Enter the driver's CDL class.");
+      });
+
+      if (matchingDriverDoc) {
+        const matchingDriver = matchingDriverDoc.data() as Driver;
+
+        if (matchingDriver.status !== "inactive") {
+          Alert.alert(
+            "Driver already exists",
+            `A driver with ${normalizedCdlState} CDL license number ${normalizedCdlNumber} is already on your active driver list.`
+          );
           return;
         }
 
-            const restoreDriver = async () => {
-        try {
-          await setDoc(
-            doc(
-              db,
-              "carriers",
-              user.uid,
-              "drivers",
-              matchingDriverDoc.id
-            ),
-            {
-              name: driverName,
-              cdlNumber: normalizedCdlNumber,
-              cdlClass: normalizedCdlClass,
-              cdlState: normalizedCdlState,
-              status: "active",
-              inactiveAt: null,
-              rehiredAt: serverTimestamp(),
-            },
-            { merge: true }
+        const restoreDriver = async () => {
+          setIsAddingDriver(true);
+
+          try {
+            await setDoc(
+              doc(
+                db,
+                "carriers",
+                user.uid,
+                "drivers",
+                matchingDriverDoc.id
+              ),
+              {
+                name: driverName,
+                cdlNumber: normalizedCdlNumber,
+                cdlClass: normalizedCdlClass,
+                cdlState: normalizedCdlState,
+                status: "active",
+                inactiveAt: null,
+                rehiredAt: serverTimestamp(),
+              },
+              { merge: true }
+            );
+
+            clearForm();
+            setOpenDriverId(matchingDriverDoc.id);
+          } catch (error) {
+            console.error("Failed to restore driver:", error);
+
+            if (Platform.OS === "web") {
+              window.alert(
+                "The driver could not be restored. Please try again."
+              );
+            } else {
+              Alert.alert(
+                "Unable to restore driver",
+                "The driver could not be restored. Please try again."
+              );
+            }
+          } finally {
+            setIsAddingDriver(false);
+          }
+        };
+
+        const restoreMessage =
+          `${matchingDriver.name || driverName} was previously removed from ` +
+          "your active list. Their saved compliance history can be restored.";
+
+        // The add operation is finished while the user decides whether to restore.
+        setIsAddingDriver(false);
+
+        if (Platform.OS === "web") {
+          const confirmed = window.confirm(
+            `Restore existing driver?\n\n${restoreMessage}`
           );
 
-          clearForm();
-          setOpenDriverId(matchingDriverDoc.id);
-        } catch (error) {
-          console.error("Failed to restore driver:", error);
-
-          if (Platform.OS === "web") {
-            window.alert("The driver could not be restored. Please try again.");
-          } else {
-            Alert.alert(
-              "Unable to restore driver",
-              "The driver could not be restored. Please try again."
-            );
+          if (confirmed) {
+            await restoreDriver();
           }
+
+          return;
         }
-      };
 
-      const restoreMessage =
-        `${matchingDriver.name || driverName} was previously removed from ` +
-        "your active list. Their saved compliance history can be restored.";
-
-      if (Platform.OS === "web") {
-        const confirmed = window.confirm(
-          `Restore existing driver?\n\n${restoreMessage}`
+        Alert.alert(
+          "Restore existing driver?",
+          restoreMessage,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+            },
+            {
+              text: "Restore Driver",
+              onPress: restoreDriver,
+            },
+          ]
         );
-
-        if (confirmed) {
-          await restoreDriver();
-        }
 
         return;
       }
 
-      Alert.alert(
-        "Restore existing driver?",
-        restoreMessage,
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-          {
-            text: "Restore Driver",
-            onPress: restoreDriver,
-          },
-        ]
-      );
+      const id = Date.now().toString();
 
-      return;
+      await setDoc(doc(db, "carriers", user.uid, "drivers", id), {
+        name: driverName,
+        cdlNumber: normalizedCdlNumber,
+        cdlClass: normalizedCdlClass,
+        cdlState: normalizedCdlState,
+        status: "active",
+        inactiveAt: null,
+        rehiredAt: null,
+        cdlExpiration: "",
+        medicalExpiration: "",
+        mvrDue: "",
+        clearinghouseDue: "",
+        roadTestOnFile: false,
+        dqFileComplete: false,
+      });
 
-      return;
+      clearForm();
+    } catch (error) {
+      console.error("Failed to add driver:", error);
+
+      if (Platform.OS === "web") {
+        window.alert("The driver could not be added. Please try again.");
+      } else {
+        Alert.alert(
+          "Unable to add driver",
+          "The driver could not be added. Please try again."
+        );
+      }
+    } finally {
+      setIsAddingDriver(false);
     }
-
-    const id = Date.now().toString();
-
-    await setDoc(doc(db, "carriers", user.uid, "drivers", id), {
-      name: driverName,
-      cdlNumber: normalizedCdlNumber,
-      cdlClass: normalizedCdlClass,
-      cdlState: normalizedCdlState,
-      status: "active",
-      inactiveAt: null,
-      rehiredAt: null,
-      cdlExpiration: "",
-      medicalExpiration: "",
-      mvrDue: "",
-      clearinghouseDue: "",
-      roadTestOnFile: false,
-      dqFileComplete: false,
-    });
-
-    clearForm();
   };
 
   return (
@@ -609,79 +706,47 @@ export default function DriversPanel() {
       )}
 
       <View style={{ marginTop: 12 }}>
-        <TextInput
-          placeholder="Driver name"
+        <DriverEntryField
+          label="Driver name"
+          placeholder="e.g., Sam Carter"
           value={newDriverName}
           onChangeText={setNewDriverName}
-          autoCorrect={false}
-          style={{
-            width: 280,
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#D3D1C7",
-            borderRadius: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            marginBottom: 8,
-          }}
+          width={280}
+          autoCapitalize="words"
         />
 
-        <TextInput
-          placeholder="CDL License Number"
+        <DriverEntryField
+          label="CDL License Number"
+          placeholder="e.g., WDL123456"
           value={newDriverNumber}
           onChangeText={setNewDriverNumber}
+          width={280}
           autoCapitalize="characters"
-          autoCorrect={false}
-          style={{
-            width: 280,
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#D3D1C7",
-            borderRadius: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            marginBottom: 8,
-          }}
         />
 
-        <TextInput
-          placeholder="CDL class"
+        <DriverEntryField
+          label="CDL Class"
+          placeholder="A, B, or C"
           value={newDriverClass}
           onChangeText={setNewDriverClass}
+          width={120}
           autoCapitalize="characters"
-          autoCorrect={false}
-          style={{
-            width: 120,
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#D3D1C7",
-            borderRadius: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            marginBottom: 8,
-          }}
+          maxLength={1}
         />
 
-        <TextInput
-          placeholder="CDL state"
+        <DriverEntryField
+          label="Issuing State"
+          placeholder="e.g., WA"
           value={newDriverState}
           onChangeText={setNewDriverState}
+          width={120}
           autoCapitalize="characters"
-          autoCorrect={false}
           maxLength={2}
-          style={{
-            width: 120,
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#D3D1C7",
-            borderRadius: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 8,
-            marginBottom: 8,
-          }}
         />
 
         <TouchableOpacity
+          accessibilityRole="button"
+          disabled={isAddingDriver}
           onPress={addDriver}
           style={{
             alignSelf: "flex-start",
@@ -691,9 +756,12 @@ export default function DriversPanel() {
             borderRadius: 8,
             borderWidth: 1,
             borderColor: "#C0DD97",
+            opacity: isAddingDriver ? 0.6 : 1,
           }}
         >
-          <Text>+ Add Driver</Text>
+          <Text style={{ color: "#2B2A27" }}>
+            {isAddingDriver ? "Adding Driver..." : "+ Add Driver"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -745,7 +813,9 @@ function DriverDateField({
       </View>
 
       <TextInput
+        accessibilityLabel={`${label} date`}
         placeholder="MM-DD-YYYY"
+        placeholderTextColor="#706E68"
         value={isoToInput(value)}
         onChangeText={(text) => {
           const formatted = formatDateInput(text);
@@ -756,6 +826,7 @@ function DriverDateField({
         style={{
           width: 160,
           backgroundColor: "#fff",
+          color: "#2B2A27",
           borderWidth: 1,
           borderColor: "#D3D1C7",
           borderRadius: 8,

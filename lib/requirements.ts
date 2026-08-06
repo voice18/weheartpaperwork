@@ -186,7 +186,7 @@ const isApplicable = (
   r(id).applicable !== false;
 
   return [ 
-    { id:"mcs150",       n:"MCS-150 / USDOT biennial update",            f:"Every 2 years",        due: r("mcs150").dueDate ||  r("mcs150").enteredDate || ud,                                             de:true, dateMode: "fixed-user-date",  dl: "Next MCS-150 due date",  crit:true, attentionDays: 30,
+    { id:"mcs150",       n:"MCS-150 / USDOT biennial update",            f:"Every 2 years",        due: r("mcs150").dueDate || ud,                                             de:true, dateMode: "fixed-user-date",  dl: "Next MCS-150 due date",  crit:true, attentionDays: 30,
       notes:"Required every 2 years even if nothing changed. Date is calculated from your USDOT number.",
       cons:"Failure can deactivate your USDOT number and halt all operations.", act:"File MCS-150 update", lnk:"https://portal.fmcsa.dot.gov", completed: r("mcs150").completed, applicable:isApplicable("mcs150"), canBeNotApplicable: true, },
     { id:"tax2290",      n:"2290 heavy vehicle use tax",                  f:"Annual",               due: r("tax2290").dueDate ||     "2026-08-31",                                        de:false, dateMode: "fixed-calendar", attentionDays: 30,

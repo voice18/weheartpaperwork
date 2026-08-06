@@ -4,6 +4,7 @@
     "slug": "weheartpaperwork",
     "version": "1.0.0",
     "scheme": "weheartpaperwork",
+    "icon": "./assets/icon.png",
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png",
@@ -12,7 +13,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.weheartpaperwork.app",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "icon": "./assets/icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.weheartpaperwork.app",

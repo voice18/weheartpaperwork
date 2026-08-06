@@ -358,7 +358,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
       borderColor: "#D3D1C7",
     }}
   >
-    <Text>overview</Text>
+    <Text>Overview</Text>
   </TouchableOpacity>
 
   <TouchableOpacity

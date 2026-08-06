@@ -42,7 +42,7 @@ export default function SupportPage() {
         <Pressable
           onPress={() =>
             Linking.openURL(
-              "mailto:support@weheartpaperwork.com?subject=We%20Heart%20Paperwork%20Support"
+              "mailto:voice18@gmail.com?subject=We%20Heart%20Paperwork%20Support"
             )
           }
           style={styles.button}
@@ -77,7 +77,7 @@ export default function SupportPage() {
 
         <Text style={styles.paragraph}>
           To request account deletion, data access, or
-          correction, email support@weheartpaperwork.com with
+          correction, email voice18@gmail.com with
           the subject “Account or Data Request.”
         </Text>
 
