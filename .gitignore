@@ -26,3 +26,8 @@ android-crash-log.txt
 *.backup.txt.ts
 *.before-*.txt
 *.before-*.txt.tsx
+# Local release/test artifacts
+/backups/
+/dist-favicon-test/
+/assets/*-backup.png
+*.bak
