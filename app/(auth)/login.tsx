@@ -165,7 +165,8 @@ export default function Login() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => Linking.openURL("https://ihatepaperwork.web.app")}
+          onPress={() =>
+            Linking.openURL("https://weheartpaperwork.com")}
         >
           <Text
             style={{

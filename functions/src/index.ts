@@ -29,7 +29,6 @@ import {
 
 admin.initializeApp();
 const db  = admin.firestore();
-const fcm = admin.messaging();
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const stripeCompanyPriceId = defineSecret("STRIPE_COMPANY_PRICE_ID");
 const stripeDriverPriceId = defineSecret("STRIPE_DRIVER_PRICE_ID");
@@ -190,47 +189,7 @@ const DRIVER_REQUIREMENTS: DriverRequirementDefinition[] = [
   },
 ];
 
-export const sendTestNotification = onCall(async (request) => {
-  const uid = request.auth?.uid;
 
-  if (!uid) {
-    throw new HttpsError(
-      "unauthenticated",
-      "You must be logged in to send a test notification."
-    );
-  }
-
-  const userSnap = await db.collection("users").doc(uid).get();
-  const token = userSnap.data()?.fcmToken as string | undefined;
-
-  if (!token) {
-    throw new HttpsError(
-      "failed-precondition",
-      "No notification token is saved for this user."
-    );
-  }
-
-  const response = await fcm.send({
-    token,
-    notification: {
-      title: "We Heart Paperwork",
-      body: "Test successful. We can alert you even when the dashboard is closed.",
-    },
-    data: {
-      url: "https://dot-compliance-dashboard.web.app/dashboard",
-    },
-    webpush: {
-      fcmOptions: {
-        link: "https://dot-compliance-dashboard.web.app/dashboard",
-      },
-    },
-  });
-
-  return {
-    success: true,
-    messageId: response,
-  };
-});
 
 function addYearsToDate(dateStr: string, years: number): string {
   const [year, month, day] = dateStr.split("-").map(Number);

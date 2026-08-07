@@ -37,7 +37,6 @@
 //      email:      string
 //      carrierId:  string             ← links user to their carrier record
 //      role:       "owner" | "admin" | "viewer"
-//      fcmToken:   string             ← push notification token
 //      createdAt:  Timestamp
 //
 // ─────────────────────────────────────────────────────────────────────────────
@@ -94,7 +93,6 @@ export interface UserDoc {
   email:      string;
   carrierId:  string;
   role:       UserRole;
-  fcmToken?:  string;
   createdAt:  Date;
 }
 
