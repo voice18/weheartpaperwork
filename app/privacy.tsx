@@ -81,7 +81,7 @@ export default function PrivacyPage() {
 
         <Text style={styles.paragraph}>
           Questions or privacy requests may be sent to
-          support@weheartpaperwork.com.
+          voice18@gmail.com.
         </Text>
       </View>
     </ScrollView>

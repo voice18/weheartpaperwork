@@ -36,7 +36,7 @@ export default function SupportPage() {
         <Text style={styles.paragraph}>
           For account access, subscription questions,
           technical issues, or feedback, contact us at
-          support@weheartpaperwork.com.
+          voice18@gmail.com.
         </Text>
 
         <Pressable

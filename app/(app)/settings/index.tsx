@@ -836,7 +836,7 @@ const trialEndLabel = (() => {
               </Text>
 
               <Text style={styles.rowDescription}>
-                Receive alerts 30 days before, when due, and three days overdue.
+                Receive alerts 30, 15, and 5 days before most compliance deadlines.
               </Text>
             </View>
 

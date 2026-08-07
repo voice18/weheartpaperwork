@@ -82,7 +82,7 @@ export default function WebLandingPage() {
               onPress={() => {
                 if (typeof window !== "undefined") {
                   window.location.href =
-                    "mailto:support@weheartpaperwork.com?subject=We%20Heart%20Paperwork";
+                    "mailto:voice18@gmail.com?subject=We%20Heart%20Paperwork";
                 }
               }}
               style={styles.secondaryButton}
@@ -94,8 +94,7 @@ export default function WebLandingPage() {
           </View>
 
           <Text style={styles.availability}>
-            Android testing is underway. iPhone availability
-            is coming soon.
+            Built for iPhone and Android.
           </Text>
         </View>
 
@@ -169,7 +168,7 @@ export default function WebLandingPage() {
             onPress={() => {
               if (typeof window !== "undefined") {
                 window.location.href =
-                  "mailto:support@weheartpaperwork.com?subject=We%20Heart%20Paperwork";
+                  "mailto:voice18@gmail.com?subject=We%20Heart%20Paperwork";
               }
             }}
             style={styles.finalButton}

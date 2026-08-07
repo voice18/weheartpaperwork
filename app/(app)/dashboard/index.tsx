@@ -33,7 +33,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/firebase";
-import PaywallCard from "./components/PaywallCard";
+
 
 
 export default function DashboardScreen() {
@@ -68,8 +68,6 @@ export default function DashboardScreen() {
 
   const [drivers, setDrivers] = useState<any[]>([]);
   const [companyName, setCompanyName] = useState("");
-  const [showPaywallTest, setShowPaywallTest] = useState(false);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<"active" | "inactive">("active");
 
   const [showNextStep, setShowNextStep] = useState(false);
   const hasDrivers = drivers.length > 0;
@@ -142,19 +140,7 @@ export default function DashboardScreen() {
 };
 
 
-  if (subscriptionStatus !== "active") {
-  return (
-    <PaywallCard
-      onSubscribe={() => {
-        alert("Stripe Checkout will connect here.");
-        setSubscriptionStatus("active");
-      }}
-      onContactManaged={() =>
-        alert("Managed compliance contact flow will connect here.")
-      }
-    />
-  );
-}
+  
 
   if (loading) return (
     <View style={styles.center}>
