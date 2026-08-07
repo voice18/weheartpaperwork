@@ -265,30 +265,6 @@ const billingNote = hasUsedTrial
             </Text>
           </View>
 
-          <View style={styles.videoCard}>
-            <View style={styles.playIcon}>
-              <Text style={styles.playIconText}>
-                ▶
-              </Text>
-            </View>
-
-            <View style={styles.videoTextContainer}>
-              <Text style={styles.videoTitle}>
-                Watch why this matters
-              </Text>
-
-              <Text style={styles.videoDescription}>
-                A short explanation of why trucking
-                companies need a reliable compliance
-                system.
-              </Text>
-
-              <Text style={styles.videoComingSoon}>
-                Video coming soon
-              </Text>
-            </View>
-          </View>
-
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
               What you get
@@ -360,34 +336,6 @@ const billingNote = hasUsedTrial
               {billingNote}
             </Text>
           </View>
-
-          <TouchableOpacity
-            style={styles.managedCard}
-            onPress={() =>
-              router.push(
-                "/(app)/fully-managed"
-              )
-            }
-            activeOpacity={0.8}
-          >
-            <Text style={styles.managedEyebrow}>
-              NEED MORE HELP?
-            </Text>
-
-            <Text style={styles.managedTitle}>
-              Prefer fully managed compliance?
-            </Text>
-
-            <Text style={styles.managedDescription}>
-              Learn how our team can help monitor
-              company and driver requirements for
-              you.
-            </Text>
-
-            <Text style={styles.managedLink}>
-              Learn about fully managed compliance →
-            </Text>
-          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.logoutButton}
@@ -502,55 +450,6 @@ const styles = StyleSheet.create({
     lineHeight: 25,
     color: "#5E6672",
     marginTop: 20,
-  },
-
-  videoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ECEFE8",
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 16,
-  },
-
-  playIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#171A1F",
-    marginRight: 16,
-  },
-
-  playIconText: {
-    color: "#FFFFFF",
-    fontSize: 17,
-    marginLeft: 2,
-  },
-
-  videoTextContainer: {
-    flex: 1,
-  },
-
-  videoTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#252A31",
-  },
-
-  videoDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#68707C",
-    marginTop: 4,
-  },
-
-  videoComingSoon: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#4F6338",
-    marginTop: 8,
   },
 
   section: {
@@ -673,42 +572,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
 
-  managedCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 22,
-    marginTop: 16,
-    borderWidth: 1,
-    borderColor: "#D9DDE3",
-  },
-
-  managedEyebrow: {
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
-    color: "#68707C",
-  },
-
-  managedTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#252A31",
-    marginTop: 8,
-  },
-
-  managedDescription: {
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#68707C",
-    marginTop: 7,
-  },
-
-  managedLink: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#4F6338",
-    marginTop: 14,
-  },
 
   logoutButton: {
     minHeight: 50,

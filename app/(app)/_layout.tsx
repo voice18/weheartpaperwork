@@ -81,13 +81,9 @@ export default function AppLayout() {
     const isSubscriptionPage =
       pathname.endsWith("/subscription-required");
 
-    const isFullyManagedPage =
-      pathname.endsWith("/fully-managed");
-
     if (
       !hasAccess &&
-      !isSubscriptionPage &&
-      !isFullyManagedPage
+      !isSubscriptionPage
     ) {
       router.replace(
         "/(app)/subscription-required"
