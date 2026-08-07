@@ -18,10 +18,7 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "../../../../lib/firebase";
-import { 
-formatDateInput,
-inputToIso,
-isoToInput, } from "../../../../lib/dateUtils";
+import PersistedDateInput from "./PersistedDateInput";
 import DriverRenewalField from "./DriverRenewalField";
 import { daysFrom } from "../../../../lib/requirements";
 
@@ -529,16 +526,16 @@ export default function DriversPanel() {
                     fontWeight: "600",
                   }}
                 >
-                  {openDriverId === driver.id ? "▲" : "▼"}
+                  {openDriverId === driver.id ? "â–²" : "â–¼"}
                 </Text>
               </View>
 
               <Text style={{ color: "#706E68", marginTop: 2 }}>
-                {driver.cdlState} · License {driver.cdlNumber || "Not entered"}
+                {driver.cdlState} Â· License {driver.cdlNumber || "Not entered"}
               </Text>
 
               <Text style={{ color: "#8A8880", marginTop: 2, fontSize: 12 }}>
-                CDL Class {driver.cdlClass || "—"}
+                CDL Class {driver.cdlClass || "â€”"}
               </Text>
             </TouchableOpacity>
 
@@ -812,27 +809,10 @@ function DriverDateField({
         </View>
       </View>
 
-      <TextInput
+      <PersistedDateInput
+        value={value}
+        onSave={onChange}
         accessibilityLabel={`${label} date`}
-        placeholder="MM-DD-YYYY"
-        placeholderTextColor="#706E68"
-        value={isoToInput(value)}
-        onChangeText={(text) => {
-          const formatted = formatDateInput(text);
-          const isoDate = inputToIso(formatted);
-
-          onChange(isoDate || formatted);
-        }}
-        style={{
-          width: 160,
-          backgroundColor: "#fff",
-          color: "#2B2A27",
-          borderWidth: 1,
-          borderColor: "#D3D1C7",
-          borderRadius: 8,
-          paddingHorizontal: 10,
-          paddingVertical: 8,
-        }}
       />
 
       <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>

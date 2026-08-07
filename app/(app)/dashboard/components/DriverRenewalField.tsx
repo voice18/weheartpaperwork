@@ -12,6 +12,7 @@ import {
   inputToIso,
   isoToInput,
 } from "../../../../lib/dateUtils";
+import PersistedDateInput from "./PersistedDateInput";
 import { useComplianceHistory } from "../../../../store/useComplianceHistory";
 import {
   addDays,
@@ -208,24 +209,10 @@ const {
     maxWidth: 320,
   }}
 >
-        <TextInput
-        placeholder="MM-DD-YYYY"
-        value={isoToInput(value)}
-        onChangeText={(text) => {
-          const formatted = formatDateInput(text);
-          const isoDate = inputToIso(formatted);
-
-          onChange(isoDate || formatted);
-        }}
-          style={{
-            width: 160,
-            backgroundColor: "#fff",
-            borderWidth: 1,
-            borderColor: "#D3D1C7",
-            borderRadius: 8,
-            paddingHorizontal: 10,
-            paddingVertical: 8,
-          }}
+        <PersistedDateInput
+          value={value}
+          onSave={onChange}
+          accessibilityLabel={`${label} date`}
         />
 
         <View
