@@ -657,7 +657,7 @@ const handleChangePassword = () => {
 }
 
 const estimatedMonthlyAmountCents =
-  1000 + activeDriverCount * 200;
+  200 + activeDriverCount * 100;
 
 const estimatedMonthlyAmount =
   `$${(
@@ -897,7 +897,7 @@ const trialEndLabel = (() => {
 
         <SettingsRow
           label="Pricing"
-          value={`$10 company + $2 × ${activeDriverCount}`}
+          value={`$2 company + $1 × ${activeDriverCount}`}
         />
 
         <SettingsRow

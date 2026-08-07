@@ -139,7 +139,7 @@ const planDescription = hasUsedTrial
   ? isPastDue
     ? "We could not process your previous payment. Continue to Stripe to update your payment information and restore access."
     : "Your previous subscription has ended. Restart your subscription to regain access to your compliance dashboard."
-  : "Start with a 14-day free trial. After the trial, the dashboard is $10 per month plus $2 per active driver.";
+  : "Start with a 14-day free trial. After the trial, the dashboard is $2 per month plus $1 per active driver.";
 
 const checkoutButtonLabel = hasUsedTrial
   ? isPastDue
@@ -148,7 +148,7 @@ const checkoutButtonLabel = hasUsedTrial
   : "Start 14-day free trial";
 
 const billingNote = hasUsedTrial
-  ? "$10 per month plus $2 per active driver. Billing begins immediately."
+  ? "$2 per month plus $1 per active driver. Billing begins immediately."
   : "A payment method is required. You can manage or cancel your subscription through the app.";
 
   async function handleLogout() {

@@ -1086,7 +1086,7 @@ console.log(
         url: checkoutSession.url,
         activeDriverCount,
         estimatedMonthlyAmountCents:
-          1000 + activeDriverCount * 200,
+          200 + activeDriverCount * 100,
       };
     } catch (error) {
       // This catches any Firestore, Stripe, secret,
