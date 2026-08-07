@@ -195,44 +195,62 @@ const {
 }
 
   return (
-    <View style={{ marginBottom: 14 }}>
-      <Text style={{ fontSize: 12, color: "#706E68", marginBottom: 4 }}>
-        {label}
-      </Text>
+          <View style={{ marginBottom: 14 }}>
+            <View
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              justifyContent: "space-between",
+              marginBottom: 4,
+              width: "100%",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                color: "#706E68",
+                flex: 1,
+                paddingRight: 8,
+              }}
+            >
+              {label}
+            </Text>
 
-      <View
-  style={{
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 4,
-    maxWidth: 320,
-  }}
->
-        <PersistedDateInput
-          value={value}
-          onSave={onChange}
-          accessibilityLabel={`${label} date`}
-        />
+            <View
+              style={{
+                backgroundColor: badge.bg,
+                borderRadius: 14,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                flexShrink: 0,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: "600",
+                  color: badge.color,
+                }}
+              >
+                {badge.text}
+              </Text>
+            </View>
+          </View>
 
-        <View
-        style={{
-            backgroundColor: badge.bg,
-            borderRadius: 14,
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-        }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "600", color: badge.color }}>
-            {badge.text}
+          <PersistedDateInput
+            value={value}
+            onSave={onChange}
+            accessibilityLabel={`${label} date`}
+          />
+
+          <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
+            Format: MM-DD-YYYY
+            {nextDue ? (
+              <>
+                {" \u00B7 "}Next due: {isoToInput(nextDue)}
+              </>
+            ) : null}
           </Text>
-        </View>
-      </View>
-
-      <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
-        Format: MM-DD-YYYY
-{nextDue ? ` · Next due: ${isoToInput(nextDue)}` : ""}
-      </Text>
       {nextDue && onMarkComplete ? (
   <TouchableOpacity
     onPress={() => {

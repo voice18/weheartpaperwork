@@ -16,6 +16,7 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
+import { Ionicons } from "@expo/vector-icons";
 
 import { auth, db } from "../../../../lib/firebase";
 import PersistedDateInput from "./PersistedDateInput";
@@ -526,16 +527,24 @@ export default function DriversPanel() {
                     fontWeight: "600",
                   }}
                 >
-                  {openDriverId === driver.id ? "â–²" : "â–¼"}
+                  <Ionicons
+                    name={
+                      openDriverId === driver.id
+                        ? "chevron-up"
+                        : "chevron-down"
+                    }
+                    size={20}
+                    color="#706E68"
+                  />
                 </Text>
               </View>
 
               <Text style={{ color: "#706E68", marginTop: 2 }}>
-                {driver.cdlState} Â· License {driver.cdlNumber || "Not entered"}
+                {driver.cdlState} {"\u00B7"} License {driver.cdlNumber || "Not entered"}
               </Text>
 
               <Text style={{ color: "#8A8880", marginTop: 2, fontSize: 12 }}>
-                CDL Class {driver.cdlClass || "â€”"}
+                CDL Class {driver.cdlClass || "\u2014"}
               </Text>
             </TouchableOpacity>
 
