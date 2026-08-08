@@ -171,6 +171,18 @@ export async function syncSubscriptionToCarrier(
   const carrierSnapshot =
     await carrierRef.get();
 
+  if (!carrierSnapshot.exists) {
+    console.log(
+      "Stripe subscription sync skipped because carrier no longer exists",
+      {
+        carrierId,
+        stripeSubscriptionId: subscription.id,
+      }
+    );
+
+    return;
+  }
+
   const existingBilling =
     carrierSnapshot.data()?.billing ?? {};
 
@@ -184,45 +196,44 @@ export async function syncSubscriptionToCarrier(
       subscription
     );
 
-  await carrierRef.set(
-    {
-      billing: {
-        status: subscription.status,
+  await carrierRef.update({
+  "billing.status":
+    subscription.status,
 
-        stripeCustomerId,
+  "billing.stripeCustomerId":
+    stripeCustomerId,
 
-        stripeSubscriptionId:
-          subscription.id,
+  "billing.stripeSubscriptionId":
+    subscription.id,
 
-        trialEndsAt,
+  "billing.trialEndsAt":
+    trialEndsAt,
 
-        currentPeriodEnd,
+  "billing.currentPeriodEnd":
+    currentPeriodEnd,
 
-        cancelAtPeriodEnd:
-          subscription.cancel_at_period_end,
+  "billing.cancelAtPeriodEnd":
+    subscription.cancel_at_period_end,
 
-        cancelAt,
+  "billing.cancelAt":
+    cancelAt,
 
-        canceledAt:
-          subscription.canceled_at
-            ? admin.firestore.Timestamp.fromMillis(
-                subscription.canceled_at *
-                  1000
-              )
-            : null,
+  "billing.canceledAt":
+    subscription.canceled_at
+      ? admin.firestore.Timestamp.fromMillis(
+          subscription.canceled_at * 1000
+        )
+      : null,
 
-        activeDriverCountAtBilling,
+  "billing.activeDriverCountAtBilling":
+    activeDriverCountAtBilling,
 
-        monthlyAmountCents,
+  "billing.monthlyAmountCents":
+    monthlyAmountCents,
 
-        updatedAt:
-          admin.firestore.FieldValue.serverTimestamp(),
-      },
-    },
-    {
-      merge: true,
-    }
-  );
+  "billing.updatedAt":
+    admin.firestore.FieldValue.serverTimestamp(),
+});
 
   console.log(
     "Stripe subscription synchronized",
@@ -297,6 +308,26 @@ export async function handleCheckoutCompleted(
     );
   }
 
+  const carrierRef = db
+  .collection("carriers")
+  .doc(carrierId);
+
+const carrierSnapshot =
+  await carrierRef.get();
+
+if (!carrierSnapshot.exists) {
+  console.log(
+    "Checkout completion skipped because carrier no longer exists",
+    {
+      carrierId,
+      stripeSubscriptionId,
+    }
+  );
+
+  return;
+}
+
+
   const subscription =
     await stripe.subscriptions.retrieve(
       stripeSubscriptionId
@@ -308,27 +339,16 @@ export async function handleCheckoutCompleted(
     carrierId,
     activeDriverCount
   );
-  await db
-  .collection("carriers")
-  .doc(carrierId)
-  .set(
-    {
-      billing: {
-        hasUsedTrial: true,
+  await carrierRef.update({
+  "billing.hasUsedTrial": true,
 
-        trialFirstStartedAt:
-          subscription.trial_start
-            ? admin.firestore.Timestamp.fromMillis(
-                subscription.trial_start *
-                  1000
-              )
-            : admin.firestore.FieldValue.serverTimestamp(),
-      },
-    },
-    {
-      merge: true,
-    }
-  );
+  "billing.trialFirstStartedAt":
+    subscription.trial_start
+      ? admin.firestore.Timestamp.fromMillis(
+          subscription.trial_start * 1000
+        )
+      : admin.firestore.FieldValue.serverTimestamp(),
+});
 
 console.log(
   "Trial usage permanently recorded",
