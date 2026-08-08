@@ -11,7 +11,7 @@
       "output": "static"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.weheartpaperwork.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "icon": "./assets/icon.png",
@@ -49,7 +49,9 @@
       }
     },
     "owner": "weheartpaperwork",
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": {
+  "policy": "appVersion"
+},
     "updates": {
       "url": "https://u.expo.dev/a80da581-6fc9-4032-bdb8-150154d3c72e"
     }
