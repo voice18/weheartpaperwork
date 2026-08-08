@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -752,6 +753,33 @@ const performDeleteAccount = async () => {
 
 const handleDeleteAccount = () => {
   if (deletingAccount) {
+    return;
+  }
+
+  if (
+    Platform.OS === "web" &&
+    typeof window !== "undefined"
+  ) {
+    const firstConfirmed = window.confirm(
+      "Delete account?\n\n" +
+      "This permanently deletes your company account, drivers, compliance records, and history. " +
+      "Your subscription will also be canceled. This cannot be undone."
+    );
+
+    if (!firstConfirmed) {
+      return;
+    }
+
+    const finalConfirmed = window.confirm(
+      "Delete permanently?\n\n" +
+      "This is your final confirmation. Your account and company data cannot be recovered after deletion."
+    );
+
+    if (!finalConfirmed) {
+      return;
+    }
+
+    void performDeleteAccount();
     return;
   }
 
