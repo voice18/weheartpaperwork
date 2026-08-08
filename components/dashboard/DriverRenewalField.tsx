@@ -11,15 +11,15 @@ import {
   formatDateInput,
   inputToIso,
   isoToInput,
-} from "../../../../lib/dateUtils";
+} from "../../lib/dateUtils";
 import PersistedDateInput from "./PersistedDateInput";
-import { useComplianceHistory } from "../../../../store/useComplianceHistory";
+import { useComplianceHistory } from "../../store/useComplianceHistory";
 import {
   addDays,
   addYears,
   daysFrom,
   localDateString,
-} from "../../../../lib/requirements";
+} from "../../lib/requirements";
 type Props = {
   label: string;
   value: string;

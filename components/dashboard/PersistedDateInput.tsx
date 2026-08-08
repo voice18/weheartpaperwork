@@ -9,7 +9,7 @@ import {
   formatDateInput,
   inputToIso,
   isoToInput,
-} from "../../../../lib/dateUtils";
+} from "../../lib/dateUtils";
 
 type Props = {
   value: string;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   useComplianceHistory,
-} from "../../../../store/useComplianceHistory";
+} from "../../store/useComplianceHistory";
 import {
   Alert,
   Platform,
@@ -18,12 +18,12 @@ import {
   fmtDate,
   localDateString,
   urgency,
-} from "../../../../lib/requirements";
+} from "../../lib/requirements";
 import {
   formatDateInput,
   inputToIso,
   isoToInput,
-} from "../../../../lib/dateUtils";
+} from "../../lib/dateUtils";
 
 type RequirementRowProps = {
   r: any;

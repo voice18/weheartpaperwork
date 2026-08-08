@@ -28,7 +28,7 @@ import {
 } from "firebase/firestore";
 import { auth, db, functions, } from "../../../lib/firebase";
 import { registerForPushNotifications } from "../../../lib/registerPushNotifications";
-import SettingsRow from "./components/SettingsRow";
+import SettingsRow from "../../../components/settings/SettingsRow";
 import { useComplianceStore } from "../../../store/useComplianceStore";
 import Constants from "expo-constants";
 import type {

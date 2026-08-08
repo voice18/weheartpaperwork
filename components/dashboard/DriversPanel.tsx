@@ -18,10 +18,10 @@ import {
 } from "firebase/firestore";
 import { Ionicons } from "@expo/vector-icons";
 
-import { auth, db } from "../../../../lib/firebase";
+import { auth, db } from "../../lib/firebase";
 import PersistedDateInput from "./PersistedDateInput";
 import DriverRenewalField from "./DriverRenewalField";
-import { daysFrom } from "../../../../lib/requirements";
+import { daysFrom } from "../../lib/requirements";
 
 type Driver = {
   id: string;
