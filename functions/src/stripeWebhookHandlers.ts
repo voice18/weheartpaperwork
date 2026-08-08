@@ -171,9 +171,12 @@ export async function syncSubscriptionToCarrier(
   const carrierSnapshot =
     await carrierRef.get();
 
-  if (!carrierSnapshot.exists) {
+  if (
+  !carrierSnapshot.exists ||
+  carrierSnapshot.data()?.deletingAccount === true
+) {
     console.log(
-      "Stripe subscription sync skipped because carrier no longer exists",
+      "Stripe subscription sync skipped because carrier is missing or being deleted",
       {
         carrierId,
         stripeSubscriptionId: subscription.id,
@@ -315,9 +318,12 @@ export async function handleCheckoutCompleted(
 const carrierSnapshot =
   await carrierRef.get();
 
-if (!carrierSnapshot.exists) {
+if (
+  !carrierSnapshot.exists ||
+  carrierSnapshot.data()?.deletingAccount === true
+) {
   console.log(
-    "Checkout completion skipped because carrier no longer exists",
+    "Checkout completion skipped because carrier is missing or being deleted",
     {
       carrierId,
       stripeSubscriptionId,

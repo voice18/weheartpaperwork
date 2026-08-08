@@ -52,6 +52,9 @@ export default function SettingsScreen() {
   const [activeDriverCount, setActiveDriverCount] =
   useState(0);
 
+  const [deletingAccount, setDeletingAccount] =
+  useState(false);
+
   useEffect(() => {
   const userId = auth.currentUser?.uid;
 
@@ -701,6 +704,90 @@ const billingStatusColor = (() => {
   }
 })();
 
+const performDeleteAccount = async () => {
+  if (deletingAccount) {
+    return;
+  }
+
+  setDeletingAccount(true);
+
+  try {
+    const deleteAccount = httpsCallable<
+      Record<string, never>,
+      { success: boolean }
+    >(
+      functions,
+      "deleteAccount"
+    );
+
+    await deleteAccount({});
+
+    try {
+      await signOut(auth);
+    } catch {
+      // The backend may already have deleted the
+      // Firebase Auth user. Either way, return to login.
+    }
+
+    router.replace("/(auth)/login");
+  } catch (error: any) {
+    console.error(
+      "Account deletion failed:",
+      error
+    );
+
+    const message =
+      typeof error?.details === "string"
+        ? error.details
+        : "Your account could not be deleted. Please try again.";
+
+    Alert.alert(
+      "Unable to delete account",
+      message
+    );
+  } finally {
+    setDeletingAccount(false);
+  }
+};
+
+const handleDeleteAccount = () => {
+  if (deletingAccount) {
+    return;
+  }
+
+  Alert.alert(
+    "Delete account?",
+    "This permanently deletes your company account, drivers, compliance records, and history. Your subscription will also be canceled. This cannot be undone.",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Continue",
+        style: "destructive",
+        onPress: () => {
+          Alert.alert(
+            "Delete permanently?",
+            "This is your final confirmation. Your account and company data cannot be recovered after deletion.",
+            [
+              {
+                text: "Cancel",
+                style: "cancel",
+              },
+              {
+                text: "Delete permanently",
+                style: "destructive",
+                onPress: performDeleteAccount,
+              },
+            ]
+          );
+        },
+      },
+    ]
+  );
+};
+
 const cancellationDateLabel = (() => {
   const cancelAt = billing?.cancelAt;
 
@@ -897,14 +984,14 @@ const trialEndLabel = (() => {
 
         <SettingsRow
           label="Pricing"
-          value={`$2 company + $1 × ${activeDriverCount}`}
+          value={`$2 company + $1 x ${activeDriverCount}`}
         />
 
         <SettingsRow
         label="Manage billing"
         value={
           openingBillingPortal
-            ? "Opening…"
+            ? "Opening..."
             : undefined
         }
         showDivider={false}
@@ -932,6 +1019,28 @@ const trialEndLabel = (() => {
             showDivider={false}
             />
 
+        </View>
+
+        <Text style={styles.sectionLabel}>
+  Account management
+</Text>
+
+        <View style={styles.card}>
+          <SettingsRow
+            label="Delete account"
+            value={
+              deletingAccount
+                ? "Deleting..."
+                : "Permanent"
+            }
+            valueColor="#A32D2D"
+            showDivider={false}
+            onPress={
+              deletingAccount
+                ? undefined
+                : handleDeleteAccount
+            }
+          />
         </View>
       </ScrollView>
       <Modal
@@ -1118,7 +1227,7 @@ const trialEndLabel = (() => {
       </Text>
 
       <Text style={styles.modalDescription}>
-        We’ll send a verification link to the new address.
+        We'll send a verification link to the new address.
       </Text>
 
       <TextInput

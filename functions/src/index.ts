@@ -503,6 +503,230 @@ async function sendDailySummaryNotification(
 
   return result.data;
 }
+
+export const deleteAccount = onCall(
+  {
+    region: "us-central1",
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 120,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "You must be signed in to delete your account."
+      );
+    }
+
+    const userId = request.auth.uid;
+
+    console.log("Account deletion started", {
+      userId,
+    });
+
+    const userRef =
+      db.collection("users").doc(userId);
+
+    const userSnapshot =
+      await userRef.get();
+
+    const userData =
+      userSnapshot.data();
+
+    if (
+      userSnapshot.exists &&
+      typeof userData?.role === "string" &&
+      userData.role !== "owner"
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "Only the account owner can delete this company account."
+      );
+    }
+
+    const savedCarrierId =
+      userData?.carrierId;
+
+    // Current v1 accounts normally use the Firebase UID as
+    // the carrier ID. The fallback also allows deletion if
+    // onboarding was never completed.
+    const carrierId =
+      typeof savedCarrierId === "string" &&
+      savedCarrierId.trim()
+        ? savedCarrierId
+        : userId;
+
+    const carrierRef =
+      db.collection("carriers").doc(carrierId);
+
+    const carrierSnapshot =
+      await carrierRef.get();
+
+    if (carrierSnapshot.exists) {
+  await carrierRef.update({
+    deletingAccount: true,
+    deletingAccountStartedAt:
+      admin.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+    const stripeCustomerId =
+      carrierSnapshot.exists &&
+      typeof carrierSnapshot.data()?.billing
+        ?.stripeCustomerId === "string"
+        ? carrierSnapshot.data()?.billing
+            ?.stripeCustomerId
+        : null;
+
+    // Remove Stripe billing first so the customer cannot
+    // continue being charged if a later cleanup step fails.
+    if (stripeCustomerId) {
+      const stripe = new Stripe(
+        stripeSecretKey.value()
+      );
+
+      try {
+        await stripe.customers.del(
+          stripeCustomerId
+        );
+
+        console.log(
+          "Stripe customer deleted during account deletion",
+          {
+            userId,
+            carrierId,
+            stripeCustomerId,
+          }
+        );
+      } catch (error: any) {
+        const isMissingCustomer =
+          error?.code === "resource_missing" ||
+          error?.statusCode === 404;
+
+        if (!isMissingCustomer) {
+          console.error(
+            "Stripe customer deletion failed",
+            {
+              userId,
+              carrierId,
+              stripeCustomerId,
+              error,
+            }
+          );
+
+          if (carrierSnapshot.exists) {
+            try {
+              await carrierRef.update({
+                deletingAccount: false,
+                deletingAccountStartedAt:
+                  admin.firestore.FieldValue.delete(),
+              });
+            } catch (resetError) {
+              console.error(
+                "Unable to reset account deletion flag",
+                {
+                  userId,
+                  carrierId,
+                  resetError,
+                }
+              );
+            }
+          }
+          throw new HttpsError(
+            "internal",
+            "Billing could not be removed. Please try deleting your account again."
+          );
+        }
+
+        console.log(
+          "Stripe customer was already deleted",
+          {
+            userId,
+            carrierId,
+            stripeCustomerId,
+          }
+        );
+      }
+    }
+
+    // Remove notification delivery/history records belonging
+    // to either this user or this carrier.
+    const [
+      notificationRunsByUser,
+      notificationRunsByCarrier,
+    ] = await Promise.all([
+      db
+        .collection("notificationRuns")
+        .where("userId", "==", userId)
+        .get(),
+
+      db
+        .collection("notificationRuns")
+        .where("carrierId", "==", carrierId)
+        .get(),
+    ]);
+
+    const notificationRefs =
+      new Map<
+        string,
+        FirebaseFirestore.DocumentReference
+      >();
+
+    notificationRunsByUser.docs.forEach(
+      (document) => {
+        notificationRefs.set(
+          document.ref.path,
+          document.ref
+        );
+      }
+    );
+
+    notificationRunsByCarrier.docs.forEach(
+      (document) => {
+        notificationRefs.set(
+          document.ref.path,
+          document.ref
+        );
+      }
+    );
+
+    if (notificationRefs.size > 0) {
+      const writer = db.bulkWriter();
+
+      for (const ref of notificationRefs.values()) {
+        writer.delete(ref);
+      }
+
+      await writer.close();
+    }
+
+    // Delete the carrier document and every descendant:
+    // drivers, compliance, complianceRecords, history, etc.
+    await db.recursiveDelete(carrierRef);
+
+    // Delete the user's standalone Firestore document.
+    await userRef.delete();
+
+    // Authentication is intentionally deleted last.
+    try {
+      await admin.auth().deleteUser(userId);
+    } catch (error: any) {
+      if (error?.code !== "auth/user-not-found") {
+        throw error;
+      }
+    }
+
+    console.log("Account deletion complete", {
+      userId,
+      carrierId,
+    });
+
+    return {
+      success: true,
+    };
+  }
+);
+
 export const createBillingPortalSession = onCall(
   {
     region: "us-central1",
@@ -584,6 +808,15 @@ export const createBillingPortalSession = onCall(
         throw new HttpsError(
           "not-found",
           "Your company account could not be found."
+        );
+      }
+
+      if (
+        carrierSnapshot.data()?.deletingAccount === true
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Account deletion is already in progress."
         );
       }
 
@@ -749,6 +982,14 @@ export const createCheckoutSession = onCall(
         throw new HttpsError(
           "not-found",
           "Your company account could not be found."
+        );
+      }
+      if (
+        carrierSnapshot.data()?.deletingAccount === true
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Account deletion is already in progress."
         );
       }
 
@@ -1136,15 +1377,30 @@ const isActive =
       await carrierRef.get();
 
     if (!carrierSnapshot.exists) {
-      console.error("Carrier not found during driver billing sync", {
-        carrierId,
-      });
+  console.error("Carrier not found during driver billing sync", {
+    carrierId,
+  });
 
-      return;
+  return;
+}
+
+const carrierData =
+  carrierSnapshot.data();
+
+if (carrierData?.deletingAccount === true) {
+  console.log(
+    "Driver billing sync skipped because account is being deleted",
+    {
+      carrierId,
+      driverId,
     }
+  );
 
-    const billing =
-      carrierSnapshot.data()?.billing;
+  return;
+}
+
+const billing =
+  carrierData?.billing;
 
     const stripeSubscriptionId =
       billing?.stripeSubscriptionId;
