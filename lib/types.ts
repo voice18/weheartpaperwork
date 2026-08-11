@@ -118,14 +118,9 @@ export interface ComplianceRecord {
 export type RequirementId =
   | "mcs150"
   | "tax2290"
-  | "clearinghouse"
-  | "mvr"
   | "fmcsa-portal"
   | "ucr"
   | "ifta"
-  | "insurance"
-  | "medical"
   | "irp"
   | "drug"
-  | "boc3"
-  | "bizlicense";
+  | "boc3";

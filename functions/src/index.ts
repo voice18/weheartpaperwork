@@ -5,10 +5,9 @@
 // Deploy with:  cd functions && npm run deploy
 // Or from root: firebase deploy --only functions
 //
-// Two functions:
-//   1. dailyComplianceCheck — runs every day at 8am, scans all carriers,
+// Firebase Functions backend.
+//   dailyComplianceCheck — runs every day at 8am, scans all carriers,
 //      sends push notifications for items due in 30 days / 15 days / 5 days
-//   2. onUserCreate — bootstraps a new user's Firestore doc on signup
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as functions from "firebase-functions/v2";

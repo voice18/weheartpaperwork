@@ -168,16 +168,6 @@ if (reqId === "ifta") {
   return `${dueYear}-12-31`;
 }
 
-  if (reqId === "medical") {
-  return enteredDate;
-}
-
-  if (
-  reqId === "clearinghouse" ||
-  reqId === "mvr"
-) {
-  return addYears(enteredDate, 1);
-}
 
   if (reqId === "fmcsa-portal") {
     d.setDate(d.getDate() + 90);

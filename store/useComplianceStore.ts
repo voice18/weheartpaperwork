@@ -129,7 +129,7 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
   },
 
   // ── saveDate ───────────────────────────────────────────────────────────────
-  // enteredDate = what the user typed (e.g. last inspection date)
+  // enteredDate = what the user typed (e.g. date of last completion)
   // dueDate     = calculated next due date (computed in the UI layer)
   async saveDate(reqId, enteredDate, dueDate) {
     const { carrierId } = get();
@@ -359,12 +359,6 @@ async markComplete(reqId, completionDate = null) {
           days?: number;
         }
       > = {
-        clearinghouse: {
-          years: 1,
-        },
-        mvr: {
-          years: 1,
-        },
         "fmcsa-portal": {
           days: 90,
         },
