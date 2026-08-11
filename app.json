@@ -48,12 +48,6 @@
         "projectId": "a80da581-6fc9-4032-bdb8-150154d3c72e"
       }
     },
-    "owner": "weheartpaperwork",
-    "runtimeVersion": {
-  "policy": "appVersion"
-},
-    "updates": {
-      "url": "https://u.expo.dev/a80da581-6fc9-4032-bdb8-150154d3c72e"
-    }
+    "owner": "weheartpaperwork"
   }
 }
