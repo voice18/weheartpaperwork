@@ -11,36 +11,103 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == carrierId;
     }
 
+    function allowedCarrierCreate() {
+      return request.resource.data.keys().hasOnly([
+        "companyName",
+        "phoneNumber",
+        "usdotNumber",
+        "onboardingComplete",
+        "notificationsEnabled",
+        "expoPushToken",
+        "notificationTokenUpdatedAt",
+        "nextStepDismissed",
+        "nextStepDismissedAt",
+        "updatedAt"
+      ]);
+    }
+
+    function allowedCarrierUpdate() {
+      return request.resource.data
+        .diff(resource.data)
+        .affectedKeys()
+        .hasOnly([
+          "companyName",
+          "phoneNumber",
+          "usdotNumber",
+          "onboardingComplete",
+          "notificationsEnabled",
+          "expoPushToken",
+          "notificationTokenUpdatedAt",
+          "nextStepDismissed",
+          "nextStepDismissedAt",
+          "updatedAt"
+        ]);
+    }
+
     match /carriers/{carrierId} {
-      allow read, create, update: if ownsCarrier(carrierId);
+      allow read: if ownsCarrier(carrierId);
+      allow create: if ownsCarrier(carrierId) && allowedCarrierCreate();
+      allow update: if ownsCarrier(carrierId) && allowedCarrierUpdate();
 
       match /compliance/{documentId} {
         allow read, write: if ownsCarrier(carrierId);
       }
-	match /complianceRecords/{requirementId} {
-         allow read, write: if ownsCarrier(carrierId);
 
-         match /history/{recordId} {
+      match /complianceRecords/{requirementId} {
         allow read, write: if ownsCarrier(carrierId);
-     }
-   }
+
+        match /history/{recordId} {
+          allow read, write: if ownsCarrier(carrierId);
+        }
+      }
 
       match /drivers/{driverId} {
-  allow read, write: if ownsCarrier(carrierId);
+        allow read, write: if ownsCarrier(carrierId);
 
-  match /complianceRecords/{requirementId} {
-    allow read, write: if ownsCarrier(carrierId);
+        match /complianceRecords/{requirementId} {
+          allow read, write: if ownsCarrier(carrierId);
 
-    match /history/{recordId} {
-      allow read, write: if ownsCarrier(carrierId);
-    }
-  }
-}
+          match /history/{recordId} {
+            allow read, write: if ownsCarrier(carrierId);
+          }
+        }
+      }
     }
 
     match /users/{userId} {
-      allow read, create, update: if signedIn()
-        && request.auth.uid == userId;
+  allow read: if signedIn()
+    && request.auth.uid == userId;
+
+  allow create: if signedIn()
+    && request.auth.uid == userId
+    && request.resource.data.keys().hasOnly([
+      "email",
+      "carrierId",
+      "role",
+      "notificationsEnabled",
+      "expoPushToken",
+      "notificationTokenUpdatedAt",
+      "updatedAt"
+    ])
+    && request.resource.data.carrierId == userId
+    && request.resource.data.role == "owner";
+
+  allow update: if signedIn()
+    && request.auth.uid == userId
+    && request.resource.data.carrierId == userId
+    && request.resource.data.role == "owner"
+    && request.resource.data
+      .diff(resource.data)
+      .affectedKeys()
+      .hasOnly([
+        "email",
+        "carrierId",
+        "role",
+        "notificationsEnabled",
+        "expoPushToken",
+        "notificationTokenUpdatedAt",
+        "updatedAt"
+      ]);
     }
   }
 }

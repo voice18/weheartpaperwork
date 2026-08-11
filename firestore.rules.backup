@@ -1,0 +1,46 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsCarrier(carrierId) {
+      return signedIn() && request.auth.uid == carrierId;
+    }
+
+    match /carriers/{carrierId} {
+      allow read, create, update: if ownsCarrier(carrierId);
+
+      match /compliance/{documentId} {
+        allow read, write: if ownsCarrier(carrierId);
+      }
+	match /complianceRecords/{requirementId} {
+         allow read, write: if ownsCarrier(carrierId);
+
+         match /history/{recordId} {
+        allow read, write: if ownsCarrier(carrierId);
+     }
+   }
+
+      match /drivers/{driverId} {
+  allow read, write: if ownsCarrier(carrierId);
+
+  match /complianceRecords/{requirementId} {
+    allow read, write: if ownsCarrier(carrierId);
+
+    match /history/{recordId} {
+      allow read, write: if ownsCarrier(carrierId);
+    }
+  }
+}
+    }
+
+    match /users/{userId} {
+      allow read, create, update: if signedIn()
+        && request.auth.uid == userId;
+    }
+  }
+}

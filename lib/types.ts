@@ -123,7 +123,6 @@ export type RequirementId =
   | "fmcsa-portal"
   | "ucr"
   | "ifta"
-  | "inspection"
   | "insurance"
   | "medical"
   | "irp"

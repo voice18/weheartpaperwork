@@ -28,42 +28,42 @@ export default function NotificationsOnboarding() {
   const isWeb = Platform.OS === "web";
 
   const finishOnboarding = async (
-    notificationsEnabled: boolean,
-    expoPushToken?: string
-  ) => {
-    const user = auth.currentUser;
+  notificationsEnabled: boolean,
+  expoPushToken?: string
+) => {
+  const user = auth.currentUser;
 
-    if (!user) {
-      setMessage("Please log in again.");
-      return;
-    }
+  if (!user) {
+    setMessage("Please log in again.");
+    return;
+  }
 
-    await setDoc(
-      doc(db, "carriers", user.uid),
-      {
-        onboardingComplete: true,
-        notificationsEnabled,
-        expoPushToken: expoPushToken ?? "",
-        notificationTokenUpdatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+  await setDoc(
+    doc(db, "users", user.uid),
+    {
+      email: user.email ?? "",
+      carrierId: user.uid,
+      role: "owner",
+      notificationsEnabled,
+      expoPushToken: expoPushToken ?? "",
+      notificationTokenUpdatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
 
-    await setDoc(
-      doc(db, "users", user.uid),
-      {
-        email: user.email ?? "",
-        carrierId: user.uid,
-        role: "owner",
-        notificationsEnabled,
-        expoPushToken: expoPushToken ?? "",
-        notificationTokenUpdatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+  await setDoc(
+    doc(db, "carriers", user.uid),
+    {
+      onboardingComplete: true,
+      notificationsEnabled,
+      expoPushToken: expoPushToken ?? "",
+      notificationTokenUpdatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
 
-    router.replace("/(app)/dashboard");
-  };
+  router.replace("/(app)/dashboard");
+};
 
   const watchMyPaperwork = async () => {
     try {

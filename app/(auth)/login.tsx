@@ -7,7 +7,6 @@ import {
   ScrollView,
   Linking,
 } from "react-native";
-import { useRouter } from "expo-router";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -15,7 +14,6 @@ import {
 import { auth } from "../../lib/firebase";
 
 export default function Login() {
-  const router = useRouter();
   const [mode, setMode] = useState<"login" | "create">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +23,6 @@ export default function Login() {
     try {
       setMessage("Signing in...");
       await signInWithEmailAndPassword(auth, email, password);
-      router.replace("/(app)/dashboard");
     } catch (e: any) {
       setMessage(e.message);
     }
@@ -35,7 +32,6 @@ export default function Login() {
     try {
       setMessage("Creating account...");
       await createUserWithEmailAndPassword(auth, email, password);
-      router.replace("/(onboarding)/company");
     } catch (e: any) {
       setMessage(e.message);
     }

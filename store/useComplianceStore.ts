@@ -19,7 +19,11 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import type { ComplianceRecord, RequirementId } from "../lib/types";
-import { calcUsdotDue } from "../lib/requirements";
+import {
+  addDays,
+  addYears,
+  calcUsdotDue,
+} from "../lib/requirements";
 
 function fixedCalendarDueDate(
   reqId: RequirementId
@@ -210,37 +214,72 @@ async markComplete(reqId, completionDate = null) {
   let previousDueDate: string | null = null;
   let nextDueDate: string | null = null;
 
+  const previousEnteredDate =
+  compliance[reqId]?.enteredDate || null;
+
   if (reqId === "mcs150") {
-    const currentDue =
-      compliance[reqId]?.dueDate ||
-      calcUsdotDue(usdotNumber);
+      const currentDue =
+        compliance[reqId]?.dueDate ||
+        calcUsdotDue(usdotNumber);
 
-    if (!currentDue) {
-      return;
-    }
+      if (!currentDue || !completionDate) {
+        return;
+      }
 
-    const d = new Date(
-      currentDue + "T00:00:00"
-    );
+      previousDueDate = currentDue;
 
-    d.setFullYear(
-      d.getFullYear() + 2
-    );
+      /*
+      * FMCSA rule:
+      * An MCS-150 update filed during the 12 months
+      * immediately preceding a scheduled biennial
+      * due date satisfies that biennial cycle.
+      *
+      * Updates made earlier than that do NOT move
+      * the scheduled biennial due date.
+      */
+      let candidateDue = currentDue;
 
-    previousDueDate = currentDue;
-    nextDueDate =
-      d.toISOString().split("T")[0];
+      while (true) {
+        const windowStart = addYears(
+          candidateDue,
+          -1
+        );
 
-    complianceUpdate = {
-      enteredDate: completionDate,
-      dueDate: nextDueDate,
-      completed: false,
-      completedAt: null,
-      lastUpdated: serverTimestamp(),
-      notified30: false,
-      notified90: false,
-    };
-  } else if (reqId === "irp") {
+        if (!windowStart) {
+          return;
+        }
+
+        if (completionDate < windowStart) {
+          break;
+        }
+
+        const followingDue = addYears(
+          candidateDue,
+          2
+        );
+
+        if (!followingDue) {
+          return;
+        }
+
+        candidateDue = followingDue;
+      }
+
+      nextDueDate = candidateDue;
+
+      complianceUpdate = {
+        enteredDate: completionDate,
+        dueDate: nextDueDate,
+        completed: false,
+        completedAt: null,
+        lastUpdated: serverTimestamp(),
+        notified30: false,
+        notified90: false,
+      };
+    } else if (
+      reqId === "irp" ||
+      reqId === "drug"
+    ) {
     const currentDue =
       compliance[reqId]?.dueDate ||
       compliance[reqId]?.enteredDate;
@@ -249,17 +288,17 @@ async markComplete(reqId, completionDate = null) {
       return;
     }
 
-    const d = new Date(
-      currentDue + "T00:00:00"
-    );
-
-    d.setFullYear(
-      d.getFullYear() + 1
-    );
-
     previousDueDate = currentDue;
-    nextDueDate =
-      d.toISOString().split("T")[0];
+      nextDueDate = addYears(
+        currentDue,
+        1
+      );
+
+      if (!nextDueDate) {
+        return;
+      }
+
+    
 
     complianceUpdate = {
       enteredDate: currentDue,
@@ -303,11 +342,9 @@ async markComplete(reqId, completionDate = null) {
         previousDueDate: currentDue,
         dueDate: nextDueDate,
 
-        completed: true,
-        completedDate:
-          completionDate || null,
-        completedAt:
-          serverTimestamp(),
+        completed: false,
+        completedDate: null,
+        completedAt: null,
 
         lastUpdated:
           serverTimestamp(),
@@ -331,15 +368,6 @@ async markComplete(reqId, completionDate = null) {
         "fmcsa-portal": {
           days: 90,
         },
-        inspection: {
-          years: 1,
-        },
-        medical: {
-          years: 2,
-        },
-        drug: {
-          years: 1,
-        },
       };
 
       const rule =
@@ -351,31 +379,21 @@ async markComplete(reqId, completionDate = null) {
         compliance[reqId]?.enteredDate;
 
       if (rule && currentDue) {
-        const d = new Date(
-          currentDue + "T00:00:00"
-        );
-
-        if (rule.years) {
-          d.setFullYear(
-            d.getFullYear() +
+        nextDueDate = rule.years
+          ? addYears(
+              currentDue,
               rule.years
-          );
+            )
+          : rule.days
+            ? addDays(
+                currentDue,
+                rule.days
+              )
+            : null;
+
+        if (!nextDueDate) {
+          return;
         }
-
-        if (rule.days) {
-          d.setDate(
-            d.getDate() +
-              rule.days
-          );
-        }
-
-        previousDueDate =
-          compliance[reqId]?.dueDate ||
-          compliance[reqId]?.enteredDate ||
-          null;
-
-        nextDueDate =
-          d.toISOString().split("T")[0];
 
         complianceUpdate = {
           enteredDate: currentDue,
@@ -427,6 +445,7 @@ async markComplete(reqId, completionDate = null) {
         "Account owner",
 
       previousDueDate,
+      previousEnteredDate,
       nextDueDate,
 
       note: null,

@@ -36,14 +36,40 @@ export const daysFrom = (s: string | null): number | null => {
 export const fmtDate = (s: string | null): string =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }) : "—";
 
-export const addYears = (s: string, y: number): string => {
-  const d = new Date(s + "T00:00:00");
+export const addYears = (
+  s: string,
+  y: number
+): string => {
+  const match =
+    /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
 
-  if (Number.isNaN(d.getTime())) return "";
+  if (!match) {
+    return "";
+  }
 
-  d.setFullYear(d.getFullYear() + y);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
 
-  return localDateString(d);
+  const targetYear = year + y;
+
+  const lastDayOfTargetMonth =
+    new Date(
+      targetYear,
+      month,
+      0
+    ).getDate();
+
+  const targetDay = Math.min(
+    day,
+    lastDayOfTargetMonth
+  );
+
+  return (
+    `${targetYear}-` +
+    `${String(month).padStart(2, "0")}-` +
+    `${String(targetDay).padStart(2, "0")}`
+  );
 };
 
 export const addDays = (s: string, n: number): string => {
@@ -143,14 +169,15 @@ if (reqId === "ifta") {
 }
 
   if (reqId === "medical") {
-    d.setFullYear(d.getFullYear() + 2);
-    return d.toISOString().split("T")[0];
-  }
+  return enteredDate;
+}
 
-  if (reqId === "clearinghouse" || reqId === "mvr" || reqId === "inspection") {
-    d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().split("T")[0];
-  }
+  if (
+  reqId === "clearinghouse" ||
+  reqId === "mvr"
+) {
+  return addYears(enteredDate, 1);
+}
 
   if (reqId === "fmcsa-portal") {
     d.setDate(d.getDate() + 90);
@@ -165,6 +192,9 @@ export function buildReqs(
 ): Requirement[] {
   const c  = compliance;
   const ud = calcUsdotDue(usdotNumber);
+  const currentYear = new Date().getFullYear();
+  const tax2290DefaultDue = `${currentYear}-08-31`;
+  const yearEndDefaultDue = `${currentYear}-12-31`;
 
   const r = (
   id: RequirementId
@@ -186,33 +216,99 @@ const isApplicable = (
   r(id).applicable !== false;
 
   return [ 
-    { id:"mcs150",       n:"MCS-150 / USDOT biennial update",            f:"Every 2 years",        due: r("mcs150").dueDate || ud,                                             de:true, dateMode: "fixed-user-date",  dl: "Next MCS-150 due date",  crit:true, attentionDays: 30,
-      notes:"Required every 2 years even if nothing changed. Date is calculated from your USDOT number.",
+    { id:"mcs150",       n:"MCS-150 / USDOT biennial update",            f:"Changes within 30 days · biennial",        due: r("mcs150").dueDate || ud,                                             de:true, dateMode: "fixed-user-date",  dl: "Next MCS-150 due date",  crit:true, attentionDays: 30,
+      notes:"Update your FMCSA registration within 30 days whenever company information changes. A biennial update is also required every 2 years on your USDOT-number schedule. An MCS-150 update filed within 12 months before the scheduled biennial due date satisfies that biennial cycle.",
       cons:"Failure can deactivate your USDOT number and halt all operations.", act:"File MCS-150 update", lnk:"https://portal.fmcsa.dot.gov", completed: r("mcs150").completed, applicable:isApplicable("mcs150"), canBeNotApplicable: true, },
-    { id:"tax2290",      n:"2290 heavy vehicle use tax",                  f:"Annual",               due: r("tax2290").dueDate ||     "2026-08-31",                                        de:false, dateMode: "fixed-calendar", attentionDays: 30,
-      notes:"Due Aug 31 for vehicles in service as of July 1.",
-      cons:"Late penalty: 4.5% per month, up to 5 months.", act:"File Form 2290", lnk:"https://www.irs.gov/businesses/small-businesses-self-employed/trucking-tax-center", completed: r("tax2290").completed, applicable:isApplicable("tax2290"), canBeNotApplicable: true, },
-    { id:"fmcsa-portal", n:"FMCSA portal account maintenance",            f:"Every 90 days",        due: r("fmcsa-portal").dueDate || (r("fmcsa-portal").enteredDate  ? addDays(r("fmcsa-portal").enteredDate as string, 90) : null), de:true, dateMode: "rolling", dl:"Last login date", attentionDays: 10,
-      notes:"Log in every 90 days to prevent account deactivation.", 
-      cons:"Inactive portal blocks filing updates and FMCSA responses.", act:"Log into FMCSA portal", lnk:"https://portal.fmcsa.dot.gov", completed: r("fmcsa-portal").completed, applicable:isApplicable("fmcsa-portal"), canBeNotApplicable: true, },
-    { id:"ucr",          n:"UCR — unified carrier registration",          f: "Annual · due Dec 31",               due: r("ucr").dueDate           || "2026-12-31",                                        de:false, dateMode: "fixed-calendar",  attentionDays: 30,
+    {
+      id: "tax2290",
+      n: "2290 heavy vehicle use tax",
+      f: "Annual · July-use fleet",
+      due:
+        r("tax2290").dueDate ||
+        tax2290DefaultDue,
+      de: false,
+      dateMode: "fixed-calendar",
+      attentionDays: 30,
+      notes:
+        "For taxable vehicles first used on public highways in July, Form 2290 is generally due August 31. If an additional taxable vehicle is first used later in the tax period, a separate Form 2290 is generally due by the last day of the following month, with tax prorated for the remaining tax period.",
+      cons:
+        "Missing or late Form 2290 filing can result in IRS penalties and leave you without current proof of Heavy Vehicle Use Tax payment.",
+
+      act: "File annual Form 2290",
+      lnk:
+        "https://www.irs.gov/businesses/small-businesses-self-employed/trucking-tax-center",
+
+      completed:
+        r("tax2290").completed,
+      applicable:
+        isApplicable("tax2290"),
+      canBeNotApplicable: true,
+      },
+    {
+        id: "fmcsa-portal",
+        n: "FMCSA Portal account access",
+        f: "Login at least every 90 days",
+        due:
+          r("fmcsa-portal").dueDate ||
+          (
+            r("fmcsa-portal").enteredDate
+              ? addDays(
+                  r("fmcsa-portal").enteredDate as string,
+                  90
+                )
+              : null
+          ),
+        de: true,
+        dateMode: "rolling",
+        dl: "Last Portal login date",
+        attentionDays: 10,
+
+        notes:
+          "FMCSA Portal accounts are disabled after 90 days and archived after 12 months of inactivity. Registration actions have moved to Motus, but the Portal remains in use for certain FMCSA systems.",
+
+        cons:
+          "A disabled Portal account can prevent access to FMCSA systems that still use the Portal.",
+
+        act: "Log into FMCSA Portal",
+
+        lnk:"https://www.fmcsa.dot.gov/registration/updating-your-registration",
+
+        completed:
+          r("fmcsa-portal").completed,
+
+        applicable:
+          isApplicable("fmcsa-portal"),
+
+        canBeNotApplicable: true,
+      },
+    { id:"ucr",          n:"UCR — unified carrier registration",          f: "Annual · due Dec 31",               due: r("ucr").dueDate || yearEndDefaultDue,                                        de:false, dateMode: "fixed-calendar",  attentionDays: 30,
       notes:"Renew before Jan 1. Fees are fleet-size based.",
       cons:"Operating without valid UCR is a federal violation.", act:"Renew UCR", lnk:"https://www.ucr.gov", completed: r("ucr").completed, applicable:isApplicable("ucr"), canBeNotApplicable: true, },
-    { id:"ifta",         n:"IFTA license & decals annual renewal",                        f:"Annual · due Dec 31",               due: r("ifta").dueDate || "2026-12-31",                                        de:false, dateMode: "fixed-calendar", attentionDays: 30,
+    { id:"ifta",         n:"IFTA license & decals annual renewal",                        f:"Annual · due Dec 31",               due: r("ifta").dueDate || yearEndDefaultDue,                                        de:false, dateMode: "fixed-calendar", attentionDays: 30,
       notes:"IFTA license and decals renew annually through your base jurisdiction. This does not track quarterly IFTA fuel tax filings.",
-      cons:"Expired IFTA decals risk fines and out-of-service at weigh stations.", act:"Renew IFTA license and decals", completed: r("ifta").completed, applicable:isApplicable("ifta"), canBeNotApplicable: true, },
-    { id:"inspection",   n:"Annual vehicle inspections",                  f:"Every 12 months/CMV",  due: r("inspection").completed   ? null : r("inspection").enteredDate   ? addYears(r("inspection").enteredDate!,1)   : null, de:true, dateMode: "rolling", dl:"Date of last inspection", attentionDays: 30,
-      notes:"Each truck and trailer needs annual FMCSA-compliant inspection.",
-      cons:"Expired inspection = immediate out-of-service violation.", act:"Schedule fleet inspections", completed: r("inspection").completed, applicable:isApplicable("inspection"), canBeNotApplicable: true, },
+      cons:"Operating without valid IFTA credentials may require trip permits and can result in citations.", act:"Renew IFTA license and decals", completed: r("ifta").completed, applicable:isApplicable("ifta"), canBeNotApplicable: true, },
     { id:"irp",          n:"IRP apportioned registration renewal",        f:"Annual · jurisdiction-specific",               due: r("irp").dueDate     || r("irp").enteredDate          || null,               de:true, dateMode: "fixed-user-date", dl:"IRP expiration / renewal due date", attentionDays: 30,
       notes:"State-specific renewal. Enter the actual IRP expiration date from your registration.",
       cons:"Expired apportioned registration can stop interstate operations.", act:"Renew IRP registration", completed: r("irp").completed, applicable:isApplicable("irp"), canBeNotApplicable: true, },
     { id:"drug",         n:"Drug & alcohol consortium Renewal",        f:"Annual · provider-specific",           due: r("drug").dueDate || r("drug").enteredDate || null,               de:true, dateMode: "fixed-user-date", dl:"Consortium membership renewal due date", attentionDays: 30,
       notes:"Enter the annual renewal date provided by your drug and alcohol consortium. FMCSA requires continuous program enrollment, but the renewal date is set by your chosen provider.", 
       cons:"A lapse in consortium enrollment can leave the company without a compliant DOT drug and alcohol testing program.", act:"Renew consortium membership", completed: r("drug").completed, applicable:isApplicable("drug"), canBeNotApplicable: true, },
-    { id:"boc3",         n:"BOC-3 process agent filing",                  f:"One-time",             due: null,                                                                                      de:false, dateMode: "none",
-      notes:"Only refile if process agent changes.",
-      cons:"Missing BOC-3 prevents FMCSA from activating authority.", act:"Confirm agent is active", completed: r("boc3").completed, applicable:isApplicable("boc3"), canBeNotApplicable: true, },
+    {
+      id: "boc3",
+      n: "BOC-3 process agent filing",
+      f: "One-time · maintain valid designation",
+      due: null,
+      de: false,
+      dateMode: "none",
+      notes:
+        "Keep a valid process agent designation on file with FMCSA. File a new BOC-3 if the designation changes or becomes invalid, or when FMCSA requires a new filing after an operating-authority change.",
+      cons:
+        "An invalid or missing BOC-3 can prevent or jeopardize active operating authority.",
+      act: "Confirm BOC-3 is active",
+      completed: r("boc3").completed,
+      applicable: isApplicable("boc3"),
+      canBeNotApplicable: true,
+    },
   ];
 }
 

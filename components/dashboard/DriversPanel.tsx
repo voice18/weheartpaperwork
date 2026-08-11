@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -34,7 +35,19 @@ type Driver = {
   mvrDue: string;
   clearinghouseDue: string;
   roadTestOnFile: boolean;
-  dqFileComplete: boolean;
+  employmentApplicationOnFile?: boolean;
+  initialMvrOnFile?: boolean;
+
+  speStatus?:
+    | "missing"
+    | "on_file"
+    | "not_applicable";
+
+  lcvStatus?:
+  | "missing"
+  | "on_file"
+  | "not_applicable";
+  previousEmployerInvestigationComplete?: boolean;
   status?: "active" | "inactive";
   inactiveAt?: unknown;
   rehiredAt?: unknown;
@@ -110,6 +123,13 @@ export default function DriversPanel() {
   const [newDriverState, setNewDriverState] = useState("");
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
   const [isAddingDriver, setIsAddingDriver] = useState(false);
+  const [openDqDriverId, setOpenDqDriverId] =
+  useState<string | null>(null);
+
+  const [
+  openDqHelpDriverId,
+  setOpenDqHelpDriverId,
+] = useState<string | null>(null);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -144,6 +164,23 @@ export default function DriversPanel() {
       { merge: true }
     );
   };
+    const getDqConfirmedCount = (
+  driver: Driver
+) => {
+ const checks = [
+  driver.employmentApplicationOnFile === true,
+  driver.initialMvrOnFile === true,
+  driver.roadTestOnFile === true,
+
+  driver.speStatus === "on_file" ||
+    driver.speStatus === "not_applicable",
+
+  driver.lcvStatus === "on_file" ||
+    driver.lcvStatus === "not_applicable",
+];
+
+  return checks.filter(Boolean).length;
+};
 
     const markDriverRequirementComplete = async (
   driver: Driver,
@@ -187,7 +224,10 @@ export default function DriversPanel() {
   batch.set(
     driverRef,
     {
-      [fieldName]: completionDate,
+      [fieldName]:
+        requirementId === "medical"
+          ? nextDueDate
+          : completionDate,
       lastUpdated: serverTimestamp(),
     },
     {
@@ -453,7 +493,11 @@ export default function DriversPanel() {
         mvrDue: "",
         clearinghouseDue: "",
         roadTestOnFile: false,
-        dqFileComplete: false,
+        employmentApplicationOnFile: false,
+        initialMvrOnFile: false,
+        speStatus: "missing",
+        lcvStatus: "missing",
+        previousEmployerInvestigationComplete: false,
       });
 
       clearForm();
@@ -561,6 +605,19 @@ export default function DriversPanel() {
                   Driver Compliance
                 </Text>
 
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: "#706E68",
+                    textTransform: "uppercase",
+                    letterSpacing: 0.6,
+                    marginBottom: 10,
+                  }}
+                >
+                  Ongoing driver compliance
+                </Text>
+
                 <DriverDateField
                   label="CDL Expiration"
                   value={driver.cdlExpiration}
@@ -570,11 +627,11 @@ export default function DriversPanel() {
                 />
 
                 <DriverRenewalField
-                  label="Medical Card - date of last DOT physical"
+                  label="Medical Card - expiration date"
                   value={driver.medicalExpiration}
                   driverId={driver.id}
                   requirementId="medical"
-                  years={2}
+                  dateRepresentsDueDate
                   onChange={(value: string) =>
                     updateDriver(driver.id, { medicalExpiration: value })
                   }
@@ -638,30 +695,393 @@ export default function DriversPanel() {
                   }
                 />
 
-                <DriverStatusToggle
-                  label="Road Test"
-                  value={driver.roadTestOnFile}
-                  trueText="On file"
-                  falseText="Missing"
-                  onPress={() =>
-                    updateDriver(driver.id, {
-                      roadTestOnFile: !driver.roadTestOnFile,
-                    })
-                  }
-                />
+                <View
+                  style={{
+                    marginTop: 6,
+                    marginBottom: 14,
+                    borderWidth: 1,
+                    borderColor: "#E2E0D8",
+                    borderRadius: 10,
+                    backgroundColor: "#FAFAF8",
+                    overflow: "hidden",
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() =>
+                      setOpenDqDriverId(current =>
+                        current === driver.id
+                          ? null
+                          : driver.id
+                      )
+                    }
+                    activeOpacity={0.8}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      paddingHorizontal: 12,
+                      paddingVertical: 12,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: "#1A1915",
+                        }}
+                      >
+                        Driver Qualification File
+                      </Text>
 
-                <DriverStatusToggle
-                  label="DQ File"
-                  value={driver.dqFileComplete}
-                  trueText="Complete"
-                  falseText="Incomplete"
-                  onPress={() =>
-                    updateDriver(driver.id, {
-                      dqFileComplete: !driver.dqFileComplete,
-                    })
-                  }
-                />
+                      <Text
+                        style={{
+                          marginTop: 2,
+                          fontSize: 11,
+                          color: "#706E68",
+                        }}
+                      >
+                        {getDqConfirmedCount(driver)} of 5 DQ checks resolved
+                      </Text>
+                    </View>
 
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: "600",
+                        color: "#27500A",
+                      }}
+                    >
+                      {openDqDriverId === driver.id
+                        ? "Hide"
+                        : "Review ›"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {openDqDriverId === driver.id && (
+                    <View
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingBottom: 12,
+                        borderTopWidth: 1,
+                        borderTopColor: "#E8E6E0",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          marginTop: 10,
+                          marginBottom: 8,
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: "#706E68",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.6,
+                        }}
+                      >
+                        Initial setup
+                      </Text>
+
+                      <DriverStatusToggle
+                        label="Employment application"
+                        value={
+                          driver.employmentApplicationOnFile ===
+                          true
+                        }
+                        trueText="On file"
+                        falseText="Missing"
+                        onPress={() =>
+                          updateDriver(driver.id, {
+                            employmentApplicationOnFile:
+                              !driver.employmentApplicationOnFile,
+                          })
+                        }
+                      />
+
+                      <DriverStatusToggle
+                        label="Initial 3-year MVR(s)"
+                        value={
+                          driver.initialMvrOnFile === true
+                        }
+                        trueText="On file"
+                        falseText="Missing"
+                        onPress={() =>
+                          updateDriver(driver.id, {
+                            initialMvrOnFile:
+                              !driver.initialMvrOnFile,
+                          })
+                        }
+                      />
+
+                      <DriverStatusToggle
+                        label="Road test certificate / equivalent"
+                        value={driver.roadTestOnFile === true}
+                        trueText="On file"
+                        falseText="Missing"
+                        onPress={() =>
+                          updateDriver(driver.id, {
+                            roadTestOnFile:
+                              !driver.roadTestOnFile,
+                          })
+                        }
+                      />
+
+                      <TouchableOpacity
+                        onPress={() => {
+                          const current =
+                            driver.speStatus ?? "missing";
+
+                          const next =
+                            current === "missing"
+                              ? "on_file"
+                              : current === "on_file"
+                                ? "not_applicable"
+                                : "missing";
+
+                          void updateDriver(driver.id, {
+                            speStatus: next,
+                          });
+                        }}
+                        activeOpacity={0.8}
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          paddingVertical: 9,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            flex: 1,
+                            paddingRight: 10,
+                            fontSize: 12,
+                            color: "#45433F",
+                          }}
+                        >
+                          SPE / medical variance
+                        </Text>
+
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: "600",
+                            color:
+                              driver.speStatus === "on_file"
+                                ? "#3B6D11"
+                                : driver.speStatus ===
+                                    "not_applicable"
+                                  ? "#706E68"
+                                  : "#A32D2D",
+                          }}
+                        >
+                          {driver.speStatus === "on_file"
+                            ? "On file"
+                            : driver.speStatus ===
+                                "not_applicable"
+                              ? "Not applicable"
+                              : "Missing"}
+                        </Text>
+                      </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => {
+                            const current =
+                              driver.lcvStatus ?? "missing";
+
+                            const next =
+                              current === "missing"
+                                ? "on_file"
+                                : current === "on_file"
+                                  ? "not_applicable"
+                                  : "missing";
+
+                            void updateDriver(driver.id, {
+                              lcvStatus: next,
+                            });
+                          }}
+                          activeOpacity={0.8}
+                          style={{
+                            width: "100%",
+                            minHeight: 44,
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            paddingVertical: 8,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              flex: 1,
+                              paddingRight: 12,
+                              fontSize: 12,
+                              color: "#45433F",
+                            }}
+                          >
+                            LCV training certificate
+                          </Text>
+
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              flexShrink: 0,
+                              fontSize: 11,
+                              fontWeight: "600",
+                              color:
+                                driver.lcvStatus === "on_file"
+                                  ? "#3B6D11"
+                                  : driver.lcvStatus ===
+                                      "not_applicable"
+                                    ? "#706E68"
+                                    : "#A32D2D",
+                            }}
+                          >
+                            {driver.lcvStatus === "on_file"
+                              ? "On file"
+                              : driver.lcvStatus ===
+                                  "not_applicable"
+                                ? "Not applicable"
+                                : "Missing"}
+                          </Text>
+                        </TouchableOpacity>
+
+                      <View
+                        style={{
+                          marginTop: 8,
+                          paddingTop: 10,
+                          borderTopWidth: 1,
+                          borderTopColor: "#E8E6E0",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            marginBottom: 8,
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: "#706E68",
+                            textTransform: "uppercase",
+                            letterSpacing: 0.6,
+                          }}
+                        >
+                          Hiring investigation
+                        </Text>
+
+                        <DriverStatusToggle
+                          label="Previous-employer safety investigation"
+                          value={
+                            driver.previousEmployerInvestigationComplete ===
+                            true
+                          }
+                          trueText="Complete"
+                          falseText="Incomplete"
+                          onPress={() =>
+                            updateDriver(driver.id, {
+                              previousEmployerInvestigationComplete:
+                                !driver.previousEmployerInvestigationComplete,
+                            })
+                          }
+                        />
+                      </View>
+                      <TouchableOpacity
+  onPress={() =>
+    setOpenDqHelpDriverId(current =>
+      current === driver.id
+        ? null
+        : driver.id
+    )
+  }
+  activeOpacity={0.8}
+  style={{
+    alignSelf: "flex-start",
+    marginTop: 10,
+    paddingVertical: 4,
+  }}
+>
+  <Text
+    style={{
+      fontSize: 11,
+      fontWeight: "600",
+      color: "#27500A",
+    }}
+  >
+    {openDqHelpDriverId === driver.id
+      ? "Hide DQ guidance"
+      : "What belongs in this file? ›"}
+  </Text>
+</TouchableOpacity>
+
+{openDqHelpDriverId === driver.id && (
+  <View
+    style={{
+      marginTop: 8,
+      padding: 10,
+      borderRadius: 8,
+      backgroundColor: "#FFFFFF",
+      borderWidth: 1,
+      borderColor: "#E8E6E0",
+    }}
+  >
+    <DqGuidanceItem
+      title="Employment application"
+      text="Keep the driver's completed employment application in the qualification file."
+    />
+
+    <DqGuidanceItem
+      title="Initial 3-year MVR(s)"
+      text="Obtain the driver's preceding 3-year driving record from each State where the driver was licensed."
+    />
+
+    <DqGuidanceItem
+      title="Road test certificate / equivalent"
+      text="Keep the road test certificate or an FMCSA-permitted equivalent qualification document."
+    />
+
+    <DqGuidanceItem
+      title="SPE / medical variance"
+      text="Required only when the driver operates under an applicable Skill Performance Evaluation certificate or medical variance."
+    />
+
+    <DqGuidanceItem
+      title="LCV training certificate"
+      text="Required only for drivers subject to FMCSA Longer Combination Vehicle training requirements."
+      last
+    />
+
+    <View
+  style={{
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "#E8E6E0",
+  }}
+>
+  <Text
+    style={{
+      fontSize: 10,
+      lineHeight: 15,
+      color: "#706E68",
+    }}
+  >
+    Medical expiration and annual MVR tracking
+    remain under Ongoing Driver Compliance below.
+  </Text>
+
+  <Text
+    style={{
+      marginTop: 6,
+      fontSize: 10,
+      lineHeight: 15,
+      color: "#706E68",
+    }}
+  >
+    Previous-employer investigation records should
+    be maintained separately with restricted access.
+  </Text>
+</View>
+                    </View>
+                    )}
+                    </View>
+                  )}
+                </View>
+              
                 <View
                   style={{
                     marginTop: 16,
@@ -790,20 +1210,30 @@ function DriverDateField({
       <View
         style={{
           flexDirection: "row",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-between",
           marginBottom: 4,
-          maxWidth: 320,
+          width: "100%",
         }}
       >
-        <Text style={{ fontSize: 12, color: "#706E68" }}>{label}</Text>
+        <Text
+          style={{
+            fontSize: 12,
+            color: "#706E68",
+            flex: 1,
+            paddingRight: 8,
+          }}
+        >
+          {label}
+        </Text>
 
         <View
           style={{
             backgroundColor: status.bg,
             borderRadius: 14,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            flexShrink: 0,
           }}
         >
           <Text
@@ -831,6 +1261,49 @@ function DriverDateField({
   );
 }
 
+function DqGuidanceItem({
+  title,
+  text,
+  last = false,
+}: {
+  title: string;
+  text: string;
+  last?: boolean;
+}) {
+  return (
+    <View
+      style={{
+        paddingBottom: last ? 0 : 9,
+        marginBottom: last ? 0 : 9,
+        borderBottomWidth:
+          last ? 0 : StyleSheet.hairlineWidth,
+        borderBottomColor: "#E8E6E0",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: "700",
+          color: "#45433F",
+        }}
+      >
+        {title}
+      </Text>
+
+      <Text
+        style={{
+          marginTop: 2,
+          fontSize: 10,
+          lineHeight: 15,
+          color: "#706E68",
+        }}
+      >
+        {text}
+      </Text>
+    </View>
+  );
+}
+
 function DriverStatusToggle({
   label,
   value,
@@ -847,25 +1320,56 @@ function DriverStatusToggle({
   return (
     <TouchableOpacity
       onPress={onPress}
+      activeOpacity={0.75}
       style={{
-        alignSelf: "flex-start",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: value ? "#C0DD97" : "#E8B4B4",
-        backgroundColor: value ? "#EAF3DE" : "#FCEBEB",
-        marginBottom: 8,
+        width: "100%",
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 8,
       }}
     >
       <Text
         style={{
+          flex: 1,
+          paddingRight: 12,
           fontSize: 12,
-          color: value ? "#27500A" : "#A32D2D",
+          lineHeight: 17,
+          color: "#45433F",
         }}
       >
-        {label}: {value ? trueText : falseText}
+        {label}
       </Text>
+
+      <View
+        style={{
+          flexShrink: 0,
+          borderRadius: 12,
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          backgroundColor: value
+            ? "#EAF3DE"
+            : "#FCEBEB",
+          borderWidth: 1,
+          borderColor: value
+            ? "#C0DD97"
+            : "#F2B8B5",
+        }}
+      >
+        <Text
+          numberOfLines={1}
+          style={{
+            fontSize: 11,
+            fontWeight: "600",
+            color: value
+              ? "#3B6D11"
+              : "#A32D2D",
+          }}
+        >
+          {value ? trueText : falseText}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }

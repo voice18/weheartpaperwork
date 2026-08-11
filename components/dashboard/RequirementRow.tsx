@@ -76,6 +76,37 @@ const {
   String(r.id)
 );
 
+const fixedCalendarIds = [
+  "tax2290",
+  "ucr",
+  "ifta",
+];
+
+const latestHistoryRecord =
+  historyRecords[0] ?? null;
+
+const currentYear =
+  new Date().getFullYear();
+
+const previousDueYear =
+  latestHistoryRecord?.previousDueDate
+    ? Number(
+        latestHistoryRecord.previousDueDate.slice(
+          0,
+          4
+        )
+      )
+    : null;
+
+const canUndoFixedCalendarCompletion =
+  fixedCalendarIds.includes(
+    String(r.id)
+  ) &&
+  !r.completed &&
+  latestHistoryRecord?.nextDueDate ===
+    r.due &&
+  previousDueYear === currentYear;
+
   const [
     confirmingComplete,
     setConfirmingComplete,
@@ -267,6 +298,72 @@ function handleDeleteHistoryRecord(
               null
             );
           }
+        },
+      },
+    ]
+  );
+}
+
+async function handleUndoFixedCalendarCompletion() {
+  if (!latestHistoryRecord) {
+    return;
+  }
+
+  const undo = async () => {
+    try {
+      setDeletingRecordId(
+        latestHistoryRecord.id
+      );
+
+      await deleteRecord(
+        latestHistoryRecord.id
+      );
+    } catch (error) {
+      console.log(
+        "Undo fixed-calendar completion failed:",
+        error
+      );
+
+      if (Platform.OS === "web") {
+        window.alert(
+          "The completion could not be undone. Please try again."
+        );
+      } else {
+        Alert.alert(
+          "Unable to undo completion",
+          "Please try again."
+        );
+      }
+    } finally {
+      setDeletingRecordId(null);
+    }
+  };
+
+  if (Platform.OS === "web") {
+    const confirmed = window.confirm(
+      "Undo last completion?\n\n" +
+        "This will restore the previous due date and remove the latest completion record."
+    );
+
+    if (confirmed) {
+      await undo();
+    }
+
+    return;
+  }
+
+  Alert.alert(
+    "Undo last completion?",
+    "This will restore the previous due date and remove the latest completion record.",
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Undo completion",
+        onPress: () => {
+          void undo();
         },
       },
     ]
@@ -1023,6 +1120,30 @@ async function handleHistoryRecordMenu(
                         color: "#27500A",
                       }}
                     >
+                      {canUndoFixedCalendarCompletion && (
+                        <TouchableOpacity
+                          onPress={
+                            handleUndoFixedCalendarCompletion
+                          }
+                          activeOpacity={0.8}
+                          style={{
+                            alignSelf: "flex-start",
+                            marginTop: 8,
+                            paddingVertical: 6,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              color: "#3B6D11",
+                              textDecorationLine: "underline",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Undo last completion
+                          </Text>
+                        </TouchableOpacity>
+                      )}
                       Mark complete
                     </Text>
                   </TouchableOpacity>

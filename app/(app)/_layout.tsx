@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "../../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   CarrierBilling,
   hasBillingAccess,
@@ -31,45 +32,60 @@ export default function AppLayout() {
     useState<CarrierBilling | null>(null);
 
   useEffect(() => {
-    const user = auth.currentUser;
+  let unsubscribeCarrier:
+    | (() => void)
+    | null = null;
 
-    if (!user) {
-      setBilling(null);
-      setBillingLoaded(true);
-      return;
-    }
+  const unsubscribeAuth = onAuthStateChanged(
+    auth,
+    (user) => {
+      unsubscribeCarrier?.();
+      unsubscribeCarrier = null;
 
-    const carrierRef = doc(
-      db,
-      "carriers",
-      user.uid
-    );
-
-    const unsubscribe = onSnapshot(
-      carrierRef,
-      (snapshot) => {
-        const carrierData = snapshot.data();
-
-        setBilling(
-          (carrierData?.billing as CarrierBilling) ??
-            null
-        );
-
-        setBillingLoaded(true);
-      },
-      (error) => {
-        console.error(
-          "Unable to read carrier billing:",
-          error
-        );
-
+      if (!user) {
         setBilling(null);
         setBillingLoaded(true);
+        return;
       }
-    );
 
-    return unsubscribe;
-  }, []);
+      setBillingLoaded(false);
+
+      const carrierRef = doc(
+        db,
+        "carriers",
+        user.uid
+      );
+
+      unsubscribeCarrier = onSnapshot(
+        carrierRef,
+        (snapshot) => {
+          const carrierData = snapshot.data();
+
+          setBilling(
+            (carrierData?.billing as CarrierBilling) ??
+              null
+          );
+
+          setBillingLoaded(true);
+        },
+        (error) => {
+          console.error(
+            "Unable to read carrier billing:",
+            error
+          );
+
+          setBilling(null);
+          setBillingLoaded(true);
+        }
+      );
+    }
+  );
+
+  return () => {
+    unsubscribeCarrier?.();
+    unsubscribeAuth();
+  };
+}, []);
 
   useEffect(() => {
     if (!billingLoaded) {

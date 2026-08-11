@@ -76,6 +76,30 @@ function getTodayKey(): string {
   }).format(new Date());
 }
 
+function isExpoPushToken(
+  token: unknown
+): token is string {
+  return (
+    typeof token === "string" &&
+    (
+      (
+        (
+          token.startsWith(
+            "ExponentPushToken["
+          ) ||
+          token.startsWith(
+            "ExpoPushToken["
+          )
+        ) &&
+        token.endsWith("]")
+      ) ||
+      /^[a-z\d]{8}-[a-z\d]{4}-[a-z\d]{4}-[a-z\d]{4}-[a-z\d]{12}$/i.test(
+        token
+      )
+    )
+  );
+}
+
 function buildNotificationId(
   userId: string,
   todayKey: string
@@ -139,21 +163,18 @@ function daysUntil(dueDateStr: string): number {
 }
 
 const REQUIREMENT_LABELS: Record<string, string> = {
-  mcs150:        "MCS-150 / USDOT Biennial Update",
-  tax2290:       "2290 Heavy Vehicle Use Tax",
-  clearinghouse: "FMCSA Clearinghouse Annual Queries",
-  mvr:           "Annual MVR Review",
-  "fmcsa-portal":"FMCSA Portal Account Maintenance",
-  ucr:           "UCR Registration",
-  ifta:          "IFTA License Renewal",
-  inspection:    "Annual Vehicle Inspections",
-  insurance:     "Insurance Policy Renewal",
-  medical:       "Medical Card / DOT Physical",
-  irp:           "IRP Registration Renewal",
-  drug:          "Drug & Alcohol Consortium Enrollment",
-  boc3:          "BOC-3 Process Agent Filing",
-  bizlicense:    "Business License Renewals",
+  mcs150: "MCS-150 / USDOT Biennial Update",
+  tax2290: "2290 Heavy Vehicle Use Tax",
+  "fmcsa-portal": "FMCSA Portal Account Maintenance",
+  ucr: "UCR Registration",
+  ifta: "IFTA License Renewal",
+  irp: "IRP Registration Renewal",
+  drug: "Drug & Alcohol Consortium Enrollment",
+  boc3: "BOC-3 Process Agent Filing",
 };
+
+const COMPANY_REQUIREMENT_IDS =
+  new Set(Object.keys(REQUIREMENT_LABELS));
 
 type DriverRequirementDefinition = {
   field: "cdlExpiration" | "medicalExpiration" | "mvrDue" | "clearinghouseDue";
@@ -169,11 +190,11 @@ const DRIVER_REQUIREMENTS: DriverRequirementDefinition[] = [
     label: "CDL expiration",
     yearsToAdd: 0,
   },
-  {
+    {
     field: "medicalExpiration",
     itemType: "medical",
     label: "Medical card",
-    yearsToAdd: 2,
+    yearsToAdd: 0,
   },
   {
     field: "mvrDue",
@@ -191,13 +212,34 @@ const DRIVER_REQUIREMENTS: DriverRequirementDefinition[] = [
 
 
 
-function addYearsToDate(dateStr: string, years: number): string {
-  const [year, month, day] = dateStr.split("-").map(Number);
+function addYearsToDate(
+  dateStr: string,
+  years: number
+): string {
+  const [year, month, day] =
+    dateStr.split("-").map(Number);
 
-  const date = new Date(Date.UTC(year, month - 1, day));
-  date.setUTCFullYear(date.getUTCFullYear() + years);
+  const targetYear = year + years;
 
-  return date.toISOString().split("T")[0];
+  const lastDayOfTargetMonth =
+    new Date(
+      Date.UTC(
+        targetYear,
+        month,
+        0
+      )
+    ).getUTCDate();
+
+  const targetDay = Math.min(
+    day,
+    lastDayOfTargetMonth
+  );
+
+  return (
+    `${targetYear}-` +
+    `${String(month).padStart(2, "0")}-` +
+    `${String(targetDay).padStart(2, "0")}`
+  );
 }
 
 // ── 1. Daily compliance check (runs every day at 8am Pacific) ─────────────────────
@@ -227,11 +269,9 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
           userId: userDoc.id,
           expoPushToken: userDoc.data().expoPushToken as string | undefined,
         }))
-        .filter(
-          user =>
-            typeof user.expoPushToken === "string" &&
-            user.expoPushToken.startsWith("ExponentPushToken[")
-        ) as Array<{
+        .filter(user =>
+            isExpoPushToken(user.expoPushToken)
+          ) as Array<{
           userId: string;
           expoPushToken: string;
         }>;
@@ -261,6 +301,14 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
       };
 
       for (const compDoc of compSnap.docs) {
+        if (
+          !COMPANY_REQUIREMENT_IDS.has(
+            compDoc.id
+          )
+        ) {
+          continue;
+        }
+
         const data = compDoc.data();
 
         if (
@@ -460,48 +508,95 @@ async function sendDailySummaryNotification(
     ...summary.dueIn30DaysIds,
   ];
 
-  const response = await fetch(
-    "https://exp.host/--/api/v2/push/send",
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        to: summary.expoPushToken,
-        title,
-        body,
-        sound: "default",
-        priority: "high",
-        data: {
-          screen: "dashboard",
-          alertType: "daily_summary",
-          carrierId: summary.carrierId,
-          itemIds: allItemIds,
-          dueIn5DaysIds: summary.dueIn5DaysIds,
-          dueIn15DaysIds: summary.dueIn15DaysIds,
-          dueIn30DaysIds: summary.dueIn30DaysIds,
-        },
-      }),
-    }
-  );
+  const maxAttempts = 3;
 
-  if (!response.ok) {
+for (
+  let attempt = 1;
+  attempt <= maxAttempts;
+  attempt++
+) {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      "https://exp.host/--/api/v2/push/send",
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: summary.expoPushToken,
+          title,
+          body,
+          sound: "default",
+          priority: "high",
+          data: {
+            screen: "dashboard",
+            alertType: "daily_summary",
+            carrierId: summary.carrierId,
+            itemIds: allItemIds,
+            dueIn5DaysIds:
+              summary.dueIn5DaysIds,
+            dueIn15DaysIds:
+              summary.dueIn15DaysIds,
+            dueIn30DaysIds:
+              summary.dueIn30DaysIds,
+          },
+        }),
+      }
+    );
+  } catch (error) {
+    if (attempt === maxAttempts) {
+      throw error;
+    }
+
+    await new Promise(resolve =>
+      setTimeout(
+        resolve,
+        1000 * Math.pow(2, attempt - 1)
+      )
+    );
+
+    continue;
+  }
+
+  if (response.ok) {
+    const result = (await response.json()) as {
+      data: {
+        status: string;
+        id?: string;
+        message?: string;
+      };
+    };
+
+    return result.data;
+  }
+
+  const errorText = await response.text();
+
+  const retryable =
+    response.status === 429 ||
+    response.status >= 500;
+
+  if (!retryable || attempt === maxAttempts) {
     throw new Error(
-      `Expo push request failed: ${response.status} ${await response.text()}`
+      `Expo push request failed: ${response.status} ${errorText}`
     );
   }
 
-  const result = (await response.json()) as {
-    data: {
-      status: string;
-      id?: string;
-      message?: string;
-    };
-  };
+  await new Promise(resolve =>
+    setTimeout(
+      resolve,
+      1000 * Math.pow(2, attempt - 1)
+    )
+  );
+}
 
-  return result.data;
+throw new Error(
+  "Expo push request failed after retries."
+);
 }
 
 export const deleteAccount = onCall(
@@ -545,16 +640,19 @@ export const deleteAccount = onCall(
     }
 
     const savedCarrierId =
-      userData?.carrierId;
+  userData?.carrierId;
 
-    // Current v1 accounts normally use the Firebase UID as
-    // the carrier ID. The fallback also allows deletion if
-    // onboarding was never completed.
-    const carrierId =
-      typeof savedCarrierId === "string" &&
-      savedCarrierId.trim()
-        ? savedCarrierId
-        : userId;
+if (
+  typeof savedCarrierId === "string" &&
+  savedCarrierId !== userId
+) {
+  throw new HttpsError(
+    "permission-denied",
+    "Your company account link is invalid."
+  );
+}
+
+const carrierId = userId;
 
     const carrierRef =
       db.collection("carriers").doc(carrierId);
@@ -770,18 +868,20 @@ export const createBillingPortalSession = onCall(
         );
       }
 
-      const carrierId =
+      const savedCarrierId =
         userSnapshot.data()?.carrierId;
 
       if (
-        !carrierId ||
-        typeof carrierId !== "string"
+        typeof savedCarrierId !== "string" ||
+        savedCarrierId !== userId
       ) {
         throw new HttpsError(
-          "failed-precondition",
-          "No carrier is connected to this account."
+          "permission-denied",
+          "Your company account link is invalid."
         );
       }
+
+      const carrierId = userId;
 
       console.log(
         "Billing portal step 3: carrier resolved",
@@ -953,19 +1053,24 @@ export const createCheckoutSession = onCall(
         );
       }
 
-      const userData = userSnapshot.data();
-      const carrierId = userData?.carrierId;
+        const userData = userSnapshot.data();
+        const savedCarrierId = userData?.carrierId;
 
-      console.log("Checkout step 3: carrier ID found", {
-        carrierId,
-      });
+        console.log("Checkout step 3: carrier ID found", {
+          carrierId: savedCarrierId,
+        });
 
-      if (!carrierId || typeof carrierId !== "string") {
-        throw new HttpsError(
-          "failed-precondition",
-          "No carrier is connected to this account."
-        );
-      }
+        if (
+          typeof savedCarrierId !== "string" ||
+          savedCarrierId !== userId
+        ) {
+          throw new HttpsError(
+            "permission-denied",
+            "Your company account link is invalid."
+          );
+        }
+
+        const carrierId = userId;
 
       // STEP 4: Read the carrier document.
       const carrierRef = db

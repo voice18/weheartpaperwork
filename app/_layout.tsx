@@ -5,6 +5,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Platform } from "react-native";
 import {
+  doc,
+  onSnapshot,
+} from "firebase/firestore";
+import {
   Stack,
   usePathname,
   useRootNavigationState,
@@ -13,7 +17,7 @@ import {
 import * as Notifications from "expo-notifications";
 import { onAuthStateChanged } from "firebase/auth";
 
-import { auth } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
 import { useComplianceStore } from "../store/useComplianceStore";
 
 Notifications.setNotificationHandler({
@@ -83,10 +87,19 @@ const isPublicWebRoute =
     return;
   }
 
-    let effectActive = true;
+  let effectActive = true;
+  let carrierUnsubscribe: (() => void) | null = null;
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!effectActive || !componentMounted.current) {
+  const unsubscribeAuth = onAuthStateChanged(
+    auth,
+    (user) => {
+      carrierUnsubscribe?.();
+      carrierUnsubscribe = null;
+
+      if (
+        !effectActive ||
+        !componentMounted.current
+      ) {
         return;
       }
 
@@ -96,38 +109,119 @@ const isPublicWebRoute =
         return;
       }
 
-      try {
-        await init(user.uid);
+      const carrierRef = doc(
+        db,
+        "carriers",
+        user.uid
+      );
 
-        if (!effectActive || !componentMounted.current) {
-          return;
+      carrierUnsubscribe = onSnapshot(
+        carrierRef,
+        async (snapshot) => {
+          if (
+            !effectActive ||
+            !componentMounted.current
+          ) {
+            return;
+          }
+
+          if (!snapshot.exists()) {
+            appReady.current = false;
+            router.replace(
+              "/(onboarding)/company"
+            );
+            return;
+          }
+
+          const carrierData = snapshot.data();
+
+          const companyName =
+            typeof carrierData?.companyName ===
+            "string"
+              ? carrierData.companyName.trim()
+              : "";
+
+          if (!companyName) {
+            appReady.current = false;
+            router.replace(
+              "/(onboarding)/company"
+            );
+            return;
+          }
+
+          if (
+            carrierData?.onboardingComplete !==
+            true
+          ) {
+            appReady.current = false;
+            router.replace(
+              "/(onboarding)/notifications"
+            );
+            return;
+          }
+
+          carrierUnsubscribe?.();
+          carrierUnsubscribe = null;
+
+          try {
+            await init(user.uid);
+
+            if (
+              !effectActive ||
+              !componentMounted.current
+            ) {
+              return;
+            }
+
+            appReady.current = true;
+            openDashboard();
+          } catch (error) {
+            console.log(
+              "Auth routing error:",
+              error
+            );
+
+            if (
+              !effectActive ||
+              !componentMounted.current
+            ) {
+              return;
+            }
+
+            appReady.current = false;
+            router.replace("/(auth)/login");
+          }
+        },
+        (error) => {
+          console.log(
+            "Carrier routing error:",
+            error
+          );
+
+          if (
+            effectActive &&
+            componentMounted.current
+          ) {
+            appReady.current = false;
+            router.replace("/(auth)/login");
+          }
         }
+      );
+    }
+  );
 
-        appReady.current = true;
-        openDashboard();
-      } catch (error) {
-        console.log("Auth routing error:", error);
-
-        if (!effectActive || !componentMounted.current) {
-          return;
-        }
-
-        appReady.current = false;
-        router.replace("/(auth)/login");
-      }
-    });
-
-    return () => {
-      effectActive = false;
-      unsubscribe();
-    };
-      }, [
-      init,
-      navigationReady,
-      openDashboard,
-      router,
-      isPublicWebRoute,
-    ]);
+  return () => {
+    effectActive = false;
+    carrierUnsubscribe?.();
+    unsubscribeAuth();
+  };
+}, [
+  init,
+  navigationReady,
+  openDashboard,
+  router,
+  isPublicWebRoute,
+]);
 
   useEffect(() => {
     if (!navigationReady) {

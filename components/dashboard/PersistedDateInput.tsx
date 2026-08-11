@@ -170,30 +170,35 @@ export default function PersistedDateInput({
 
         <View
           style={{
-            width: 90,
+            width: 68,
             marginLeft: 8,
             justifyContent: "center",
+            alignItems: "center",
           }}
         >
           {saving ? (
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
               style={{
                 fontSize: 12,
                 color: "#706E68",
                 fontWeight: "500",
               }}
             >
-              Saving...
+              Saving
             </Text>
           ) : saved ? (
             <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
               style={{
                 fontSize: 12,
                 color: "#3B6D11",
                 fontWeight: "600",
               }}
             >
-              ✓ Saved
+              Saved
             </Text>
           ) : hasChanges ? (
             <TouchableOpacity
@@ -205,9 +210,10 @@ export default function PersistedDateInput({
               disabled={!canSave}
               onPress={handleSave}
               style={{
-                alignSelf: "flex-start",
-                paddingHorizontal: 11,
-                paddingVertical: 7,
+                width: 68,
+                minHeight: 34,
+                alignItems: "center",
+                justifyContent: "center",
                 borderRadius: 7,
                 borderWidth: 1,
                 borderColor: canSave
@@ -220,6 +226,8 @@ export default function PersistedDateInput({
               }}
             >
               <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
                 style={{
                   fontSize: 12,
                   color: canSave
@@ -228,7 +236,7 @@ export default function PersistedDateInput({
                   fontWeight: "600",
                 }}
               >
-                {draft ? "Save date" : "Clear"}
+                {draft ? "Save" : "Clear"}
               </Text>
             </TouchableOpacity>
           ) : null}

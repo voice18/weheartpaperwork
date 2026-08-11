@@ -21,6 +21,7 @@ import {
   localDateString,
 } from "../../lib/requirements";
 type Props = {
+  dateRepresentsDueDate?: boolean;
   label: string;
   value: string;
   driverId: string;
@@ -101,9 +102,14 @@ export default function DriverRenewalField({
   days = 0,
   onChange,
   onMarkComplete,
+  dateRepresentsDueDate = false,
 }: Props) { 
   const isValidDateFormat = /^\d{4}-\d{2}-\d{2}$/.test(value);
-  const nextDue = isValidDateFormat ? addInterval(value, years, days) : "";
+  const nextDue = isValidDateFormat
+  ? dateRepresentsDueDate
+    ? value
+    : addInterval(value, years, days)
+  : "";
   const daysLeft = nextDue ? daysFrom(nextDue) : null;
   const badge = getBadge(daysLeft);
   const today = localDateString();
@@ -325,11 +331,13 @@ const {
           }
 
           const confirmedNextDue =
-            addInterval(
-              isoCompletionDate,
-              years,
-              days
-            );
+            dateRepresentsDueDate
+              ? nextDue
+              : addInterval(
+                  isoCompletionDate,
+                  years,
+                  days
+                );
 
           if (!confirmedNextDue) {
             return;
