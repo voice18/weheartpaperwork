@@ -1089,66 +1089,64 @@ async function handleHistoryRecordMenu(
                 ).startsWith(
                   "driver-"
                 ) && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setCompletionDate(
-                      isoToInput(localDateString())
-                    );
-                    setConfirmingComplete(
-                      true
-                    );
-                    }}
-                    activeOpacity={0.8}
+                  <View
                     style={{
-                      alignSelf:
-                        "flex-start",
                       marginTop: 10,
-                      paddingHorizontal: 14,
-                      paddingVertical: 9,
-                      backgroundColor:
-                        "#EAF3DE",
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor:
-                        "#C0DD97",
+                      alignItems: "flex-start",
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: "#27500A",
-                      }}
-                    >
-                      {canUndoFixedCalendarCompletion && (
-                        <TouchableOpacity
-                          onPress={
-                            handleUndoFixedCalendarCompletion
-                          }
-                          activeOpacity={0.8}
+                    {canUndoFixedCalendarCompletion && (
+                      <TouchableOpacity
+                        onPress={handleUndoFixedCalendarCompletion}
+                        activeOpacity={0.8}
+                        style={{
+                          marginBottom: 8,
+                          paddingVertical: 6,
+                        }}
+                      >
+                        <Text
                           style={{
-                            alignSelf: "flex-start",
-                            marginTop: 8,
-                            paddingVertical: 6,
+                            fontSize: 12,
+                            color: "#3B6D11",
+                            textDecorationLine: "underline",
+                            fontWeight: "600",
                           }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              color: "#3B6D11",
-                              textDecorationLine: "underline",
-                              fontWeight: "600",
-                            }}
-                          >
-                            Undo last completion
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                      Mark complete
-                    </Text>
-                  </TouchableOpacity>
-                )}
+                          Undo last completion
+                        </Text>
+                      </TouchableOpacity>
+                    )}
 
+                    <TouchableOpacity
+                      onPress={() => {
+                        setCompletionDate(
+                          isoToInput(localDateString())
+                        );
+                        setConfirmingComplete(true);
+                      }}
+                      activeOpacity={0.8}
+                      style={{
+                        alignSelf: "flex-start",
+                        paddingHorizontal: 14,
+                        paddingVertical: 9,
+                        backgroundColor: "#EAF3DE",
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: "#C0DD97",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: "#27500A",
+                        }}
+                      >
+                        Mark complete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               {r.completed && (
                 <View
                   style={{
