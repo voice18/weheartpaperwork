@@ -17,7 +17,10 @@ import {
 } from "firebase/firestore";
 
 import { auth, db } from "../../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signOut,
+} from "firebase/auth";
 import {
   CarrierBilling,
   hasBillingAccess,
@@ -64,6 +67,23 @@ export default function AppLayout() {
       unsubscribeCarrier = onSnapshot(
         carrierRef,
         (snapshot) => {
+          if (!snapshot.exists()) {
+            setBilling(null);
+            setBillingLoaded(false);
+
+            void signOut(auth).catch((error) => {
+              console.error(
+                "Unable to sign out after carrier removal:",
+                error
+              );
+
+              setIsAuthenticated(false);
+              setBillingLoaded(true);
+            });
+
+            return;
+          }
+
           const carrierData = snapshot.data();
 
           setBilling(
