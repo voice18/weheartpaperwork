@@ -542,10 +542,58 @@ const handleChangePassword = () => {
   const email = auth.currentUser?.email;
 
   if (!email) {
-    Alert.alert(
-      "Email unavailable",
-      "We could not find an email address for this account."
-    );
+    if (Platform.OS === "web") {
+      window.alert(
+        "We could not find an email address for this account."
+      );
+    } else {
+      Alert.alert(
+        "Email unavailable",
+        "We could not find an email address for this account."
+      );
+    }
+
+    return;
+  }
+
+  const sendResetEmail = async () => {
+    try {
+      await sendPasswordResetEmail(
+        auth,
+        email
+      );
+
+      if (Platform.OS === "web") {
+        window.alert(
+          `Password reset email sent to ${email}.`
+        );
+      } else {
+        Alert.alert(
+          "Email sent",
+          "Check your inbox for a link to change your password."
+        );
+      }
+    } catch (error) {
+      console.log(
+        "Password reset failed:",
+        error
+      );
+
+      if (Platform.OS === "web") {
+        window.alert(
+          "Unable to send the password reset email. Please try again."
+        );
+      } else {
+        Alert.alert(
+          "Unable to send email",
+          "Please check your connection and try again."
+        );
+      }
+    }
+  };
+
+  if (Platform.OS === "web") {
+    void sendResetEmail();
     return;
   }
 
@@ -559,27 +607,12 @@ const handleChangePassword = () => {
       },
       {
         text: "Send email",
-        onPress: async () => {
-          try {
-            await sendPasswordResetEmail(auth, email);
-
-            Alert.alert(
-              "Email sent",
-              "Check your inbox for a link to change your password."
-            );
-          } catch (error) {
-            console.log("Password reset failed:", error);
-
-            Alert.alert(
-              "Unable to send email",
-              "Please check your connection and try again."
-            );
-          }
-        },
+        onPress: sendResetEmail,
       },
     ]
   );
 };
+
 
   const handleLogOut = async () => {
     try {

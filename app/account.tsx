@@ -5,6 +5,7 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -56,54 +57,80 @@ useEffect(() => {
     currentUser?.email ?? "Not available";
 
   const handleChangePassword = () => {
-    const currentEmail =
-      currentUser?.email;
+  const currentEmail =
+    currentUser?.email;
 
-    if (!currentEmail) {
+  if (!currentEmail) {
+    if (Platform.OS === "web") {
+      window.alert(
+        "We could not find an email address for this account."
+      );
+    } else {
       Alert.alert(
         "Email unavailable",
         "We could not find an email address for this account."
       );
-      return;
     }
 
-    Alert.alert(
-      "Change password",
-      `We will send a password-reset link to ${currentEmail}.`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Send email",
-          onPress: async () => {
-            try {
-              await sendPasswordResetEmail(
-                auth,
-                currentEmail
-              );
+    return;
+  }
 
-              Alert.alert(
-                "Email sent",
-                "Check your inbox for a link to change your password."
-              );
-            } catch (error) {
-              console.log(
-                "Password reset failed:",
-                error
-              );
+  const sendResetEmail = async () => {
+    try {
+      await sendPasswordResetEmail(
+        auth,
+        currentEmail
+      );
 
-              Alert.alert(
-                "Unable to send email",
-                "Please check your connection and try again."
-              );
-            }
-          },
-        },
-      ]
-    );
+      if (Platform.OS === "web") {
+        window.alert(
+          `Password reset email sent to ${currentEmail}.`
+        );
+      } else {
+        Alert.alert(
+          "Email sent",
+          "Check your inbox for a link to change your password."
+        );
+      }
+    } catch (error) {
+      console.log(
+        "Password reset failed:",
+        error
+      );
+
+      if (Platform.OS === "web") {
+        window.alert(
+          "Unable to send the password reset email. Please try again."
+        );
+      } else {
+        Alert.alert(
+          "Unable to send email",
+          "Please check your connection and try again."
+        );
+      }
+    }
   };
+
+  if (Platform.OS === "web") {
+    void sendResetEmail();
+    return;
+  }
+
+  Alert.alert(
+    "Change password",
+    `We will send a password-reset link to ${currentEmail}.`,
+    [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Send email",
+        onPress: sendResetEmail,
+      },
+    ]
+  );
+};
 
   const handleLogOut = async () => {
     try {
