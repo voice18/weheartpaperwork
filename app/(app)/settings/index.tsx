@@ -984,29 +984,33 @@ const trialEndLabel = (() => {
         </Text>
 
         <View style={styles.card}>
-          <View style={styles.switchRow}>
-            <View style={styles.switchText}>
-              <Text style={styles.rowTitle}>
-                Push notifications
-              </Text>
+        <View style={styles.switchRow}>
+          <View style={styles.switchText}>
+            <Text style={styles.rowTitle}>
+              Push notifications
+            </Text>
 
-              <Text style={styles.rowDescription}>
-                Receive alerts 30, 15, and 5 days before most compliance deadlines.
-              </Text>
-            </View>
+            <Text style={styles.rowDescription}>
+              {Platform.OS === "web"
+                ? "Manage push notifications in the iOS or Android app."
+                : "Receive compliance deadline reminders on this device."}
+            </Text>
+          </View>
 
+          {Platform.OS !== "web" && (
             <Switch
-            value={notificationsEnabled}
-            onValueChange={updateNotificationStatus}
-            disabled={savingNotifications}
+              value={notificationsEnabled}
+              onValueChange={updateNotificationStatus}
+              disabled={savingNotifications}
               trackColor={{
                 false: "#D3D1C7",
                 true: "#7DA35A",
               }}
               thumbColor="#FFFFFF"
             />
-          </View>
+          )}
         </View>
+      </View>
 
 
         <Text style={styles.sectionLabel}>
