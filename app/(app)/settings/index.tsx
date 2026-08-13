@@ -198,7 +198,7 @@ useEffect(() => {
             : ""
         );
 
-        
+
       }
 
             const userSnap = await getDoc(
@@ -304,7 +304,7 @@ const saveUsdotNumber = async () => {
   try {
     setSavingUsdot(true);
 
-       
+
     await setUsdotInStore(cleanedNumber);
 
     setUsdotNumber(cleanedNumber);
@@ -537,21 +537,6 @@ const updateNotificationStatus = async (
   }
 };
 
-const handleSendFeedback = async () => {
-  const feedbackUrl =
-    "https://docs.google.com/forms/d/e/1FAIpQLSecfl3bMNdqnF1ifBjPui_ftyz1MFz8vudtqcIuXVTghkugbQ/viewform?usp=dialog";
-
-  try {
-    await Linking.openURL(feedbackUrl);
-  } catch (error) {
-    console.log("Unable to open feedback form:", error);
-
-    Alert.alert(
-      "Unable to open feedback",
-      "Please try again."
-    );
-  }
-};
 
 const handleChangePassword = () => {
   const email = auth.currentUser?.email;
@@ -871,6 +856,28 @@ const trialEndLabel = (() => {
         style={styles.container}
         contentContainerStyle={styles.content}
       >
+        {Platform.OS === "web" && (
+        <TouchableOpacity
+          onPress={() =>
+            router.replace("/(app)/dashboard")
+          }
+          style={{
+            alignSelf: "flex-start",
+            paddingVertical: 6,
+            marginBottom: 10,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: "700",
+              color: "#27500A",
+            }}
+          >
+            ‹ Dashboard
+          </Text>
+        </TouchableOpacity>
+      )}
         <View style={styles.header}>
           <Text style={styles.title}>Settings</Text>
           <Text style={styles.subtitle}>
@@ -968,6 +975,7 @@ const trialEndLabel = (() => {
           </View>
         </View>
 
+
         <Text style={styles.sectionLabel}>
         Subscription
       </Text>
@@ -1013,8 +1021,10 @@ const trialEndLabel = (() => {
         <SettingsRow
           label="Pricing"
           value={`$2 company + $1 x ${activeDriverCount}`}
+          showDivider={Platform.OS === "web"}
         />
 
+      {Platform.OS === "web" && (
         <SettingsRow
         label="Manage billing"
         value={
@@ -1029,6 +1039,7 @@ const trialEndLabel = (() => {
             : handleManageBilling
         }
       />
+      )}
       </View>
 
         <Text style={styles.sectionLabel}>
@@ -1037,16 +1048,24 @@ const trialEndLabel = (() => {
 
         <View style={styles.card}>
           <SettingsRow
-            label="Send feedback"
-            onPress={handleSendFeedback}
-            />
+            label="Support"
+            onPress={() =>
+              router.push("/support")
+            }
+          />
 
-            <SettingsRow
+          <SettingsRow
+            label="Privacy Policy"
+            onPress={() =>
+              router.push("/privacy")
+            }
+          />
+
+          <SettingsRow
             label="App version"
             value={appVersion}
             showDivider={false}
-            />
-
+          />
         </View>
 
         <Text style={styles.sectionLabel}>
@@ -1439,7 +1458,7 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.6,
   },
-  
+
   modalDescription: {
   marginTop: -6,
   marginBottom: 14,

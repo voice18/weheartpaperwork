@@ -4,6 +4,7 @@ import React, {
 } from "react";
 import {
   Alert,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -38,6 +39,11 @@ export default function SubscriptionRequiredScreen() {
   const [isBillingLoading, setIsBillingLoading] =
   useState(true);
 useEffect(() => {
+  if (Platform.OS !== "web") {
+    router.replace("/compliance-guide");
+    return;
+  }
+
   const user = auth.currentUser;
 
   if (!user) {
@@ -124,6 +130,9 @@ useEffect(() => {
     unsubscribeCarrier?.();
   };
 }, []);
+if (Platform.OS !== "web") {
+  return null;
+}
 
     const isPastDue =
   billingStatus === "past_due" ||

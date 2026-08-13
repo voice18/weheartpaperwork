@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -25,6 +26,8 @@ import {
 export default function AppLayout() {
   const pathname = usePathname();
 
+  const [isAuthenticated, setIsAuthenticated] =
+  useState(false);
   const [billingLoaded, setBillingLoaded] =
     useState(false);
 
@@ -43,11 +46,13 @@ export default function AppLayout() {
       unsubscribeCarrier = null;
 
       if (!user) {
+        setIsAuthenticated(false);
         setBilling(null);
         setBillingLoaded(true);
         return;
       }
 
+      setIsAuthenticated(true);
       setBillingLoaded(false);
 
       const carrierRef = doc(
@@ -88,42 +93,53 @@ export default function AppLayout() {
 }, []);
 
   useEffect(() => {
-    if (!billingLoaded) {
-      return;
-    }
+  if (!billingLoaded) {
+    return;
+  }
 
-    const hasAccess = hasBillingAccess(billing);
+  if (!isAuthenticated) {
+    router.replace("/(auth)/login");
+    return;
+  }
 
-    const isSubscriptionPage =
-      pathname.endsWith("/subscription-required");
+  const hasAccess =
+    hasBillingAccess(billing);
 
-    if (
-      !hasAccess &&
-      !isSubscriptionPage
-    ) {
+const isSubscriptionPage =
+  pathname.endsWith(
+    "/subscription-required"
+  );
+
+if (!hasAccess) {
+  if (Platform.OS === "web") {
+    if (!isSubscriptionPage) {
       router.replace(
         "/(app)/subscription-required"
       );
-
-      return;
     }
-
-    if (hasAccess && isSubscriptionPage) {
-      router.replace("/(app)/dashboard");
-    }
-  }, [billing, billingLoaded, pathname]);
-
-  if (!billingLoaded) {
-    return (
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" />
-
-        <Text style={styles.loadingText}>
-          Checking subscription…
-        </Text>
-      </View>
+  } else {
+    router.replace(
+      "/compliance-guide"
     );
   }
+
+  return;
+}
+
+if (hasAccess && isSubscriptionPage) {
+  router.replace(
+    "/(app)/dashboard"
+  );
+}
+  }, [billing, billingLoaded, isAuthenticated, pathname]);
+
+  if (!billingLoaded || !isAuthenticated) {
+  return (
+    <View style={styles.loadingScreen}>
+      <ActivityIndicator size="large" />
+    </View>
+  );
+}
 
   return (
     <Stack

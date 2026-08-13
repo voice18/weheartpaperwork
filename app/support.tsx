@@ -1,4 +1,4 @@
-import { Link } from "expo-router";
+import { router } from "expo-router";
 import {
   Linking,
   Pressable,
@@ -7,21 +7,31 @@ import {
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SupportPage() {
   return (
+  <SafeAreaView
+    edges={["top", "bottom"]}
+    style={styles.page}
+  >
     <ScrollView
-      style={styles.page}
       contentContainerStyle={styles.content}
     >
       <View style={styles.header}>
-        <Link href="/" asChild>
-          <Pressable>
-            <Text style={styles.backLink}>
-              ← We Heart Paperwork
-            </Text>
-          </Pressable>
-        </Link>
+       <Pressable
+        onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace("/compliance-guide");
+          }
+        }}
+      >
+        <Text style={styles.backLink}>
+          ‹ Back
+        </Text>
+      </Pressable>
       </View>
 
       <View style={styles.article}>
@@ -92,6 +102,7 @@ export default function SupportPage() {
         </Text>
       </View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -111,7 +122,7 @@ const styles = StyleSheet.create({
     maxWidth: 960,
     alignSelf: "center",
     paddingHorizontal: 24,
-    paddingTop: 28,
+    paddingTop: 12,
   },
 
   backLink: {

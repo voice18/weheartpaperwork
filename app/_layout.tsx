@@ -1,7 +1,11 @@
 // app/_layout.tsx
 // Root layout — initializes Firebase auth listener and notification routing.
 
-import { useCallback, useEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Platform } from "react-native";
 import {
@@ -19,6 +23,11 @@ import { onAuthStateChanged } from "firebase/auth";
 
 import { auth, db } from "../lib/firebase";
 import { useComplianceStore } from "../store/useComplianceStore";
+import {
+  hasBillingAccess,
+  type CarrierBilling,
+} from "../lib/billing";
+
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -38,9 +47,17 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
 
-const isPublicWebRoute =
-  Platform.OS === "web" &&
-  ["/", "/privacy", "/support"].includes(pathname);
+const isPublicRoute =
+  ["/compliance-guide", "/privacy", "/support"].includes(
+    pathname
+  ) ||
+  (
+    Platform.OS === "web" &&
+    pathname === "/"
+  );
+
+const isAccountRoute =
+  pathname === "/account";
   const rootNavigationState = useRootNavigationState();
   const init = useComplianceStore((state) => state.init);
 
@@ -83,9 +100,13 @@ const isPublicWebRoute =
   }, []);
 
   useEffect(() => {
-  if (!navigationReady || isPublicWebRoute) {
-    return;
-  }
+  if (!navigationReady) {
+  return;
+}
+
+if (isPublicRoute) {
+  return;
+}
 
   let effectActive = true;
   let carrierUnsubscribe: (() => void) | null = null;
@@ -109,7 +130,12 @@ const isPublicWebRoute =
         return;
       }
 
-      const carrierRef = doc(
+        if (isAccountRoute) {
+        appReady.current = false;
+        return;
+      }
+
+const carrierRef = doc(
         db,
         "carriers",
         user.uid
@@ -127,9 +153,9 @@ const isPublicWebRoute =
 
           if (!snapshot.exists()) {
             appReady.current = false;
-            router.replace(
-              "/(onboarding)/company"
-            );
+
+            router.replace("/(onboarding)/company");
+
             return;
           }
 
@@ -143,9 +169,9 @@ const isPublicWebRoute =
 
           if (!companyName) {
             appReady.current = false;
-            router.replace(
-              "/(onboarding)/company"
-            );
+
+            router.replace("/(onboarding)/company");
+
             return;
           }
 
@@ -154,6 +180,7 @@ const isPublicWebRoute =
             true
           ) {
             appReady.current = false;
+
             router.replace(
               "/(onboarding)/notifications"
             );
@@ -164,6 +191,33 @@ const isPublicWebRoute =
           carrierUnsubscribe = null;
 
           try {
+            const billing =
+              (carrierData?.billing as CarrierBilling) ??
+              null;
+
+            const hasAccess =
+              hasBillingAccess(billing);
+
+            if (!hasAccess) {
+              appReady.current = false;
+
+              if (Platform.OS === "web") {
+
+
+                router.replace(
+                  "/(app)/subscription-required"
+                );
+              } else {
+
+
+                router.replace(
+                  "/compliance-guide"
+                );
+              }
+
+              return;
+            }
+
             await init(user.uid);
 
             if (
@@ -174,6 +228,11 @@ const isPublicWebRoute =
             }
 
             appReady.current = true;
+
+            if (pathname === "/settings") {
+               return;
+              }
+
             openDashboard();
           } catch (error) {
             console.log(
@@ -189,6 +248,7 @@ const isPublicWebRoute =
             }
 
             appReady.current = false;
+
             router.replace("/(auth)/login");
           }
         },
@@ -203,6 +263,7 @@ const isPublicWebRoute =
             componentMounted.current
           ) {
             appReady.current = false;
+
             router.replace("/(auth)/login");
           }
         }
@@ -220,7 +281,8 @@ const isPublicWebRoute =
   navigationReady,
   openDashboard,
   router,
-  isPublicWebRoute,
+  isPublicRoute,
+  isAccountRoute,
 ]);
 
   useEffect(() => {

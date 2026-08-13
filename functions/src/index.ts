@@ -968,7 +968,8 @@ export const createBillingPortalSession = onCall(
       const portalSession =
         await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,
-          return_url: "weheartpaperwork://settings",
+          return_url:
+            "https://weheartpaperwork.com/settings",
         });
 
       console.log(
@@ -1363,10 +1364,10 @@ console.log(
           },
 
           success_url:
-            "weheartpaperwork://dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+            "https://weheartpaperwork.com/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}",
 
           cancel_url:
-            "weheartpaperwork://settings?checkout=cancelled",
+            "https://weheartpaperwork.com/subscription-required?checkout=cancelled",
         });
 
       // STEP 11 belongs immediately after the Stripe

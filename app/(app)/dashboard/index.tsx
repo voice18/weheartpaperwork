@@ -7,7 +7,7 @@
 
 import {
   View, Text, ScrollView, TouchableOpacity,
-StyleSheet, Platform, ActivityIndicator, Button, Linking,
+StyleSheet, Platform, ActivityIndicator, Button,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useComplianceStore }            from "../../../store/useComplianceStore";
@@ -592,25 +592,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
 ) : (
   <DriversPanel />
 )}
-    <TouchableOpacity
-  onPress={() => Linking.openURL("https://docs.google.com/forms/d/e/1FAIpQLSecfl3bMNdqnF1ifBjPui_ftyz1MFz8vudtqcIuXVTghkugbQ/viewform?usp=dialog")}
-  style={{
-    alignSelf: "center",
-    marginTop: 20,
-    marginBottom: 30,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#D3D1C7",
-    backgroundColor: "#fff",
-  }}
->
-  <Text style={{ fontSize: 13, color: "#706E68", fontWeight: "500" }}>
-    Send Feedback
-  </Text>
-</TouchableOpacity>
-    </ScrollView>
+ </ScrollView>
 
   );
 }

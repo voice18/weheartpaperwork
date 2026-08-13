@@ -1,17 +1,18 @@
 import { useState } from "react";
 import {
+  Platform,
   View,
   Text,
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Linking,
 } from "react-native";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from "firebase/auth";
 import { auth } from "../../lib/firebase";
+import { router } from "expo-router";
 
 export default function Login() {
   const [mode, setMode] = useState<"login" | "create">("login");
@@ -37,12 +38,19 @@ export default function Login() {
     }
   };
 
-  const submit = () => {
-    if (mode === "login") signIn();
-    else createAccount();
-  };
+        const submit = () => {
+        if (Platform.OS !== "web") {
+          signIn();
+          return;
+        }
 
-  return (
+        if (mode === "login") {
+          signIn();
+        } else {
+          createAccount();
+        }
+      };
+    return (
     <ScrollView
       contentContainerStyle={{
         flexGrow: 1,
@@ -139,10 +147,15 @@ export default function Login() {
           }}
         >
                 <Text style={{ color: "#fff", fontSize: 16, fontWeight: "800" }}>
-                {mode === "login" ? "Log In" : "Create Account"}
-            </Text>
+                  {Platform.OS === "web"
+                    ? mode === "login"
+                      ? "Log In"
+                      : "Create Account"
+                    : "Log In"}
+                </Text>
         </TouchableOpacity>
 
+        {Platform.OS === "web" && (
         <TouchableOpacity
           onPress={() => setMode(mode === "login" ? "create" : "login")}
         >
@@ -159,10 +172,12 @@ export default function Login() {
           : "Log in to an existing account instead"}
           </Text>
         </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           onPress={() =>
-            Linking.openURL("https://weheartpaperwork.com")}
+            router.push("/compliance-guide")
+          }
         >
           <Text
             style={{
@@ -172,7 +187,7 @@ export default function Login() {
               fontWeight: "600",
             }}
           >
-            Not sure where to start? Take the free assessment →
+            Explore the free Compliance Guide ›
           </Text>
         </TouchableOpacity>
 
