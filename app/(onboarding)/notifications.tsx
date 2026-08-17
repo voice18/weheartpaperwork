@@ -28,7 +28,7 @@ export default function NotificationsOnboarding() {
   const isWeb = Platform.OS === "web";
 
   const finishOnboarding = async (
-  notificationsEnabled: boolean,
+  notificationsEnabled?: boolean,
   expoPushToken?: string
 ) => {
   const user = auth.currentUser;
@@ -38,27 +38,45 @@ export default function NotificationsOnboarding() {
     return;
   }
 
+  const userUpdate: Record<string, any> = {
+    email: user.email ?? "",
+    carrierId: user.uid,
+    role: "owner",
+  };
+
+  const carrierUpdate: Record<string, any> = {
+    onboardingComplete: true,
+  };
+
+  if (typeof notificationsEnabled === "boolean") {
+    userUpdate.notificationsEnabled =
+      notificationsEnabled;
+
+    carrierUpdate.notificationsEnabled =
+      notificationsEnabled;
+  }
+
+  if (expoPushToken) {
+    userUpdate.expoPushToken =
+      expoPushToken;
+    userUpdate.notificationTokenUpdatedAt =
+      serverTimestamp();
+
+    carrierUpdate.expoPushToken =
+      expoPushToken;
+    carrierUpdate.notificationTokenUpdatedAt =
+      serverTimestamp();
+  }
+
   await setDoc(
     doc(db, "users", user.uid),
-    {
-      email: user.email ?? "",
-      carrierId: user.uid,
-      role: "owner",
-      notificationsEnabled,
-      expoPushToken: expoPushToken ?? "",
-      notificationTokenUpdatedAt: serverTimestamp(),
-    },
+    userUpdate,
     { merge: true }
   );
 
   await setDoc(
     doc(db, "carriers", user.uid),
-    {
-      onboardingComplete: true,
-      notificationsEnabled,
-      expoPushToken: expoPushToken ?? "",
-      notificationTokenUpdatedAt: serverTimestamp(),
-    },
+    carrierUpdate,
     { merge: true }
   );
 
@@ -71,9 +89,9 @@ export default function NotificationsOnboarding() {
       setMessage("");
 
           if (isWeb) {
-      await finishOnboarding(false);
-      return;
-    }
+        await finishOnboarding();
+        return;
+      }
 
       
 

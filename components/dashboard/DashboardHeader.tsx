@@ -32,13 +32,16 @@ export default function DashboardHeader({
           }}
         >
           <Text
-            numberOfLines={1}
+            numberOfLines={2}
+            ellipsizeMode="tail"
             style={{
               fontSize: 22,
+              lineHeight: 27,
               fontWeight: "700",
               color: "#1A1915",
+              flexShrink: 1,
             }}
-          >
+>
             {companyName || "Your company"}
           </Text>
 

@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { router } from "expo-router";
+import * as Notifications from "expo-notifications";
 import {
   sendPasswordResetEmail,
   signOut,
@@ -202,16 +203,62 @@ useEffect(() => {
       }
 
             const userSnap = await getDoc(
-        doc(db, "users", user.uid)
-        );
+              doc(db, "users", user.uid)
+            );
 
-        if (userSnap.exists()) {
-        const userData = userSnap.data();
+            if (userSnap.exists()) {
+              const userData = userSnap.data();
 
-        setNotificationsEnabled(
-            userData.notificationsEnabled === true
-        );
-        }
+              const accountNotificationsEnabled =
+                userData.notificationsEnabled === true;
+
+              if (
+                Platform.OS === "web" ||
+                !accountNotificationsEnabled
+              ) {
+                setNotificationsEnabled(
+                  accountNotificationsEnabled
+                );
+              } else {
+                try {
+                  const permissions =
+                    await Notifications.getPermissionsAsync();
+
+                  if (permissions.status !== "granted") {
+                    setNotificationsEnabled(false);
+                  } else {
+                    const projectId =
+                      Constants.expoConfig?.extra?.eas?.projectId ??
+                      Constants.easConfig?.projectId;
+
+                    if (!projectId) {
+                      setNotificationsEnabled(false);
+                    } else {
+                      const tokenResponse =
+                        await Notifications.getExpoPushTokenAsync({
+                          projectId,
+                        });
+
+                      const storedToken =
+                        typeof userData.expoPushToken === "string"
+                          ? userData.expoPushToken
+                          : "";
+
+                      setNotificationsEnabled(
+                        tokenResponse.data === storedToken
+                      );
+                    }
+                  }
+                } catch (notificationError) {
+                  console.log(
+                    "Unable to verify notification device:",
+                    notificationError
+                  );
+
+                  setNotificationsEnabled(false);
+                }
+              }
+            }
 
     } catch (error) {
       console.log("Unable to load company settings:", error);
