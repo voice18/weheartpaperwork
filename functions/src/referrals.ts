@@ -224,6 +224,60 @@ export const claimReferral = onCall(
         .collection("referrals")
         .doc(referredCarrierId);
 
+    const existingReferralSnapshot =
+      await referralRef.get();
+
+    if (existingReferralSnapshot.exists) {
+      const existingData =
+        existingReferralSnapshot.data();
+
+      if (
+        existingData?.referralCode === code &&
+        existingData?.referredCarrierId ===
+          referredCarrierId
+      ) {
+        return {
+          status: "already-claimed",
+          referralCode: code,
+          referrerCarrierId:
+            existingData.referrerCarrierId,
+        };
+      }
+
+      throw new HttpsError(
+        "already-exists",
+        "This company has already been attributed to a referral."
+      );
+    }
+
+    const referredUser =
+      await admin.auth().getUser(
+        referredCarrierId
+      );
+
+    const createdAtMillis =
+      Date.parse(
+        referredUser.metadata.creationTime
+      );
+
+    const accountAgeMillis =
+      Date.now() - createdAtMillis;
+
+    const maxReferralClaimAgeMillis =
+      24 * 60 * 60 * 1000;
+
+    if (
+      !Number.isFinite(createdAtMillis) ||
+      accountAgeMillis < 0 ||
+      accountAgeMillis >
+        maxReferralClaimAgeMillis
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Referral rewards must be claimed during initial account signup."
+      );
+    }
+
     const result = await db.runTransaction(
       async (transaction) => {
         // One referred company can only ever have one
@@ -321,32 +375,15 @@ export const claimReferral = onCall(
             .collection("carriers")
             .doc(referrerCarrierId);
 
-        const referredCarrierRef =
-          db
-            .collection("carriers")
-            .doc(referredCarrierId);
-
         const referrerCarrierSnapshot =
           await transaction.get(
             referrerCarrierRef
-          );
-
-        const referredCarrierSnapshot =
-          await transaction.get(
-            referredCarrierRef
           );
 
         if (!referrerCarrierSnapshot.exists) {
           throw new HttpsError(
             "not-found",
             "The referring company no longer exists."
-          );
-        }
-
-        if (!referredCarrierSnapshot.exists) {
-          throw new HttpsError(
-            "failed-precondition",
-            "Finish creating your company before claiming the referral."
           );
         }
 
