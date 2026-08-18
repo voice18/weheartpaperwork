@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
+  Share,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -731,48 +732,106 @@ const handleChangePassword = () => {
   }
 }
 
-const loadReferralCode = async () => {
-  if (loadingReferralCode) {
+const loadReferralCode =
+  async (): Promise<string | null> => {
+    if (referralCode) {
+      return referralCode;
+    }
+
+    if (loadingReferralCode) {
+      return null;
+    }
+
+    try {
+      setLoadingReferralCode(true);
+
+      const getReferralCode = httpsCallable<
+        Record<string, never>,
+        { code: string }
+      >(
+        functions,
+        "getReferralCode"
+      );
+
+      const result = await getReferralCode({});
+
+      if (
+        !result.data?.code ||
+        typeof result.data.code !== "string"
+      ) {
+        throw new Error(
+          "Referral code was not returned."
+        );
+      }
+
+      setReferralCode(result.data.code);
+
+      return result.data.code;
+    } catch (error: any) {
+      console.error(
+        "Unable to load referral code:",
+        error
+      );
+
+      Alert.alert(
+        "Unable to load referral code",
+        typeof error?.message === "string"
+          ? error.message
+          : "Please try again."
+      );
+
+      return null;
+    } finally {
+      setLoadingReferralCode(false);
+    }
+  };
+  const handleShareReferralLink = async () => {
+  if (!referralCode) {
     return;
   }
 
+  const referralLink =
+    `https://weheartpaperwork.com/login?ref=${referralCode}`;
+
   try {
-    setLoadingReferralCode(true);
+    if (Platform.OS === "web") {
+      try {
+        await navigator.clipboard.writeText(
+          referralLink
+        );
 
-    const getReferralCode = httpsCallable<
-      Record<string, never>,
-      { code: string }
-    >(
-      functions,
-      "getReferralCode"
-    );
+        if (typeof window !== "undefined") {
+          window.alert(
+            "Referral link copied."
+          );
+        }
+      } catch {
+        if (typeof window !== "undefined") {
+          window.prompt(
+            "Copy your referral link:",
+            referralLink
+          );
+        }
+      }
 
-    const result = await getReferralCode({});
-
-    if (
-      !result.data?.code ||
-      typeof result.data.code !== "string"
-    ) {
-      throw new Error(
-        "Referral code was not returned."
-      );
+      return;
     }
 
-    setReferralCode(result.data.code);
-  } catch (error: any) {
+    await Share.share({
+      message:
+        `I use We Heart Paperwork to help keep trucking compliance organized. ` +
+        `Here is my referral link: ${referralLink}`,
+    });
+  } catch (error) {
     console.error(
-      "Unable to load referral code:",
+      "Unable to share referral link:",
       error
     );
 
     Alert.alert(
-      "Unable to load referral code",
-      typeof error?.message === "string"
-        ? error.message
-        : "Please try again."
+      "Unable to share referral link",
+      "Please try again."
     );
-  } finally {
-    setLoadingReferralCode(false);
   }
 };
 const estimatedMonthlyAmountCents =
@@ -1181,21 +1240,47 @@ const trialEndLabel = (() => {
         </Text>
 
         <View style={styles.card}>
-          <SettingsRow
-            label="Your referral code"
-            value={
-              loadingReferralCode
-                ? "Loading..."
-                : referralCode || "Get code"
-            }
-            showDivider={false}
-            onPress={
-              loadingReferralCode
-                ? undefined
-                : loadReferralCode
-            }
-          />
-        </View>
+        <SettingsRow
+          label="Your referral code"
+          value={
+            loadingReferralCode
+              ? "Loading..."
+              : referralCode || "Get code"
+          }
+          onPress={
+            loadingReferralCode
+              ? undefined
+              : () => {
+                  void loadReferralCode();
+                }
+          }
+        />
+
+        <SettingsRow
+          label="Share referral link"
+          value={
+            loadingReferralCode
+              ? "Preparing..."
+              : referralCode
+                ? Platform.OS === "web"
+                  ? "Copy link"
+                  : "Share"
+                : "Create link"
+          }
+          showDivider={false}
+          onPress={
+            loadingReferralCode
+              ? undefined
+              : referralCode
+                ? () => {
+                    void handleShareReferralLink();
+                  }
+                : () => {
+                    void loadReferralCode();
+                  }
+          }
+        />
+      </View>
         <Text style={styles.sectionLabel}>
           Support
         </Text>
