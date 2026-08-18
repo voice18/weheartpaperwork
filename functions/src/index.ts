@@ -1898,5 +1898,5 @@ if (!eventClaimed) {
   }
 );
 // ── 2. On new user signup — create Firestore user doc ─────────────────────
-
+export { getReferralCode } from "./referrals";
 
