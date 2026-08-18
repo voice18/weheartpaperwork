@@ -57,6 +57,12 @@ export default function SettingsScreen() {
   const [deletingAccount, setDeletingAccount] =
   useState(false);
 
+  const [referralCode, setReferralCode] =
+  useState("");
+
+  const [loadingReferralCode, setLoadingReferralCode] =
+    useState(false);
+
   useEffect(() => {
   const userId = auth.currentUser?.uid;
 
@@ -725,6 +731,50 @@ const handleChangePassword = () => {
   }
 }
 
+const loadReferralCode = async () => {
+  if (loadingReferralCode) {
+    return;
+  }
+
+  try {
+    setLoadingReferralCode(true);
+
+    const getReferralCode = httpsCallable<
+      Record<string, never>,
+      { code: string }
+    >(
+      functions,
+      "getReferralCode"
+    );
+
+    const result = await getReferralCode({});
+
+    if (
+      !result.data?.code ||
+      typeof result.data.code !== "string"
+    ) {
+      throw new Error(
+        "Referral code was not returned."
+      );
+    }
+
+    setReferralCode(result.data.code);
+  } catch (error: any) {
+    console.error(
+      "Unable to load referral code:",
+      error
+    );
+
+    Alert.alert(
+      "Unable to load referral code",
+      typeof error?.message === "string"
+        ? error.message
+        : "Please try again."
+    );
+  } finally {
+    setLoadingReferralCode(false);
+  }
+};
 const estimatedMonthlyAmountCents =
   200 + activeDriverCount * 100;
 
@@ -1126,6 +1176,26 @@ const trialEndLabel = (() => {
       )}
       </View>
 
+        <Text style={styles.sectionLabel}>
+          Referral Rewards
+        </Text>
+
+        <View style={styles.card}>
+          <SettingsRow
+            label="Your referral code"
+            value={
+              loadingReferralCode
+                ? "Loading..."
+                : referralCode || "Get code"
+            }
+            showDivider={false}
+            onPress={
+              loadingReferralCode
+                ? undefined
+                : loadReferralCode
+            }
+          />
+        </View>
         <Text style={styles.sectionLabel}>
           Support
         </Text>
