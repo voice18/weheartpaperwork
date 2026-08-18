@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Platform,
   View,
@@ -12,9 +12,40 @@ import {
   createUserWithEmailAndPassword,
 } from "firebase/auth";
 import { auth } from "../../lib/firebase";
-import { router } from "expo-router";
+import {
+  router,
+  useLocalSearchParams,
+} from "expo-router";
+
+import {
+  savePendingReferralCode,
+} from "../../lib/referrals";
 
 export default function Login() {
+    const { ref } =
+    useLocalSearchParams<{
+      ref?: string | string[];
+    }>();
+
+    useEffect(() => {
+      const referralCode =
+        Array.isArray(ref)
+          ? ref[0]
+          : ref;
+
+      if (!referralCode) {
+        return;
+      }
+
+      void savePendingReferralCode(
+        referralCode
+      ).catch((error) => {
+        console.error(
+          "Unable to save pending referral code:",
+          error
+        );
+      });
+    }, [ref]);
   const [mode, setMode] = useState<"login" | "create">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
