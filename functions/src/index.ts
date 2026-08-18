@@ -797,6 +797,43 @@ const carrierId = userId;
       await writer.close();
     }
 
+    // Remove referral-code ownership records belonging
+    // to this carrier. Historical referral attribution
+    // records are intentionally retained.
+    const referralCodeOwnerRef =
+      db
+        .collection("carrierReferralCodes")
+        .doc(carrierId);
+
+    const ownedReferralCodesSnapshot =
+      await db
+        .collection("referralCodes")
+        .where("carrierId", "==", carrierId)
+        .get();
+
+    const referralWriter = db.bulkWriter();
+
+    referralWriter.delete(referralCodeOwnerRef);
+
+    for (
+      const referralCodeDocument of
+      ownedReferralCodesSnapshot.docs
+    ) {
+      referralWriter.delete(
+        referralCodeDocument.ref
+      );
+    }
+
+    await referralWriter.close();
+
+    console.log(
+      "Referral code records deleted during account deletion",
+      {
+        carrierId,
+        referralCodeCount:
+          ownedReferralCodesSnapshot.size,
+      }
+    );
     // Delete the carrier document and every descendant:
     // drivers, compliance, complianceRecords, history, etc.
     await db.recursiveDelete(carrierRef);
