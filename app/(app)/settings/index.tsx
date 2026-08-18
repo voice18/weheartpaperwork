@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
+  Share,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -56,6 +57,12 @@ export default function SettingsScreen() {
 
   const [deletingAccount, setDeletingAccount] =
   useState(false);
+
+  const [referralCode, setReferralCode] =
+  useState("");
+
+  const [loadingReferralCode, setLoadingReferralCode] =
+    useState(false);
 
   useEffect(() => {
   const userId = auth.currentUser?.uid;
@@ -725,6 +732,108 @@ const handleChangePassword = () => {
   }
 }
 
+const loadReferralCode =
+  async (): Promise<string | null> => {
+    if (referralCode) {
+      return referralCode;
+    }
+
+    if (loadingReferralCode) {
+      return null;
+    }
+
+    try {
+      setLoadingReferralCode(true);
+
+      const getReferralCode = httpsCallable<
+        Record<string, never>,
+        { code: string }
+      >(
+        functions,
+        "getReferralCode"
+      );
+
+      const result = await getReferralCode({});
+
+      if (
+        !result.data?.code ||
+        typeof result.data.code !== "string"
+      ) {
+        throw new Error(
+          "Referral code was not returned."
+        );
+      }
+
+      setReferralCode(result.data.code);
+
+      return result.data.code;
+    } catch (error: any) {
+      console.error(
+        "Unable to load referral code:",
+        error
+      );
+
+      Alert.alert(
+        "Unable to load referral code",
+        typeof error?.message === "string"
+          ? error.message
+          : "Please try again."
+      );
+
+      return null;
+    } finally {
+      setLoadingReferralCode(false);
+    }
+  };
+  const handleShareReferralLink = async () => {
+  if (!referralCode) {
+    return;
+  }
+
+  const referralLink =
+    `https://weheartpaperwork.com/login?ref=${referralCode}`;
+
+  try {
+    if (Platform.OS === "web") {
+      try {
+        await navigator.clipboard.writeText(
+          referralLink
+        );
+
+        if (typeof window !== "undefined") {
+          window.alert(
+            "Referral link copied."
+          );
+        }
+      } catch {
+        if (typeof window !== "undefined") {
+          window.prompt(
+            "Copy your referral link:",
+            referralLink
+          );
+        }
+      }
+
+      return;
+    }
+
+    await Share.share({
+      message:
+        `I use We Heart Paperwork to help keep trucking compliance organized. ` +
+        `Here is my referral link: ${referralLink}`,
+    });
+  } catch (error) {
+    console.error(
+      "Unable to share referral link:",
+      error
+    );
+
+    Alert.alert(
+      "Unable to share referral link",
+      "Please try again."
+    );
+  }
+};
 const estimatedMonthlyAmountCents =
   200 + activeDriverCount * 100;
 
@@ -1126,6 +1235,52 @@ const trialEndLabel = (() => {
       )}
       </View>
 
+        <Text style={styles.sectionLabel}>
+          Referral Rewards
+        </Text>
+
+        <View style={styles.card}>
+        <SettingsRow
+          label="Your referral code"
+          value={
+            loadingReferralCode
+              ? "Loading..."
+              : referralCode || "Get code"
+          }
+          onPress={
+            loadingReferralCode
+              ? undefined
+              : () => {
+                  void loadReferralCode();
+                }
+          }
+        />
+
+        <SettingsRow
+          label="Share referral link"
+          value={
+            loadingReferralCode
+              ? "Preparing..."
+              : referralCode
+                ? Platform.OS === "web"
+                  ? "Copy link"
+                  : "Share"
+                : "Create link"
+          }
+          showDivider={false}
+          onPress={
+            loadingReferralCode
+              ? undefined
+              : referralCode
+                ? () => {
+                    void handleShareReferralLink();
+                  }
+                : () => {
+                    void loadReferralCode();
+                  }
+          }
+        />
+      </View>
         <Text style={styles.sectionLabel}>
           Support
         </Text>

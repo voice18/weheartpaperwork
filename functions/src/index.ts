@@ -797,6 +797,43 @@ const carrierId = userId;
       await writer.close();
     }
 
+    // Remove referral-code ownership records belonging
+    // to this carrier. Historical referral attribution
+    // records are intentionally retained.
+    const referralCodeOwnerRef =
+      db
+        .collection("carrierReferralCodes")
+        .doc(carrierId);
+
+    const ownedReferralCodesSnapshot =
+      await db
+        .collection("referralCodes")
+        .where("carrierId", "==", carrierId)
+        .get();
+
+    const referralWriter = db.bulkWriter();
+
+    referralWriter.delete(referralCodeOwnerRef);
+
+    for (
+      const referralCodeDocument of
+      ownedReferralCodesSnapshot.docs
+    ) {
+      referralWriter.delete(
+        referralCodeDocument.ref
+      );
+    }
+
+    await referralWriter.close();
+
+    console.log(
+      "Referral code records deleted during account deletion",
+      {
+        carrierId,
+        referralCodeCount:
+          ownedReferralCodesSnapshot.size,
+      }
+    );
     // Delete the carrier document and every descendant:
     // drivers, compliance, complianceRecords, history, etc.
     await db.recursiveDelete(carrierRef);
@@ -1345,6 +1382,27 @@ console.log(
         }
       );
 
+      const requestOrigin =
+  typeof request.rawRequest.headers.origin === "string"
+    ? request.rawRequest.headers.origin
+    : "";
+
+const allowedCheckoutOrigins = new Set([
+  "https://weheartpaperwork.com",
+  "http://localhost:8081",
+  "http://127.0.0.1:8081",
+]);
+
+const checkoutBaseUrl =
+  allowedCheckoutOrigins.has(requestOrigin)
+    ? requestOrigin
+    : "https://weheartpaperwork.com";
+
+console.log("Checkout return origin resolved", {
+  requestOrigin: requestOrigin || null,
+  checkoutBaseUrl,
+});
+
       const checkoutSession =
         await stripe.checkout.sessions.create({
           mode: "subscription",
@@ -1364,11 +1422,11 @@ console.log(
           },
 
           success_url:
-            "https://weheartpaperwork.com/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+          `${checkoutBaseUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
 
           cancel_url:
-            "https://weheartpaperwork.com/subscription-required?checkout=cancelled",
-        });
+            `${checkoutBaseUrl}/subscription-required?checkout=cancelled`,
+          });
 
       // STEP 11 belongs immediately after the Stripe
       // sessions.create call.
@@ -1898,5 +1956,8 @@ if (!eventClaimed) {
   }
 );
 // ── 2. On new user signup — create Firestore user doc ─────────────────────
-
+export {
+  getReferralCode,
+  claimReferral,
+} from "./referrals";
 
