@@ -184,3 +184,192 @@ export const getReferralCode = onCall(
     );
   }
 );
+const REFERRAL_COMMISSION_RATE_BPS = 1000;
+
+export const claimReferral = onCall(
+  {
+    region: "us-central1",
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "You must be signed in to claim a referral."
+      );
+    }
+
+    const rawCode = request.data?.code;
+
+    if (typeof rawCode !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "A referral code is required."
+      );
+    }
+
+    const code = rawCode.trim().toUpperCase();
+
+    if (!REFERRAL_CODE_PATTERN.test(code)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "The referral code is invalid."
+      );
+    }
+
+    const referredCarrierId = request.auth.uid;
+    const db = admin.firestore();
+
+    const referralRef =
+      db
+        .collection("referrals")
+        .doc(referredCarrierId);
+
+    const result = await db.runTransaction(
+      async (transaction) => {
+        // One referred company can only ever have one
+        // authoritative referral record.
+        const existingReferral =
+          await transaction.get(referralRef);
+
+        if (existingReferral.exists) {
+          const existingData =
+            existingReferral.data();
+
+          if (
+            existingData?.referralCode === code &&
+            existingData?.referredCarrierId ===
+              referredCarrierId
+          ) {
+            return {
+              status: "already-claimed",
+              referralCode: code,
+              referrerCarrierId:
+                existingData.referrerCarrierId,
+            };
+          }
+
+          throw new HttpsError(
+            "already-exists",
+            "This company has already been attributed to a referral."
+          );
+        }
+
+        const codeRef =
+          db.collection("referralCodes").doc(code);
+
+        const codeSnapshot =
+          await transaction.get(codeRef);
+
+        if (!codeSnapshot.exists) {
+          throw new HttpsError(
+            "not-found",
+            "The referral code does not exist."
+          );
+        }
+
+        const codeData = codeSnapshot.data();
+
+        if (codeData?.active !== true) {
+          throw new HttpsError(
+            "failed-precondition",
+            "This referral code is not active."
+          );
+        }
+
+        const referrerCarrierId =
+          codeData?.carrierId;
+
+        if (
+          typeof referrerCarrierId !== "string" ||
+          !referrerCarrierId
+        ) {
+          throw new HttpsError(
+            "internal",
+            "The referral code is not linked to a valid company."
+          );
+        }
+
+        if (
+          referrerCarrierId === referredCarrierId
+        ) {
+          throw new HttpsError(
+            "failed-precondition",
+            "A company cannot refer itself."
+          );
+        }
+
+        const ownerCodeRef =
+          db
+            .collection("carrierReferralCodes")
+            .doc(referrerCarrierId);
+
+        const ownerCodeSnapshot =
+          await transaction.get(ownerCodeRef);
+
+        if (
+          !ownerCodeSnapshot.exists ||
+          ownerCodeSnapshot.data()?.code !== code
+        ) {
+          throw new HttpsError(
+            "internal",
+            "The referral code ownership record is invalid."
+          );
+        }
+
+        const referrerCarrierRef =
+          db
+            .collection("carriers")
+            .doc(referrerCarrierId);
+
+        const referredCarrierRef =
+          db
+            .collection("carriers")
+            .doc(referredCarrierId);
+
+        const referrerCarrierSnapshot =
+          await transaction.get(
+            referrerCarrierRef
+          );
+
+        const referredCarrierSnapshot =
+          await transaction.get(
+            referredCarrierRef
+          );
+
+        if (!referrerCarrierSnapshot.exists) {
+          throw new HttpsError(
+            "not-found",
+            "The referring company no longer exists."
+          );
+        }
+
+        if (!referredCarrierSnapshot.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Finish creating your company before claiming the referral."
+          );
+        }
+
+        transaction.create(referralRef, {
+          referrerCarrierId,
+          referredCarrierId,
+          referralCode: code,
+          commissionRateBps:
+            REFERRAL_COMMISSION_RATE_BPS,
+          status: "active",
+          claimedAt:
+            admin.firestore.FieldValue
+              .serverTimestamp(),
+        });
+
+        return {
+          status: "claimed",
+          referralCode: code,
+          referrerCarrierId,
+        };
+      }
+    );
+
+    return result;
+  }
+);
