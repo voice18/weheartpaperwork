@@ -10,6 +10,9 @@ import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 
 import { auth, db } from "../../lib/firebase";
+import {
+  claimPendingReferral,
+} from "../../lib/referrals";
 
 export default function CompanyOnboarding() {
   const router = useRouter();
@@ -44,6 +47,8 @@ export default function CompanyOnboarding() {
         },
         { merge: true }
       );
+
+      await claimPendingReferral();
 
       router.replace("/(onboarding)/notifications");
     } catch (error: any) {
