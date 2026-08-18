@@ -564,23 +564,15 @@ export default function DriversPanel() {
                   {driver.name}
                 </Text>
 
-                <Text
-                  style={{
-                    fontSize: 18,
-                    color: "#706E68",
-                    fontWeight: "600",
-                  }}
-                >
-                  <Ionicons
-                    name={
-                      openDriverId === driver.id
-                        ? "chevron-up"
-                        : "chevron-down"
-                    }
-                    size={20}
-                    color="#706E68"
-                  />
-                </Text>
+                <Ionicons
+                  name={
+                    openDriverId === driver.id
+                      ? "chevron-up"
+                      : "chevron-down"
+                  }
+                  size={20}
+                  color="#706E68"
+                />
               </View>
 
               <Text style={{ color: "#706E68", marginTop: 2 }}>
