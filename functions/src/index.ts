@@ -1345,6 +1345,27 @@ console.log(
         }
       );
 
+      const requestOrigin =
+  typeof request.rawRequest.headers.origin === "string"
+    ? request.rawRequest.headers.origin
+    : "";
+
+const allowedCheckoutOrigins = new Set([
+  "https://weheartpaperwork.com",
+  "http://localhost:8081",
+  "http://127.0.0.1:8081",
+]);
+
+const checkoutBaseUrl =
+  allowedCheckoutOrigins.has(requestOrigin)
+    ? requestOrigin
+    : "https://weheartpaperwork.com";
+
+console.log("Checkout return origin resolved", {
+  requestOrigin: requestOrigin || null,
+  checkoutBaseUrl,
+});
+
       const checkoutSession =
         await stripe.checkout.sessions.create({
           mode: "subscription",
@@ -1364,11 +1385,11 @@ console.log(
           },
 
           success_url:
-            "https://weheartpaperwork.com/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}",
+          `${checkoutBaseUrl}/dashboard?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
 
           cancel_url:
-            "https://weheartpaperwork.com/subscription-required?checkout=cancelled",
-        });
+            `${checkoutBaseUrl}/subscription-required?checkout=cancelled`,
+          });
 
       // STEP 11 belongs immediately after the Stripe
       // sessions.create call.

@@ -89,6 +89,19 @@ useEffect(() => {
           const billing =
             carrierSnapshot.data()?.billing;
 
+          const currentBillingStatus =
+            typeof billing?.status === "string"
+              ? billing.status
+              : null;
+
+          if (
+            currentBillingStatus === "trialing" ||
+            currentBillingStatus === "active"
+          ) {
+            router.replace("/(app)/dashboard");
+            return;
+          }
+
           const trialPreviouslyUsed =
             billing?.hasUsedTrial === true ||
             billing?.trialEndsAt != null;
@@ -97,11 +110,7 @@ useEffect(() => {
             trialPreviouslyUsed
           );
 
-          setBillingStatus(
-            typeof billing?.status === "string"
-              ? billing.status
-              : null
-          );
+          setBillingStatus(currentBillingStatus);
 
           setIsBillingLoading(false);
         },
