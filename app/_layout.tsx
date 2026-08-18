@@ -126,6 +126,11 @@ if (isPublicRoute) {
 
       if (!user) {
         appReady.current = false;
+
+        if (pathname === "/login") {
+          return;
+        }
+
         router.replace("/(auth)/login");
         return;
       }
