@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/tools/tool-header.css">
 <style>
 :root{
   --ground:#FBFBF9;
@@ -196,6 +197,10 @@ strong{font-weight:600}
 .t-crit{background:var(--crit-bg);color:var(--crit)}
 .iwhat{font-size:.92rem;color:var(--ink-2);line-height:1.5}
 .imeta{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding-top:1px}
+.item-action{display:inline-flex;align-items:center;align-self:flex-start;margin-top:4px;padding:9px 12px;
+  border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent);color:var(--accent-ink);
+  font-family:"Barlow Semi Condensed",Barlow,sans-serif;font-size:.86rem;font-weight:600;text-decoration:none}
+.item-action:hover{filter:brightness(1.08)}
 
 .note{border:1px solid var(--line);border-left:3px solid var(--cost);border-radius:var(--radius);
   background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:7px}
@@ -253,11 +258,21 @@ strong{font-weight:600}
 </head>
 <body>
 
-<div class="shell">
+<header class="whp-sitebar noprint">
+  <div class="whp-sitebar-inner">
+    <a class="whp-brand" href="/"><span class="whp-brand-mark">WHP</span><span>We Heart Paperwork</span></a>
+    <nav class="whp-site-links" aria-label="Main navigation">
+      <a href="/features">What We Track</a>
+      <a href="/how-to">How to Stay Compliant</a>
+      <a href="/tools/" aria-current="page">Free Tools</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/login">Sign in</a>
+      <a class="whp-create-account" href="/login?mode=create">Create account</a>
+    </nav>
+  </div>
+</header>
 
-<nav class="toolnav noprint" aria-label="Free tools navigation">
-  <a href="/tools/" aria-label="Back to all free tools">&larr; Back to Free Tools</a>
-</nav>
+<div class="shell">
 
 <!-- ================= INTRO ================= -->
 <section id="intro">
@@ -697,6 +712,7 @@ const REQS = [
   g:2, id:"dapolicy", t:"Written drug and alcohol policy", cad:"One-time, then per driver", cost:"free",
   when:(a,d)=>d.needsDA,
   what:"You must give every driver a written policy covering twelve required subject areas, and <strong>collect a signed receipt from each one</strong>. The signed receipt is the part carriers forget, and it is the part the auditor asks for.",
+  action:{href:"/tools/drug-alcohol-policy/", label:"Build the required policy and signed receipt"},
   cite:"49 CFR 382.601"
 },
 {
@@ -1004,10 +1020,14 @@ function showResults(){
         ? '<span class="tag t-free">Free</span>'
         : (r.cost === "Good news" ? "" : '<span class="tag t-cost">'+r.cost+'</span>');
       const cadTag = '<span class="tag '+(r.g===4?'t-rep':'t-once')+'">'+r.cad+'</span>';
+      const action = r.action
+        ? '<a class="item-action noprint" href="'+r.action.href+'">'+r.action.label+' &rarr;</a>'
+        : '';
       html += '<div class="item"><span class="box" aria-hidden="true"></span><div class="ib">'
            +  '<div class="ititle"><h3>'+title+'</h3>'+cadTag+costTag+'</div>'
            +  '<p class="iwhat">'+what+'</p>'
            +  '<div class="imeta"><span class="cite">'+cite+'</span></div>'
+           +  action
            +  '</div></div>';
     });
     html += '</div></div>';
