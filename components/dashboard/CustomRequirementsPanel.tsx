@@ -56,6 +56,7 @@ export default function CustomRequirementsPanel({ onItemsChange }: Props) {
   const [scheduleType, setScheduleType] =
     useState<CustomRequirementScheduleType>("fixed");
   const [dueDate, setDueDate] = useState("");
+  const [dueDateError, setDueDateError] = useState<string | null>(null);
   const [intervalValue, setIntervalValue] = useState("1");
   const [intervalUnit, setIntervalUnit] =
     useState<CustomRequirementIntervalUnit>("month");
@@ -140,8 +141,14 @@ export default function CustomRequirementsPanel({ onItemsChange }: Props) {
         ? calendarPeriodEnd(localDateString(), "quarterly")
         : inputToIso(dueDate);
     const numericInterval = Number(intervalValue);
-    if (!carrierId || !name.trim() || !isoDueDate) {
-      Alert.alert("Missing information", "Enter a name and valid due date.");
+    if (!carrierId) return;
+    if (!name.trim()) {
+      Alert.alert("Missing information", "Enter a requirement name.");
+      return;
+    }
+    if (!isoDueDate) {
+      setDueDateError("Enter a real date in MM-DD-YYYY format.");
+      Alert.alert("Invalid due date", "Enter a real date in MM-DD-YYYY format.");
       return;
     }
     if (scheduleType === "rolling" && (!Number.isInteger(numericInterval) || numericInterval < 1)) {
@@ -158,7 +165,7 @@ export default function CustomRequirementsPanel({ onItemsChange }: Props) {
         completedAt: null, notified30: false, notified90: false,
         createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
       });
-      setName(""); setDueDate(""); setNotes(""); setIntervalValue("1");
+      setName(""); setDueDate(""); setDueDateError(null); setNotes(""); setIntervalValue("1");
       setIntervalUnit("month"); setRecurrencePreset("monthly");
       setScheduleType("fixed"); setAdding(false);
     } finally { setSaving(false); }
@@ -281,7 +288,30 @@ export default function CustomRequirementsPanel({ onItemsChange }: Props) {
           {(["day", "week", "month", "year"] as const).map(value => <TouchableOpacity key={value} onPress={() => setIntervalUnit(value)} style={[styles.choice, intervalUnit === value && styles.choiceActive]}><Text>{value}</Text></TouchableOpacity>)}
         </View></>}
       </>}
-      {(scheduleType === "fixed" || recurrencePreset === "custom") && <><Text style={styles.label}>{scheduleType === "fixed" ? "Due date" : "First due date"}</Text><TextInput style={styles.input} value={dueDate} onChangeText={text => setDueDate(formatDateInput(text))} placeholder="MM-DD-YYYY" /></>}
+      {(scheduleType === "fixed" || recurrencePreset === "custom") && <>
+        <Text style={styles.label}>{scheduleType === "fixed" ? "Due date" : "First due date"}</Text>
+        <TextInput
+          accessibilityLabel={scheduleType === "fixed" ? "Due date" : "First due date"}
+          style={[styles.input, dueDateError && styles.inputError]}
+          value={dueDate}
+          onChangeText={text => {
+            setDueDate(formatDateInput(text));
+            setDueDateError(null);
+          }}
+          onBlur={() => {
+            if (dueDate && !inputToIso(dueDate)) {
+              setDueDateError("Enter a real date in MM-DD-YYYY format.");
+            }
+          }}
+          placeholder="MM-DD-YYYY"
+          placeholderTextColor="#706E68"
+          keyboardType="number-pad"
+          maxLength={10}
+          selectionColor="#27500A"
+          cursorColor="#27500A"
+        />
+        {dueDateError ? <Text style={styles.errorText}>{dueDateError}</Text> : null}
+      </>}
       {scheduleType === "rolling" && recurrencePreset !== "custom" && <View style={styles.periodPreview}>
         <Text style={styles.periodPreviewLabel}>Current reporting period ends</Text>
         <Text style={styles.periodPreviewDate}>{fmtDate(calendarPeriodEnd(localDateString(), recurrencePreset))}</Text>
@@ -301,6 +331,8 @@ const styles = StyleSheet.create({
   form: { padding: 14, marginBottom: 14, borderWidth: 1, borderColor: "#D6E4C9", borderRadius: 12, backgroundColor: "#F8FAF5" }, label: { fontSize: 12, color: "#706E68", marginTop: 10, marginBottom: 5 },
   helpText: { marginTop: 7, color: "#706E68", fontSize: 12, lineHeight: 17 },
   input: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D3D1C7", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 9 }, choiceRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, alignItems: "center" },
+  inputError: { borderColor: "#A32D2D" },
+  errorText: { marginTop: 4, fontSize: 11, color: "#A32D2D" },
   intervalInput: { width: 74 },
   periodPreview: { marginTop: 12, padding: 12, borderRadius: 9, backgroundColor: "#EEF4E9", borderWidth: 1, borderColor: "#D6E4C9" },
   periodPreviewLabel: { fontSize: 11, color: "#706E68" },

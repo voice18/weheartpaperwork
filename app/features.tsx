@@ -292,6 +292,7 @@ function Footer({ compact }: { compact: boolean }) {
         </View>
         <View style={styles.footerLinks}>
           <Link href="/features" asChild><Pressable><Text style={styles.footerLink}>Features</Text></Pressable></Link>
+          <Link href="/compliance-guide" asChild><Pressable><Text style={styles.footerLink}>Compliance Guide</Text></Pressable></Link>
           <Link href="/pricing" asChild><Pressable><Text style={styles.footerLink}>Pricing</Text></Pressable></Link>
           <Link href="/about" asChild><Pressable><Text style={styles.footerLink}>About</Text></Pressable></Link>
           <Link href="/tools/mcs-150-due-date-calculator" asChild><Pressable><Text style={styles.footerLink}>Free MCS-150 Tool</Text></Pressable></Link>

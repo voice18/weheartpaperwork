@@ -72,7 +72,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "When you mark an MCS-150 update complete, the app records the filing date. If that filing falls within the 12-month window before the scheduled biennial deadline, the tracker advances to the next two-year cycle. An earlier filing outside that window does not move the scheduled biennial deadline.",
 
     notifications:
-      "For an active MCS-150 deadline, We Heart Paperwork can send reminders 30, 15, and 5 days before the tracked due date.",
+      "For an active MCS-150 deadline, We Heart Paperwork can send reminders 15 days before, 5 days before, and on the tracked due date.",
 
     history:
       "A completed update is stored in Compliance History with the completion date and the previous and next tracked due dates so the newest completion can be reversed safely.",
@@ -112,7 +112,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "Marking the annual cycle complete records the completion in history and advances the tracker to August 31 of the following year.",
 
     notifications:
-      "For the annual tracked deadline, We Heart Paperwork can send reminders 30, 15, and 5 days before the due date.",
+      "For the annual tracked deadline, We Heart Paperwork can send reminders 15 days before, 5 days before, and on the due date.",
 
     history:
       "Each completed annual cycle is stored in Compliance History. Reversing the newest completion can restore the previous annual due date.",
@@ -156,7 +156,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "After you log in to the Portal, mark the item complete using the date of that login. The next tracked date becomes 90 days later.",
 
     notifications:
-      "Portal maintenance intentionally uses a lighter reminder policy: one reminder 5 days before the tracked 90-day date.",
+      "Portal maintenance intentionally uses a lighter reminder policy: 5 days before and on the tracked 90-day date.",
 
     history:
       "Completed Portal login events can be recorded in Compliance History so the most recent maintenance action is documented.",
@@ -196,7 +196,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "Marking UCR complete records the completion and advances the tracked due date to December 31 of the next annual cycle.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the tracked UCR deadline.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the tracked UCR deadline.",
 
     history:
       "Each completed annual cycle is stored in Compliance History. The newest completion can be reversed to restore the previous annual due date.",
@@ -240,7 +240,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "Marking the annual IFTA license and decal renewal complete records the completion and advances the tracker to December 31 of the next year.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the tracked annual renewal deadline.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the tracked annual renewal deadline.",
 
     history:
       "Annual license and decal renewals can be retained in Compliance History and the newest completion can be reversed safely.",
@@ -268,19 +268,19 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "Track the four quarterly IFTA fuel-tax return deadlines separately from annual license renewal.",
 
     whatItIs:
-      "Carriers operating qualified motor vehicles in more than one IFTA jurisdiction generally report mileage and fuel activity to their base jurisdiction each quarter.",
+      "Carriers operating qualified motor vehicles in more than one IFTA jurisdiction generally report mileage and fuel activity to their base jurisdiction each quarter. The reporting quarter closes first; the return is normally due the following month.",
 
     whatYouEnter:
       "The app supplies the normal quarterly due dates: April 30, July 31, October 31, and January 31.",
 
     howItWorks:
-      "This is a fixed quarterly calendar. It applies to IFTA licensees, while an intrastate-only carrier can mark the requirement Does not apply.",
+      "This is a fixed quarterly filing calendar. January–March activity is due April 30, April–June is due July 31, July–September is due October 31, and October–December is due January 31. The tracker displays the quarter end for context, but notifications follow the filing due date. It applies to IFTA licensees, while an intrastate-only carrier can mark the requirement Does not apply.",
 
     markComplete:
       "Marking a return complete records that quarter in history and advances the tracker to the next quarterly due date.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before each tracked quarterly deadline.",
+      "Quarterly IFTA uses a lighter reminder schedule: 5 days before and on the filing due date—not when the reporting quarter closes.",
 
     history:
       "Each completed quarter is retained in Compliance History with its previous and next due dates.",
@@ -320,7 +320,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "When the current IRP cycle is completed, the next tracked due date advances one year from the existing due date rather than from the day you happened to complete the renewal.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the tracked IRP due date.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the tracked IRP due date.",
 
     history:
       "Each completed renewal can be stored in Compliance History with the previous and next due dates.",
@@ -360,7 +360,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "When you complete a provider renewal, the tracker advances one year from the existing provider due date so completing early does not shorten the next cycle.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the tracked provider renewal date.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the tracked provider renewal date.",
 
     history:
       "Completed renewals can be recorded in Compliance History with their previous and next tracked dates.",
@@ -444,7 +444,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "CDL expiration is updated by saving the new expiration date from the renewed license. It does not use the recurring Mark Complete workflow used by MVR and Clearinghouse.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the saved CDL expiration date.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the saved CDL expiration date.",
 
     history:
       "The current version saves the live CDL expiration date on the driver record. CDL date edits do not create the same completion-history records used by recurring MVR and Clearinghouse completions.",
@@ -484,7 +484,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "When medical qualification is renewed, save the actual new expiration date. Mark Complete can record the renewal event in history, but the app does not invent the new expiration date from the completion date.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the saved medical expiration date.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the saved medical expiration date.",
 
     history:
       "A medical renewal completion can be recorded in Compliance History. If the newest history record is reversed, the previous saved value is restored only when the live value has not been manually changed afterward.",
@@ -524,7 +524,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "When you complete the next annual review, Mark Complete saves that completion date as the new date of last review and calculates the next annual due date one year later.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the calculated annual due date.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the calculated annual due date.",
 
     history:
       "Each Mark Complete action creates a Compliance History record containing the completion date and calculated next due date. Reversing the newest completion can restore the prior review date.",
@@ -564,7 +564,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "When the next annual query is completed, Mark Complete saves that completion date as the new date of last annual query and calculates the next date one year later.",
 
     notifications:
-      "We Heart Paperwork can send reminders 30, 15, and 5 days before the calculated annual query date.",
+      "We Heart Paperwork can send reminders 15 days before, 5 days before, and on the calculated annual query date.",
 
     history:
       "Each completed annual query can be recorded in Compliance History. The newest completion can be reversed without overwriting a later manual edit.",

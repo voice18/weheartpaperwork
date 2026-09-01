@@ -54,15 +54,15 @@ function publicAppBaseUrl(): string {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type AlertType = "30_days" | "15_days" | "5_days" | "1_day";
-type ReminderPolicy = "standard" | "five-day-only" | "one-day-only";
+type AlertType = "15_days" | "5_days" | "due_today";
+type ReminderPolicy = "standard" | "five-day-and-due" | "due-day-only";
 
 type ReminderState = {
   dueDate: string;
   notified30: boolean;
   notified15: boolean;
   notified5: boolean;
-  notified1: boolean;
+  notifiedDue: boolean;
 };
 
 type ReminderUpdate = {
@@ -86,10 +86,9 @@ type DailyNotificationSummary = {
   carrierId: string;
   userId: string;
   expoPushTokens: string[];
-  dueIn30DaysIds: string[];
   dueIn15DaysIds: string[];
   dueIn5DaysIds: string[];
-  dueIn1DayIds: string[];
+  dueTodayIds: string[];
 };
 
 function customReminderPolicy(data: admin.firestore.DocumentData): ReminderPolicy {
@@ -97,17 +96,20 @@ function customReminderPolicy(data: admin.firestore.DocumentData): ReminderPolic
   if (
     data.recurrenceKind === "calendar-monthly" ||
     data.recurrenceKind === "calendar-quarterly"
-  ) return "five-day-only";
+  ) return "five-day-and-due";
 
   const value = typeof data.intervalValue === "number" ? data.intervalValue : 1;
+  if (data.intervalUnit === "year" || (data.intervalUnit === "month" && value >= 12)) {
+    return "standard";
+  }
   const approximateDays =
     data.intervalUnit === "day" ? value :
     data.intervalUnit === "week" ? value * 7 :
     data.intervalUnit === "month" ? value * 30 :
     data.intervalUnit === "year" ? value * 365 : 365;
 
-  if (approximateDays <= 7) return "one-day-only";
-  if (approximateDays < 365) return "five-day-only";
+  if (approximateDays <= 7) return "due-day-only";
+  if (approximateDays < 365) return "five-day-and-due";
   return "standard";
 }
 
@@ -130,12 +132,18 @@ function getAlertDecision(
     notified30: sameOccurrence && data.notified30 === true,
     notified15: sameOccurrence && data.notified15 === true,
     notified5: sameOccurrence && data.notified5 === true,
-    notified1: sameOccurrence && data.notified1 === true,
+    notifiedDue: sameOccurrence && data.notifiedDue === true,
   };
 
-  // Short-cycle items are intentionally quieter: Portal maintenance and
-  // quarterly IFTA each receive one push at five days remaining.
-  if (requirementId === "fmcsa-portal" || requirementId === "ifta-quarterly") {
+  // The 90-day Portal login cycle is intentionally quieter: reminders five
+  // days before and on the maintenance date.
+  if (requirementId === "fmcsa-portal") {
+    if (days === 0 && !state.notifiedDue) {
+      return {
+        alertType: "due_today",
+        state: { ...state, notified5: true, notifiedDue: true },
+      };
+    }
     if (days <= 5 && !state.notified5) {
       return {
         alertType: "5_days",
@@ -145,14 +153,21 @@ function getAlertDecision(
     return null;
   }
 
-  if (policy === "one-day-only") {
-    if (days <= 1 && !state.notified1) {
-      return { alertType: "1_day", state: { ...state, notified1: true } };
+  if (policy === "due-day-only") {
+    if (days === 0 && !state.notifiedDue) {
+      return { alertType: "due_today", state: { ...state, notifiedDue: true } };
     }
     return null;
   }
 
-  if (policy === "five-day-only") {
+  if (days === 0 && !state.notifiedDue) {
+    return {
+      alertType: "due_today",
+      state: { ...state, notified15: true, notified5: true, notifiedDue: true },
+    };
+  }
+
+  if (requirementId === "ifta-quarterly" || policy === "five-day-and-due") {
     if (days <= 5 && !state.notified5) {
       return { alertType: "5_days", state: { ...state, notified5: true } };
     }
@@ -165,22 +180,15 @@ function getAlertDecision(
   if (days <= 5 && !state.notified5) {
     return {
       alertType: "5_days",
-      state: { ...state, notified30: true, notified15: true, notified5: true },
+      state: { ...state, notified15: true, notified5: true },
     };
   }
   if (days <= 15 && !state.notified15) {
     return {
       alertType: "15_days",
-      state: { ...state, notified30: true, notified15: true },
+      state: { ...state, notified15: true },
     };
   }
-  if (days <= 30 && !state.notified30) {
-    return {
-      alertType: "30_days",
-      state: { ...state, notified30: true },
-    };
-  }
-
   return null;
 }
 
@@ -453,19 +461,6 @@ function addYearsToDate(
   );
 }
 
-function iftaQuarterEndFromDueDate(dueDate: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-
-  if (month === 4) return `${year}-03-31`;
-  if (month === 7) return `${year}-06-30`;
-  if (month === 10) return `${year}-09-30`;
-  if (month === 1) return `${year - 1}-12-31`;
-  return null;
-}
-
 function addDaysToDate(dateStr: string, days: number): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
   if (!match || !Number.isInteger(days)) return "";
@@ -558,10 +553,7 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
         }
 
         const dueDate = String(data.dueDate);
-        const reminderDate = compDoc.id === "ifta-quarterly"
-          ? iftaQuarterEndFromDueDate(dueDate) || dueDate
-          : dueDate;
-        const days = daysUntil(reminderDate);
+        const days = daysUntil(dueDate);
             console.log("Compliance item checked", {
       carrierId,
       itemId: compDoc.id,
@@ -571,9 +563,7 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
     });
         reminderCandidates.push({
           itemId: compDoc.id,
-          label: compDoc.id === "ifta-quarterly"
-            ? "IFTA reporting quarter ends"
-            : REQUIREMENT_LABELS[compDoc.id] || compDoc.id,
+          label: REQUIREMENT_LABELS[compDoc.id] || compDoc.id,
           days,
           dueDate,
           requirementId: compDoc.id,
@@ -728,10 +718,9 @@ for (const vehicleDoc of vehiclesSnap.docs) {
             AlertType,
             Array<{ itemId: string; label: string }>
           > = {
-            "30_days": [],
             "15_days": [],
             "5_days": [],
-            "1_day": [],
+            "due_today": [],
           };
           const stateRefs = reminderCandidates.map(candidate =>
             reminderStateRef(carrierId, user.userId, candidate.itemId)
@@ -769,15 +758,13 @@ for (const vehicleDoc of vehiclesSnap.docs) {
             });
           });
 
-          const dueIn30DaysItems = groupedItems["30_days"];
           const dueIn15DaysItems = groupedItems["15_days"];
           const dueIn5DaysItems = groupedItems["5_days"];
-          const dueIn1DayItems = groupedItems["1_day"];
+          const dueTodayItems = groupedItems["due_today"];
           const allItems = [
             ...dueIn5DaysItems,
-            ...dueIn1DayItems,
+            ...dueTodayItems,
             ...dueIn15DaysItems,
-            ...dueIn30DaysItems,
           ];
 
           if (allItems.length === 0) continue;
@@ -794,9 +781,8 @@ for (const vehicleDoc of vehiclesSnap.docs) {
             notificationDate: todayKey,
             totalItems: allItems.length,
             dueIn5DaysCount: dueIn5DaysItems.length,
-            dueIn1DayCount: dueIn1DayItems.length,
+            dueTodayCount: dueTodayItems.length,
             dueIn15DaysCount: dueIn15DaysItems.length,
-            dueIn30DaysCount: dueIn30DaysItems.length,
             itemIds: allItems.map(item => item.itemId),
           });
 
@@ -810,10 +796,9 @@ for (const vehicleDoc of vehiclesSnap.docs) {
               carrierId,
               userId: user.userId,
               expoPushTokens: user.expoPushTokens,
-              dueIn30DaysIds: dueIn30DaysItems.map(item => item.itemId),
               dueIn15DaysIds: dueIn15DaysItems.map(item => item.itemId),
               dueIn5DaysIds: dueIn5DaysItems.map(item => item.itemId),
-              dueIn1DayIds: dueIn1DayItems.map(item => item.itemId),
+              dueTodayIds: dueTodayItems.map(item => item.itemId),
             });
 
             const acceptedTickets = ticket.filter(item => item.status === "ok" && item.id);
@@ -872,15 +857,13 @@ async function sendDailySummaryNotification(
   token: string;
 }>> {
   const dueIn5DaysCount = summary.dueIn5DaysIds.length;
-  const dueIn1DayCount = summary.dueIn1DayIds.length;
+  const dueTodayCount = summary.dueTodayIds.length;
   const dueIn15DaysCount = summary.dueIn15DaysIds.length;
-  const dueIn30DaysCount = summary.dueIn30DaysIds.length;
 
   const totalItems =
     dueIn5DaysCount +
-    dueIn1DayCount +
-    dueIn15DaysCount +
-    dueIn30DaysCount;
+    dueTodayCount +
+    dueIn15DaysCount;
 
   const title =
     totalItems === 1
@@ -889,8 +872,8 @@ async function sendDailySummaryNotification(
 
   const bodyParts: string[] = [];
 
-  if (dueIn1DayCount > 0) {
-    bodyParts.push(`${dueIn1DayCount} need attention within 1 day`);
+  if (dueTodayCount > 0) {
+    bodyParts.push(`${dueTodayCount} due today`);
   }
 
   if (dueIn5DaysCount > 0) {
@@ -901,17 +884,12 @@ async function sendDailySummaryNotification(
     bodyParts.push(`${dueIn15DaysCount} need attention within 15 days`);
   }
 
-  if (dueIn30DaysCount > 0) {
-    bodyParts.push(`${dueIn30DaysCount} need attention within 30 days`);
-  }
-
   const body = `${bodyParts.join(" • ")}. Tap to review.`;
 
   const allItemIds = [
-    ...summary.dueIn1DayIds,
+    ...summary.dueTodayIds,
     ...summary.dueIn5DaysIds,
     ...summary.dueIn15DaysIds,
-    ...summary.dueIn30DaysIds,
   ];
 
   const maxAttempts = 3;
@@ -945,12 +923,10 @@ for (
             itemIds: allItemIds,
             dueIn5DaysIds:
               summary.dueIn5DaysIds,
-            dueIn1DayIds:
-              summary.dueIn1DayIds,
+            dueTodayIds:
+              summary.dueTodayIds,
             dueIn15DaysIds:
               summary.dueIn15DaysIds,
-            dueIn30DaysIds:
-              summary.dueIn30DaysIds,
           },
         }))),
       }

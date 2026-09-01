@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { onAuthStateChanged } from "firebase/auth";
 import { router } from "expo-router";
+import Head from "expo-router/head";
 import { auth } from "../lib/firebase";
 import {
   SafeAreaView,
@@ -81,6 +82,14 @@ function handleCreateAccount() {
         backgroundColor: "#F7F6F3",
       }}
     >
+      <Head>
+        <title>Trucking Compliance Guide and Notification Schedule | We Heart Paperwork</title>
+        <meta
+          name="description"
+          content="See what We Heart Paperwork tracks, how trucking compliance dates are calculated, and when deadline notifications are sent."
+        />
+        <link rel="canonical" href="https://weheartpaperwork.com/compliance-guide" />
+      </Head>
       <ScrollView
         contentContainerStyle={{
           paddingHorizontal: 18,
@@ -208,6 +217,27 @@ function handleCreateAccount() {
             to enter, how deadlines are calculated, and
             what happens when you mark an item complete.
           </Text>
+
+          <View
+            style={{
+              marginTop: 20,
+              padding: 16,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: "#D6E4C9",
+              backgroundColor: "#F8FAF5",
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "800", color: "#27500A" }}>
+              Notification schedule
+            </Text>
+            <Text style={{ marginTop: 7, fontSize: 13, lineHeight: 19, color: "#4E4C46" }}>
+              We check deadlines daily at 11:00 AM Pacific Time. Most company, driver, vehicle, and fixed-date custom requirements send reminders 15 days before, 5 days before, and on the due date.
+            </Text>
+            <Text style={{ marginTop: 7, fontSize: 13, lineHeight: 19, color: "#4E4C46" }}>
+              FMCSA Portal maintenance and quarterly IFTA send reminders 5 days before and on the due date. Recurring custom requirements with an 8–364 day cycle use that same schedule; cycles of 7 days or less notify only on the due date. Annual or longer custom cycles use the standard 15-day, 5-day, and due-date schedule.
+            </Text>
+          </View>
 
           <View
             style={{

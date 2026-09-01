@@ -1178,6 +1178,17 @@ const trialEndLabel = (() => {
             />
           )}
         </View>
+        <View style={styles.notificationSchedule}>
+          <Text style={styles.notificationScheduleTitle}>
+            When reminders are sent
+          </Text>
+          <Text style={styles.notificationScheduleText}>
+            We check deadlines daily at 11:00 AM Pacific Time. Most requirements notify you 15 days before, 5 days before, and on the due date.
+          </Text>
+          <Text style={styles.notificationScheduleText}>
+            FMCSA Portal maintenance and quarterly IFTA notify you 5 days before and on the due date. Short custom cycles also use fewer reminders to avoid repeated alerts.
+          </Text>
+        </View>
       </View>
 
 
@@ -1654,6 +1665,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: "#706E68",
+  },
+  notificationSchedule: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#ECEAE4",
+    backgroundColor: "#F8FAF5",
+  },
+  notificationScheduleTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#27500A",
+  },
+  notificationScheduleText: {
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#5E5C55",
   },
   modalBackdrop: {
     flex: 1,
