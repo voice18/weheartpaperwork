@@ -98,6 +98,9 @@ strong{font-weight:600}
 
 .shell{max-width:720px;margin:0 auto;padding:0 20px 80px}
 .col{max-width:36rem}
+.toolnav{padding-top:22px}
+.toolnav a{display:inline-flex;align-items:center;gap:7px;color:var(--ink-2);font-size:.88rem;font-weight:600;text-decoration:none}
+.toolnav a:hover{color:var(--accent)}
 
 /* ---------- masthead ---------- */
 .mast{display:flex;flex-direction:column;gap:16px;padding:48px 0 28px}
@@ -225,7 +228,7 @@ strong{font-weight:600}
   @page{margin:14mm 13mm}
   html,body{background:#fff;color:#000;font-size:10.5pt;line-height:1.4}
   .shell{max-width:none;padding:0}
-  .noprint,.toolbar,.offer,.prog,.nav,.btn,.mast{display:none !important}
+  .noprint,.toolbar,.offer,.prog,.nav,.btn,.mast,.toolnav{display:none !important}
   .printonly{display:block !important}
   .verdict{border:1.5pt solid #000;border-top-width:3pt;background:#fff;padding:12pt;break-inside:avoid}
   .vname{font-size:16pt}
@@ -251,6 +254,10 @@ strong{font-weight:600}
 <body>
 
 <div class="shell">
+
+<nav class="toolnav noprint" aria-label="Free tools navigation">
+  <a href="/tools/" aria-label="Back to all free tools">&larr; Back to Free Tools</a>
+</nav>
 
 <!-- ================= INTRO ================= -->
 <section id="intro">
