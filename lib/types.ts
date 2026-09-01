@@ -114,6 +114,29 @@ export interface ComplianceRecord {
   applicable?: boolean;
 }
 
+export type CustomRequirementScheduleType = "fixed" | "rolling";
+export type CustomRequirementIntervalUnit = "day" | "week" | "month" | "year";
+export type CustomRequirementRecurrenceKind =
+  | "calendar-monthly"
+  | "calendar-quarterly"
+  | "custom-interval";
+
+export interface CustomRequirement {
+  id: string;
+  name: string;
+  scheduleType: CustomRequirementScheduleType;
+  dueDate: string;
+  intervalValue: number | null;
+  intervalUnit: CustomRequirementIntervalUnit | null;
+  recurrenceKind: CustomRequirementRecurrenceKind | null;
+  active: boolean;
+  notes: string | null;
+  completed: boolean;
+  completedAt: Date | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
 // Requirement IDs — must match keys in the compliance sub-collection
 export type RequirementId =
   | "mcs150"
@@ -121,6 +144,8 @@ export type RequirementId =
   | "fmcsa-portal"
   | "ucr"
   | "ifta"
+  | "ifta-quarterly"
   | "irp"
+  | "insurance"
   | "drug"
   | "boc3";

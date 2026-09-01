@@ -9,6 +9,7 @@ import {
 import { useRouter } from "expo-router";
 
 import {
+  arrayUnion,
   doc,
   serverTimestamp,
   setDoc,
@@ -59,6 +60,8 @@ export default function NotificationsOnboarding() {
   if (expoPushToken) {
     userUpdate.expoPushToken =
       expoPushToken;
+    userUpdate.expoPushTokens =
+      arrayUnion(expoPushToken);
     userUpdate.notificationTokenUpdatedAt =
       serverTimestamp();
 

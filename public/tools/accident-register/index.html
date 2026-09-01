@@ -1,0 +1,1611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accident Register Builder: 49 CFR 390.15 Records | We Heart Paperwork</title>
+<meta name="description" content="Free DOT accident register builder. Determine whether an occurrence belongs on the federal register, organize supporting documents, and print a complete carrier record in your browser.">
+<link rel="canonical" href="https://weheartpaperwork.com/tools/accident-register/">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<meta name="theme-color" content="#F1F3F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111518" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="article"><meta property="og:site_name" content="We Heart Paperwork">
+<meta property="og:url" content="https://weheartpaperwork.com/tools/accident-register/">
+<meta property="og:title" content="The Accident Register Builder — determine, document, and print">
+<meta property="og:description" content="Work through the federal definition, build the three-year register, and organize the records behind each accident.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Accident Register Builder","url":"https://weheartpaperwork.com/tools/accident-register/","applicationCategory":"BusinessApplication","operatingSystem":"Any","description":"Determines whether an occurrence meets the federal accident definition and builds carrier records under 49 CFR 390.15.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"We Heart Paperwork","url":"https://weheartpaperwork.com"}}</script>
+<style>
+/* ============================================================================
+   DOT ACCIDENT REGISTER BUILDER
+   Single-file tool. No dependencies, no network calls, no storage APIs.
+   PDFs come from the browser's own print engine (@page + print CSS): selectable
+   text, exact Letter geometry, nothing to bundle.
+
+   Shares its design system and print machinery with the vehicle maintenance
+   file builder, so the two tools read as one family on the site.
+   ========================================================================= */
+
+:root{
+  --ink:#14181B;
+  --ink-2:#4E5A60;
+  --ink-3:#78868D;
+  --rule:#D6DBD8;
+  --rule-2:#E9ECEA;
+  --bg:#F1F3F1;
+  --panel:#ffffff;
+  --accent:#A85F06;
+  --accent-2:#A85F06;
+  --accent-soft:#F5E7CF;
+  --warn:#8A5A00;
+  --warn-soft:#FFF4DD;
+  --warn-rule:#e0c39a;
+  --ok:#1C6647;
+  --ok-soft:#DCEBE2;
+  --ok-rule:#a8cfba;
+  --stop:#8f2727;
+  --stop-soft:#fbeeee;
+  --radius:4px;
+  --shadow:0 1px 2px rgba(20,24,27,.06),0 6px 20px -12px rgba(20,24,27,.22);
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --sans:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+
+@media (prefers-color-scheme:dark){:root{
+  --ink:#E7EBE8;--ink-2:#A7B2B7;--ink-3:#7E8B91;--rule:#2B3439;--rule-2:#222A2F;
+  --bg:#111518;--panel:#191F23;--accent:#EBA33C;--accent-2:#EBA33C;--accent-soft:#3A2C14;
+  --warn:#D9A441;--warn-soft:#3A2C14;--ok:#57C495;--ok-soft:#153328;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -14px rgba(0,0,0,.7);
+}}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans);color:var(--ink);background:var(--bg);
+  font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased;
+}
+
+/* ---------------------------------------------------------------- app bar */
+.appbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:10px max(20px,calc((100vw - 1180px)/2));
+  background:var(--bg);color:var(--ink);border-bottom:1px solid var(--rule);
+}
+.appbar h1{margin:0;font-size:16px;font-weight:650;display:flex;align-items:baseline;gap:10px}
+.appbar h1 small{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.appbar .spacer{flex:1}
+.appbar .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+button{font-family:inherit;font-size:13px;cursor:pointer}
+.btn{
+  border:1px solid transparent;border-radius:var(--radius);
+  padding:7px 13px;font-weight:550;line-height:1.2;
+  background:#fff;color:var(--accent);white-space:nowrap;
+  transition:background .12s,border-color .12s,color .12s;
+}
+.btn:hover{background:#eef3f7}
+.btn-ghost{background:transparent;color:var(--ink-2);border-color:var(--rule)}
+.btn-ghost:hover{background:var(--panel);color:var(--ink)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-sm{padding:4px 9px;font-size:12px}
+.btn-quiet{background:transparent;color:var(--ink-2);border-color:var(--rule)}
+.btn-quiet:hover{background:#fff;color:var(--ink)}
+.btn-danger{background:transparent;color:#9a2b2b;border-color:#e3c4c4}
+.btn-danger:hover{background:#fbeeee}
+
+/* ----------------------------------------------------------------- layout */
+.mast{max-width:1180px;margin:0 auto;padding:34px 20px 22px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
+.mast h1{font-family:var(--display);font-size:clamp(34px,6vw,58px);line-height:1.02;letter-spacing:-.02em;margin:0}
+.mast h1 span{font-weight:500;color:var(--ink-2)}
+.dek{max-width:69ch;color:var(--ink-2);font-size:17px;margin:16px 0 18px}
+.mast-meta{display:flex;gap:8px;flex-wrap:wrap}
+.mast-tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--rule);padding:4px 9px;border-radius:2px;color:var(--ink-2)}
+.layout{display:grid;grid-template-columns:306px minmax(0,1fr);align-items:start;max-width:1180px;margin:0 auto}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.sidebar{background:var(--panel);border-right:1px solid var(--rule);min-height:calc(100vh - 57px);padding:18px 16px 40px}
+.editor{padding:22px 26px 80px;max-width:1080px}
+
+.sec-label{font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-3);font-weight:650;margin:0 0 9px}
+
+/* ---------------------------------------------------------- accident list */
+.aclist{list-style:none;margin:0 0 12px;padding:0}
+.aclist li{margin-bottom:4px}
+.ac-btn{width:100%;text-align:left;border:1px solid var(--rule);border-radius:var(--radius);background:#fff;padding:8px 10px;display:flex;gap:9px;align-items:flex-start}
+.ac-btn:hover{border-color:var(--accent-2)}
+.ac-btn.active{background:var(--accent-soft);border-color:var(--accent-2)}
+.ac-btn .grow{flex:1;min-width:0}
+.ac-btn .num{font-weight:650;font-size:13px}
+.ac-btn .meta{font-size:11px;color:var(--ink-3);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;margin-top:5px}
+.dot.on{background:#b4542c}
+.dot.off{background:#5c9a76}
+.dot.inc{background:#b9c0c7}
+
+.empty-note{font-size:12.5px;color:var(--ink-3);padding:10px 2px 14px;line-height:1.5}
+.file-note{font-size:12px;color:var(--ink-3);line-height:1.6;margin-top:26px;border-top:1px solid var(--rule);padding-top:16px}
+
+/* ---------------------------------------------------------------- fields */
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:var(--radius);padding:18px 20px 20px;margin-bottom:18px;box-shadow:var(--shadow)}
+.card>h2{margin:0 0 3px;font-size:14px;font-weight:650;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.cite{font-size:11px;font-weight:600;color:var(--accent-2);background:var(--accent-soft);padding:2px 7px;border-radius:3px}
+.card>.hint{margin:0 0 15px;font-size:12.5px;color:var(--ink-3);line-height:1.5}
+
+.grid{display:grid;gap:12px 14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}
+@media (max-width:460px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.span2{grid-column:span 2}
+@media (max-width:460px){.span2{grid-column:span 1}}
+
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11.5px;font-weight:600;color:var(--ink-2)}
+.field .sub{font-size:11px;color:var(--ink-3);font-weight:400}
+input[type=text],input[type=date],input[type=time],input[type=number],select,textarea{
+  font-family:inherit;font-size:13.5px;color:var(--ink);
+  border:1px solid var(--rule);border-radius:5px;padding:7px 9px;background:var(--panel);width:100%;min-width:0;
+}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent-2);box-shadow:0 0 0 3px rgba(26,95,146,.13)}
+textarea{resize:vertical;min-height:74px;line-height:1.45}
+
+.checkrow{display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:13px}
+.checkrow input{margin-top:3px;flex:none}
+.checkrow span{color:var(--ink-2)}
+.checkrow .c{font-size:11px;color:var(--ink-3);display:block;margin-top:1px}
+
+/* ----------------------------------------------------------- decision path */
+.verdict{
+  border-radius:7px;padding:13px 16px;margin:0 0 16px;
+  display:flex;gap:13px;align-items:flex-start;border:1px solid;
+}
+.verdict .vt{font-size:14px;font-weight:700;letter-spacing:.01em;margin:0 0 2px}
+.verdict .vr{font-size:12.5px;line-height:1.5}
+.verdict.on{background:var(--warn-soft);border-color:var(--warn-rule);color:var(--warn)}
+.verdict.off{background:var(--ok-soft);border-color:var(--ok-rule);color:var(--ok)}
+.verdict.inc{background:#f2f4f6;border-color:var(--rule);color:var(--ink-2)}
+.verdict .vr strong{color:inherit}
+
+.gate{border-top:1px solid var(--rule-2);padding:14px 0 4px}
+.gate:first-of-type{border-top:none}
+.gate.muted{opacity:.42}
+.gate-q{font-size:13.5px;font-weight:600;margin:0 0 3px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.gate-help{font-size:12px;color:var(--ink-3);line-height:1.55;margin:0 0 9px;max-width:70ch}
+.gate-help em{color:var(--ink-2);font-style:normal;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.seg-b{border:none;background:#fff;padding:6px 15px;font-size:12.5px;color:var(--ink-2);border-right:1px solid var(--rule);font-weight:550}
+.seg-b:last-child{border-right:none}
+.seg-b:hover{background:#f2f5f8}
+.seg-b.sel{background:var(--accent);color:#fff}
+.seg-b.sel.no{background:var(--ok)}
+.seg-b.sel.unk{background:var(--ink-3)}
+.gate-out{font-size:12px;margin-top:8px;padding:7px 11px;border-radius:5px;line-height:1.5}
+.gate-out.stop{background:var(--stop-soft);color:var(--stop)}
+.gate-out.pass{background:var(--ok-soft);color:var(--ok)}
+.gate-out.trig{background:var(--warn-soft);color:var(--warn)}
+
+.callout{border-left:3px solid var(--accent-2);background:var(--accent-soft);padding:11px 14px;border-radius:0 5px 5px 0;font-size:12.5px;color:var(--ink-2);line-height:1.55;margin:0 0 16px}
+.callout strong{color:var(--ink)}
+.callout.warn{border-left-color:#c07a2e;background:var(--warn-soft)}
+.callout.flag{border-left-color:#b4542c;background:var(--stop-soft);color:#7a3030}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:80;box-shadow:0 4px 14px rgba(0,0,0,.22);max-width:min(90vw,460px)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* =========================================================================
+   PRINTED DOCUMENT
+   ====================================================================== */
+#print-root{display:none}
+
+.sheet{
+  width:7.5in;min-height:10in;background:#fff;color:#000;
+  font-family:var(--sans);font-size:9.5pt;line-height:1.32;
+  display:flex;flex-direction:column;padding:0;
+}
+.sheet-head{display:flex;justify-content:space-between;align-items:flex-end;gap:14px;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:9px}
+.sheet-head .carrier{font-size:12pt;font-weight:700;line-height:1.15}
+.sheet-head .carrier .sub{font-size:8pt;font-weight:400;margin-top:2px;letter-spacing:.02em}
+.sheet-head .doc{text-align:right;font-size:8pt;line-height:1.35;white-space:nowrap}
+.sheet-head .doc .t{font-size:10.5pt;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.sheet-body{flex:1}
+.sheet-body.fill{display:flex;flex-direction:column}
+.sheet-body.fill .grow{flex:1;display:flex;flex-direction:column}
+.sheet-body.fill .grow>div:last-child{flex:1}
+.sheet-foot{border-top:1px solid #999;margin-top:9px;padding-top:4px;display:flex;justify-content:space-between;gap:12px;font-size:7pt;color:#333;line-height:1.35}
+
+.doc-title{font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin:0 0 3px}
+.doc-sub{font-size:8pt;color:#333;margin:0 0 10px;line-height:1.4}
+
+.blk{margin-bottom:11px;break-inside:avoid}
+.blk-h{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;background:#e9edf1;border:1px solid #000;border-bottom:none;padding:3px 6px}
+.blk-h .c{float:right;font-weight:600;letter-spacing:.02em;text-transform:none;font-size:7.5pt}
+
+.kv{display:flex;min-height:.29in}
+.kv .k{width:1.45in;flex:none;background:#f4f6f8;border-right:1px solid #000;padding:3px 6px;font-size:7.5pt;font-weight:650;text-transform:uppercase;letter-spacing:.04em;color:#111;display:flex;align-items:center;line-height:1.2}
+.kv .v{flex:1;padding:3px 7px;display:flex;align-items:center;font-size:9.5pt;min-width:0;word-break:break-word}
+.kv .v.mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:9pt;letter-spacing:.04em}
+
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 11px;align-items:start}
+.two-col .kv{min-height:.27in}
+.two-col .kv .k{width:1.12in;font-size:6.8pt;letter-spacing:.03em}
+.two-col .kv .v{font-size:8.5pt}
+
+table.grid-doc{border-collapse:collapse;width:100%;border:1px solid #000}
+table.grid-doc th{background:#e9edf1;border:1px solid #000;padding:4px 5px;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.05em;text-align:left;line-height:1.25}
+table.grid-doc td{border:1px solid #000;padding:4px 5px;font-size:8.5pt;vertical-align:top;line-height:1.3}
+table.grid-doc td.blank{height:.31in}
+table.grid-doc tr.zebra td{background:#fafbfc}
+.nowrap{white-space:nowrap}
+.ctr{text-align:center}
+.rt{text-align:right}
+.tiny{font-size:7pt;color:#333}
+.strike-note{font-size:7.5pt;color:#333;margin-top:5px;line-height:1.45}
+.chk{display:inline-block;width:9pt;height:9pt;border:1px solid #000;vertical-align:-1px}
+
+.stamp{border:1.5px solid #000;padding:5px 9px;font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:.07em;display:inline-block}
+.stamp.off{border-style:double;border-width:3px}
+
+.sig-row{display:flex;gap:16px;margin-top:14px}
+.sig{flex:1;border-top:1px solid #000;padding-top:3px;font-size:7pt;text-transform:uppercase;letter-spacing:.05em;color:#333}
+
+/* ------------------------------------------------------- preview overlay */
+.preview{position:fixed;inset:0;background:rgba(22,25,29,.62);z-index:60;display:none;flex-direction:column}
+.preview.open{display:flex}
+.preview-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 18px;background:var(--ink);color:#fff;font-size:13px}
+.preview-bar .spacer{flex:1}
+.preview-scroll{flex:1;overflow:auto;padding:26px 18px 60px;-webkit-overflow-scrolling:touch}
+.preview-scroll .sheet{margin:0 auto 22px;box-shadow:0 3px 16px rgba(0,0,0,.3);padding:.5in;min-height:10in}
+@media (max-width:860px){.preview-scroll{padding:16px 8px 60px}}
+
+@media print{
+  html,body{background:#fff !important;margin:0 !important;padding:0 !important}
+  body>*{display:none !important}
+  #print-root{display:block !important}
+  .preview{display:none !important}
+  .sheet{
+    width:100% !important;box-shadow:none !important;margin:0 !important;padding:0 !important;
+    page-break-after:always;break-after:page;
+    /* min-height, not height: a long narrative makes the sheet taller and
+       flows onto another physical page instead of being clipped at the fold.
+       9.9in leaves slack against the 10in printable area so rounding never
+       produces a stray blank page. */
+    min-height:9.9in !important;
+  }
+  .sheet:last-child{page-break-after:auto;break-after:auto}
+  table.grid-doc{page-break-inside:auto}
+  tr{page-break-inside:avoid}
+}
+@page{size:Letter;margin:.5in}
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <h1>We Heart Paperwork <small>Free safety tool</small></h1>
+  <div class="spacer"></div>
+  <div class="actions">
+    <button class="btn btn-ghost" id="btn-import">Load file</button>
+    <button class="btn btn-ghost" id="btn-export">Save file</button>
+    <button class="btn btn-ghost" id="btn-preview">Preview</button>
+    <button class="btn btn-primary" id="btn-print-one">PDF — this accident</button>
+    <button class="btn btn-primary" id="btn-print-all">PDF — full register</button>
+  </div>
+</header>
+
+<section class="mast">
+  <div class="eyebrow">Built by a trucking company · shared with yours</div>
+  <h1>The Accident Register <span>Builder</span></h1>
+  <p class="dek">Work out whether an occurrence belongs on the federal register, build the three-year record, document why other crashes stay off, and organize the reports behind every entry.</p>
+  <div class="mast-meta">
+    <span class="mast-tag">49 CFR 390.5 &amp; 390.15</span>
+    <span class="mast-tag">Built in your browser</span>
+    <span class="mast-tag">No signup</span>
+    <span class="mast-tag">Free PDF</span>
+  </div>
+</section>
+
+<div class="layout">
+  <aside class="sidebar">
+    <p class="sec-label">Carrier</p>
+    <div class="grid" style="gap:9px" id="carrier-fields"></div>
+
+    <p class="sec-label" style="margin-top:22px">Accidents <span id="ac-count" style="color:var(--ink-3);font-weight:500"></span></p>
+    <ul class="aclist" id="ac-list"></ul>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-quiet btn-sm" id="btn-add">+ Add occurrence</button>
+      <button class="btn btn-quiet btn-sm" id="btn-csv">Import CSV</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn btn-quiet btn-sm" id="btn-csv-tpl">CSV template</button>
+      <button class="btn btn-quiet btn-sm" id="btn-csv-out">Export CSV</button>
+    </div>
+
+    <p class="file-note">
+      Everything you type stays in this browser. Nothing is uploaded, and nothing is saved
+      automatically — use <strong>Save file</strong> to keep a copy and <strong>Load file</strong>
+      to pick it back up.
+    </p>
+  </aside>
+
+  <main class="editor" id="editor"></main>
+</div>
+
+<div class="preview" id="preview">
+  <div class="preview-bar">
+    <strong id="preview-title">Preview</strong>
+    <span id="preview-pages" style="opacity:.7"></span>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" id="preview-print">Save as PDF</button>
+    <button class="btn btn-ghost btn-sm" id="preview-close">Close</button>
+  </div>
+  <div class="preview-scroll" id="preview-scroll"></div>
+</div>
+
+<div id="print-root"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="file-json" accept="application/json,.json" hidden>
+<input type="file" id="file-csv" accept=".csv,text/csv" hidden>
+
+<script>
+"use strict";
+/* =========================================================================
+   1. THE RULE, ENCODED
+   ------------------------------------------------------------------------
+   An occurrence goes on the federal accident register only if it meets the
+   definition of "accident" in 49 CFR 390.5. That definition is four threshold
+   conditions that must all hold, then an outcome test that any one of three
+   results can satisfy. Most parking-lot bumps fail either the highway
+   threshold or the outcome test, which is why they do not belong here.
+   ====================================================================== */
+
+var THRESHOLDS = [
+  {
+    k:"cmv",
+    q:"Was a commercial motor vehicle involved?",
+    cite:"390.5",
+    help:"A CMV is a vehicle used on a highway in commerce to transport passengers or property that: has a " +
+         "gross vehicle or combination weight rating — or actual weight — of <em>10,001 lbs or more</em>, " +
+         "whichever is greater; is designed or used to carry <em>more than 8 passengers including the driver, " +
+         "for compensation</em>; is designed or used to carry <em>more than 15 passengers including the driver, " +
+         "not for compensation</em>; or is used to transport <em>hazardous materials in a quantity requiring " +
+         "placards</em>.",
+    stopOn:"no",
+    stopWhy:"No commercial motor vehicle was involved, so the occurrence is not an accident as defined in 49 CFR 390.5.",
+    passWhy:"A commercial motor vehicle was involved."
+  },
+  {
+    k:"highway",
+    q:"Did it happen on a highway?",
+    cite:"390.5",
+    help:"A highway is <em>any road, street or way, on public or private property, that is open to public " +
+         "travel</em>. Ownership is not the test — public access is. A customer yard, a terminal, a dock " +
+         "apron or a gated lot closed to the public is generally not a highway; a retail lot that anyone " +
+         "may drive into may well be. This is the gate most low-speed yard incidents fail, and the one " +
+         "most often argued, so record your reasoning.",
+    stopOn:"no",
+    stopWhy:"The occurrence was not on a highway open to public travel, so it is not an accident as defined in 49 CFR 390.5.",
+    passWhy:"The occurrence was on a highway open to public travel."
+  },
+  {
+    k:"commerce",
+    q:"Was the vehicle operating in interstate or intrastate commerce?",
+    cite:"390.5",
+    help:"The definition reaches both interstate and intrastate commerce. A unit being moved for the " +
+         "carrier's business purposes is in commerce; a personal errand in a company pickup is not.",
+    stopOn:"no",
+    stopWhy:"The vehicle was not operating in commerce, so the occurrence is not an accident as defined in 49 CFR 390.5.",
+    passWhy:"The vehicle was operating in commerce."
+  },
+  {
+    k:"exclusion",
+    q:"Did the occurrence involve <em>only</em> boarding or alighting from a stationary vehicle, or <em>only</em> loading or unloading cargo?",
+    cite:"390.5(2)",
+    help:"These two are carved out of the definition by name. The word that does the work is <em>only</em> — " +
+         "if the vehicle was also in motion, or anything else happened, the carve-out does not apply.",
+    stopOn:"yes",
+    stopWhy:"The occurrence involved only boarding and alighting from a stationary vehicle, or only the loading " +
+            "or unloading of cargo, and is expressly excluded from the definition of accident by 49 CFR 390.5(2).",
+    passWhy:"Neither express exclusion applies."
+  }
+];
+
+var OUTCOMES = [
+  {
+    k:"fatality",
+    q:"Did the occurrence result in a fatality?",
+    cite:"390.5(1)(i)",
+    help:"Any death resulting from the occurrence, whoever it was.",
+    trigWhy:"The occurrence resulted in a fatality — 49 CFR 390.5(1)(i)."
+  },
+  {
+    k:"injuryTreated",
+    q:"Was anyone injured and <em>immediately</em> taken away from the scene for medical treatment?",
+    cite:"390.5(1)(ii)",
+    help:"The test is bodily injury where the person, as a result of the injury, <em>immediately receives " +
+         "medical treatment away from the scene</em>. Treated at the roadside and released does not count. " +
+         "Declining treatment does not count. Seeing a doctor the next day does not count. Taken by " +
+         "ambulance, or driven straight to an urgent care or emergency room, does.",
+    trigWhy:"A person suffered bodily injury and immediately received medical treatment away from the scene — 49 CFR 390.5(1)(ii)."
+  },
+  {
+    k:"towAway",
+    q:"Was any motor vehicle towed from the scene?",
+    cite:"390.5(1)(iii)",
+    help:"Any vehicle involved, not only yours. If everything drove away under its own power in the normal " +
+         "way, the outcome test is not met and you can stop here.",
+    sub:"disabling"
+  }
+];
+
+var SUB_DISABLING = {
+  k:"disabling",
+  q:"Was that damage <em>disabling damage</em>?",
+  cite:"390.5",
+  help:"Disabling damage means damage that <em>prevents the vehicle leaving the scene in its usual manner, " +
+       "in daylight, after simple repairs</em>. It <em>includes</em> damage to a vehicle that could have been " +
+       "driven but would have been further damaged by driving it. It <em>excludes</em>: damage that can be " +
+       "fixed temporarily at the scene without special tools or parts; tire disablement with no other damage, " +
+       "even with no spare; headlamp or taillight damage; and damage to turn signals, horn or windshield " +
+       "wipers. A vehicle towed for convenience, or on a police or company policy that everything gets towed, " +
+       "is not automatically disabling damage — the question is whether it <em>could</em> have driven away.",
+  trigWhy:"A motor vehicle incurred disabling damage and had to be transported from the scene — 49 CFR 390.5(1)(iii).",
+  stopWhy:"A vehicle was towed, but the damage was not disabling damage as defined in 49 CFR 390.5, so the " +
+          "outcome test in 390.5(1)(iii) is not met."
+};
+
+/* Supporting documents. `hm` rows apply only where hazardous materials were
+   released; `cit` rows only where the driver was cited. */
+var DOCS = [
+  ["State or local police crash report", "390.15(b)(2)", "Required copy — request it from the reporting agency if it was not left at the scene", null],
+  ["Any accident report required by another governmental entity", "390.15(b)(2)", "Required copy", null],
+  ["The insurer's accident report or claim record", "390.15(b)(2)", "Required copy", null],
+  ["Driver's written statement", "—", "Take it while the driver's recollection is fresh", null],
+  ["Photographs of the scene, the vehicles and the damage", "—", "Supports the disabling-damage determination", null],
+  ["Witness names, contact details and statements", "—", "", null],
+  ["Copy of any citation issued to the driver", "382.303", "Determines whether post-accident testing was required", null],
+  ["Post-accident alcohol test result, or a record of why no test was given", "382.303(a), (d)", "Testing attempts cease at 8 hours", null],
+  ["Post-accident controlled substances test result, or a record of why no test was given", "382.303(b), (d)", "Testing attempts cease at 32 hours", null],
+  ["Record explaining any alcohol test not administered within 2 hours", "382.303(d)", "Required whenever the alcohol test was late", "cit"],
+  ["Tow invoice and repair estimate or invoice", "—", "The evidence behind a disabling-damage call", null],
+  ["Driver's records of duty status and supporting documents for the period", "395.8, 395.11", "", null],
+  ["Driver vehicle inspection reports for the unit around the accident date", "396.11", "", null],
+  ["Maintenance and repair records for the unit", "396.3(b)(3)", "", null],
+  ["Immediate telephone notice of the hazardous materials incident", "171.15", "Within 12 hours of the incident", "hm"],
+  ["Hazardous materials incident report, DOT Form F 5800.1", "171.16", "Within 30 days of the incident", "hm"],
+  ["Shipping papers and cargo manifest", "172 subpart C", "", "hm"]
+];
+
+var STATES = ("AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND " +
+  "OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR").split(" ");
+
+var RETENTION_FOOT = "Retain each entry, and the accident reports that support it, for 3 years after the date of the accident — 49 CFR 390.15(b).";
+
+/* Page geometry. Pagination is by estimated row height, not a fixed row count,
+   so a long location or driver name cannot silently run past the fold. */
+var BUDGET_FIRST = 780;   // px of table body on a first page (10in printable = 960px)
+var BUDGET_CONT  = 815;   // px on a continuation page
+var ROW_BLANK_PX = 31;
+var LINE_PX      = 14.8;
+var CHAR_PX      = 5.55;
+
+/* =========================================================================
+   2. STATE
+   ====================================================================== */
+
+var state = {
+  carrier:{name:"",dot:"",mc:"",address:"",cityStateZip:"",phone:"",contact:"",recordLocation:""},
+  accidents:[],
+  selected:null,
+  opts:{entrySheets:true, docSheets:true, determinations:true, extraCols:true, onlyThreeYears:true}
+};
+var dirty = false;
+
+function uid(){ return "a" + Math.random().toString(36).slice(2,9); }
+
+function newAccident(){
+  return {
+    id:uid(),
+    date:"", time:"", city:"", stateCode:"", location:"",
+    driverName:"", driverCdl:"", driverCdlState:"",
+    unitNumber:"", unitVin:"", trailerNumber:"",
+    injuries:"", fatalities:"",
+    hazmat:"", hazmatDetail:"",
+    citation:"", citationDetail:"", part382:"",
+    policeAgency:"", reportNumber:"",
+    description:"", notes:"",
+    q:{cmv:"", highway:"", commerce:"", exclusion:"", fatality:"", injuryTreated:"", towAway:"", disabling:""},
+    docs:{}
+  };
+}
+
+function selected(){
+  if (!state.selected) return null;
+  for (var i=0;i<state.accidents.length;i++) if (state.accidents[i].id===state.selected) return state.accidents[i];
+  return null;
+}
+
+/* =========================================================================
+   3. VERDICT
+   ------------------------------------------------------------------------
+   Returns {status, headline, reason, basis[], gate} where status is
+   "on" (belongs on the register), "off" (does not) or "inc" (unanswered).
+   `basis` is the audit trail printed on the determination sheet.
+   ====================================================================== */
+
+function verdict(a){
+  var basis = [];
+
+  for (var i=0;i<THRESHOLDS.length;i++){
+    var g = THRESHOLDS[i];
+    var v = a.q[g.k];
+    if (v === "" || v === "unk"){
+      return {status:"inc", headline:"Not yet determined",
+        reason:"Answer “" + stripTags(g.q) + "” to continue the determination.",
+        basis:basis, gate:g.k};
+    }
+    if (v === g.stopOn){
+      basis.push({q:stripTags(g.q), a:cap(v), why:g.stopWhy, cite:g.cite});
+      return {status:"off", headline:"Not on the federal accident register",
+        reason:g.stopWhy, basis:basis, gate:g.k};
+    }
+    basis.push({q:stripTags(g.q), a:cap(v), why:g.passWhy, cite:g.cite});
+  }
+
+  var anyUnknown = null, trigger = null;
+
+  for (var j=0;j<OUTCOMES.length;j++){
+    var o = OUTCOMES[j];
+    var ov = a.q[o.k];
+    if (ov === "" || ov === "unk"){ if (!anyUnknown) anyUnknown = o; continue; }
+
+    if (o.k === "towAway"){
+      if (ov === "no"){
+        basis.push({q:stripTags(o.q), a:"No", why:"No vehicle required transport from the scene.", cite:o.cite});
+        continue;
+      }
+      var dv = a.q.disabling;
+      if (dv === "" || dv === "unk"){ if (!anyUnknown) anyUnknown = SUB_DISABLING; continue; }
+      basis.push({q:stripTags(o.q), a:"Yes", why:"A motor vehicle was transported from the scene.", cite:o.cite});
+      if (dv === "yes"){
+        basis.push({q:stripTags(SUB_DISABLING.q), a:"Yes", why:SUB_DISABLING.trigWhy, cite:SUB_DISABLING.cite});
+        if (!trigger) trigger = SUB_DISABLING.trigWhy;
+      } else {
+        basis.push({q:stripTags(SUB_DISABLING.q), a:"No", why:SUB_DISABLING.stopWhy, cite:SUB_DISABLING.cite});
+      }
+      continue;
+    }
+
+    if (ov === "yes"){
+      basis.push({q:stripTags(o.q), a:"Yes", why:o.trigWhy, cite:o.cite});
+      if (!trigger) trigger = o.trigWhy;
+    } else {
+      basis.push({q:stripTags(o.q), a:"No", why:"This result did not occur.", cite:o.cite});
+    }
+  }
+
+  if (trigger){
+    return {status:"on", headline:"Belongs on the federal accident register",
+      reason:trigger, basis:basis, gate:null};
+  }
+  if (anyUnknown){
+    return {status:"inc", headline:"Not yet determined",
+      reason:"Answer “" + stripTags(anyUnknown.q) + "” to complete the determination.",
+      basis:basis, gate:anyUnknown.k};
+  }
+  return {status:"off", headline:"Not on the federal accident register",
+    reason:"The occurrence met none of the three results in 49 CFR 390.5(1) — no fatality, no bodily injury " +
+           "treated away from the scene, and no disabling damage requiring tow-away.",
+    basis:basis, gate:null};
+}
+
+/* Post-accident testing under 382.303 shares facts with the register but is a
+   different test on three counts: outside a fatality it also requires a
+   citation; it reaches a narrower class of vehicle (Part 382 rides on the CDL
+   definition in 382.107 — 26,001 lbs — while the register threshold in 390.5
+   is 10,001 lbs); and it turns on the driver being CDL-required. Carriers
+   routinely conflate the two, so it is computed separately and printed. */
+function testingVerdict(a){
+  var f = a.q.fatality, inj = a.q.injuryTreated, tow = a.q.towAway, dis = a.q.disabling, cit = a.citation;
+
+  /* 382.303 opens with "an occurrence involving a commercial motor vehicle
+     operating on a public road in commerce". Fail that and nothing follows. */
+  if (a.q.cmv === "no" || a.q.highway === "no" || a.q.commerce === "no"){
+    return {req:false, headline:"Post-accident testing was not required",
+      why:"49 CFR 382.303 reaches an occurrence involving a commercial motor vehicle operating on a public road " +
+          "in commerce. This occurrence did not meet that threshold, so no testing condition applies."};
+  }
+
+  if (a.part382 === "no"){
+    return {req:false, headline:"Post-accident testing was not required",
+      why:"Part 382 applies only to a driver required to hold a commercial driver’s license operating a vehicle " +
+          "that is a commercial motor vehicle under 49 CFR 382.107. This driver and vehicle are outside that " +
+          "class, so 382.303 does not apply — even though the occurrence may still belong on the accident register."};
+  }
+  if (a.part382 !== "yes"){
+    return {req:null, headline:"Testing determination incomplete",
+      why:"Part 382 reaches a narrower class of vehicle than the accident register does. The register threshold " +
+          "in 49 CFR 390.5 is 10,001 lbs; the testing threshold in 49 CFR 382.107 is 26,001 lbs, a vehicle " +
+          "designed to carry 16 or more passengers including the driver, or any size vehicle carrying placarded " +
+          "hazardous materials — and the driver must be one required to hold a CDL. Answer whether Part 382 " +
+          "covers this driver and vehicle."};
+  }
+
+  if (f === "yes"){
+    return {req:true, headline:"Post-accident testing was required",
+      why:"The occurrence involved a loss of human life. Alcohol and controlled substances testing is required " +
+          "of each surviving driver performing safety-sensitive functions, whether or not a citation was issued " +
+          "— 49 CFR 382.303(a)(1), (b)(1)."};
+  }
+  var qualifying = (inj === "yes") || (tow === "yes" && dis === "yes");
+  if (!qualifying){
+    return {req:false, headline:"Post-accident testing was not required",
+      why:"There was no fatality, no bodily injury treated away from the scene, and no disabling damage " +
+          "requiring tow-away, so no testing condition in 49 CFR 382.303 was met."};
+  }
+  if (cit === "yes"){
+    return {req:true, headline:"Post-accident testing was required",
+      why:"The occurrence involved " + (inj === "yes" ? "bodily injury treated away from the scene" : "disabling damage requiring tow-away") +
+          " and the driver received a citation for a moving violation — 49 CFR 382.303(a)(2), (b)(2)."};
+  }
+  if (cit === "no"){
+    return {req:false, headline:"Post-accident testing was not required",
+      why:"A qualifying result occurred, but the driver did not receive a citation for a moving traffic " +
+          "violation, so the condition in 49 CFR 382.303(a)(2) and (b)(2) was not met."};
+  }
+  return {req:null, headline:"Testing determination incomplete",
+    why:"A qualifying result occurred. Whether testing was required turns on whether the driver received a " +
+        "citation for a moving traffic violation — within 8 hours for alcohol testing, within 32 hours for " +
+        "controlled substances testing — 49 CFR 382.303(a)(2), (b)(2)."};
+}
+
+/* =========================================================================
+   4. HELPERS
+   ====================================================================== */
+
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function or(v, fb){ v = (v==null?"":String(v)).trim(); return v ? esc(v) : (fb===undefined?"":fb); }
+function stripTags(s){ return String(s).replace(/<[^>]+>/g,""); }
+function cap(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : ""; }
+
+function fmtDate(iso){
+  if (!iso) return "";
+  var p = String(iso).split("-");
+  if (p.length !== 3) return iso;
+  return p[1] + "/" + p[2] + "/" + p[0];
+}
+function addYears(iso, y){
+  if (!iso) return "";
+  var p = String(iso).split("-");
+  if (p.length !== 3) return "";
+  return (Number(p[0]) + y) + "-" + p[1] + "-" + p[2];
+}
+function todayISO(){
+  var d = new Date(), m = String(d.getMonth()+1), dd = String(d.getDate());
+  return d.getFullYear()+"-"+(m.length<2?"0"+m:m)+"-"+(dd.length<2?"0"+dd:dd);
+}
+function daysUntil(iso){
+  if (!iso) return null;
+  var p = String(iso).split("-");
+  if (p.length !== 3) return null;
+  var t = new Date(Number(p[0]), Number(p[1])-1, Number(p[2])), n = new Date();
+  n.setHours(0,0,0,0);
+  return Math.round((t - n) / 86400000);
+}
+function withinThreeYears(a){
+  var d = daysUntil(addYears(a.date, 3));
+  return d == null ? true : d >= 0;
+}
+function toast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2800);
+}
+function markDirty(){ dirty = true; }
+
+function recordable(){
+  return state.accidents.filter(function(a){ return verdict(a).status === "on"; });
+}
+function registerRows(){
+  var list = recordable();
+  if (state.opts.onlyThreeYears) list = list.filter(withinThreeYears);
+  return list.sort(function(x,y){ return String(y.date||"").localeCompare(String(x.date||"")); });
+}
+
+/* =========================================================================
+   5. SIDEBAR
+   ====================================================================== */
+
+var CARRIER_FIELDS = [
+  ["name","Carrier name",""],
+  ["dot","USDOT number",""],
+  ["mc","MC / docket number","optional"],
+  ["address","Street address",""],
+  ["cityStateZip","City, state, ZIP",""],
+  ["phone","Phone","optional"],
+  ["contact","Safety contact","optional"],
+  ["recordLocation","Where the register is kept","optional"]
+];
+
+function renderCarrier(){
+  document.getElementById("carrier-fields").innerHTML = CARRIER_FIELDS.map(function(f){
+    return '<div class="field"><label>' + esc(f[1]) +
+      (f[2] ? ' <span class="sub">' + esc(f[2]) + '</span>' : '') + '</label>' +
+      '<input type="text" data-carrier="' + f[0] + '" value="' + esc(state.carrier[f[0]]) + '"></div>';
+  }).join("");
+}
+
+function renderList(){
+  var ul = document.getElementById("ac-list");
+  var on = recordable().length;
+  document.getElementById("ac-count").textContent =
+    state.accidents.length ? "(" + on + " of " + state.accidents.length + " on register)" : "";
+
+  if (!state.accidents.length){
+    ul.innerHTML = '<li class="empty-note">No occurrences yet. Add one and answer the determination ' +
+      'questions — the tool works out whether it belongs on the federal register before you write anything down.</li>';
+    return;
+  }
+  ul.innerHTML = state.accidents.slice().sort(function(x,y){
+    return String(y.date||"").localeCompare(String(x.date||""));
+  }).map(function(a){
+    var v = verdict(a);
+    var where = [a.city, a.stateCode].filter(Boolean).join(", ");
+    return '<li><button class="ac-btn' + (a.id===state.selected?' active':'') + '" data-ac="' + a.id + '">' +
+      '<span class="dot ' + v.status + '"></span>' +
+      '<span class="grow"><div class="num">' + (fmtDate(a.date) || "Date not entered") + '</div>' +
+      '<div class="meta">' + (esc(where) || "Location not entered") +
+        (a.driverName ? "  ·  " + esc(a.driverName) : "") + '</div></span>' +
+    '</button></li>';
+  }).join("");
+}
+
+/* =========================================================================
+   6. EDITOR
+   ====================================================================== */
+
+function seg(gateKey, val, includeUnknown){
+  var opts = [["yes","Yes"],["no","No"]];
+  if (includeUnknown !== false) opts.push(["unk","Not yet known"]);
+  return '<div class="seg">' + opts.map(function(o){
+    var sel = (val === o[0]) ? " sel " + o[0] : "";
+    return '<button type="button" class="seg-b' + sel + '" data-gate="' + gateKey + '" data-v="' + o[0] + '">' + o[1] + '</button>';
+  }).join("") + '</div>';
+}
+
+function gateHtml(g, a, muted){
+  var v = a.q[g.k] || "";
+  var out = "";
+  if (v && v !== "unk"){
+    if (g.stopOn && v === g.stopOn) out = '<div class="gate-out stop">' + esc(g.stopWhy) + '</div>';
+    else if (g.stopOn) out = '<div class="gate-out pass">' + esc(g.passWhy) + '</div>';
+    else if (v === "yes" && g.trigWhy) out = '<div class="gate-out trig">' + esc(g.trigWhy) + '</div>';
+    else if (v === "no" && g.stopWhy) out = '<div class="gate-out pass">' + esc(g.stopWhy) + '</div>';
+  }
+  return '<div class="gate' + (muted?" muted":"") + '">' +
+    '<p class="gate-q">' + g.q + ' <span class="cite">' + esc(g.cite) + '</span></p>' +
+    '<p class="gate-help">' + g.help + '</p>' +
+    seg(g.k, v) + out +
+  '</div>';
+}
+
+function renderEditor(){
+  var host = document.getElementById("editor");
+  var a = selected();
+
+  if (!a){
+    host.innerHTML =
+      '<div class="card"><h2>Not every collision is a federal accident</h2>' +
+      '<p class="hint">49 CFR 390.15(b) requires a register of accidents — but “accident” is a defined term, ' +
+      'and the definition is narrower than most people assume.</p>' +
+      '<div class="callout"><strong>The test has two halves.</strong> Four threshold conditions must all hold: ' +
+      'a commercial motor vehicle, on a highway open to public travel, operating in commerce, and not one of ' +
+      'the two express carve-outs. Then <em>one</em> of three results must follow: a fatality, a bodily injury ' +
+      'treated immediately away from the scene, or disabling damage that required a vehicle to be towed.</div>' +
+      '<div class="callout warn"><strong>A parking-lot bump usually fails twice.</strong> A closed yard or a ' +
+      'gated dock apron is generally not a highway, and a scuffed bumper that drives away is not disabling ' +
+      'damage. Neither is a vehicle towed for convenience when it could have been driven. Putting those on ' +
+      'the register does not make you safer — it just makes your own record say you had more accidents than ' +
+      'you did.</div>' +
+      '<div class="callout flag"><strong>The half that is a critical violation.</strong> Part 385, Appendix B ' +
+      'lists <em>failing to maintain copies of all accident reports required by State or other governmental ' +
+      'entities or insurers</em> — 390.15(b)(2) — as a critical violation. The paperwork behind each entry ' +
+      'carries as much weight as the entry itself, which is why this tool builds a document checklist for ' +
+      'every accident.</div>' +
+      '<p class="hint" style="margin-bottom:0">Add an occurrence in the left panel to start a determination. ' +
+      'Fill in the carrier block once — it heads every printed page.</p></div>';
+    return;
+  }
+
+  var v = verdict(a), tv = testingVerdict(a);
+  var h = [];
+
+  /* --- determination -------------------------------------------------- */
+  h.push('<div class="card"><h2>Does this belong on the register? <span class="cite">390.5</span>' +
+    '<span style="flex:1"></span>' +
+    '<button class="btn btn-danger btn-sm" data-act="del">Delete</button></h2>' +
+    '<div class="verdict ' + v.status + '">' +
+      '<div><div class="vt">' + esc(v.headline) + '</div>' +
+      '<div class="vr">' + esc(v.reason) + '</div></div>' +
+    '</div>' +
+    THRESHOLDS.map(function(g){ return gateHtml(g, a, false); }).join("") +
+    '<div class="gate"><p class="gate-q" style="margin-bottom:8px">Then any <em>one</em> of these three results ' +
+      'puts it on the register <span class="cite">390.5(1)</span></p></div>' +
+    OUTCOMES.map(function(g){
+      var out = gateHtml(g, a, false);
+      if (g.k === "towAway" && a.q.towAway === "yes") out += gateHtml(SUB_DISABLING, a, false);
+      return out;
+    }).join("") +
+  '</div>');
+
+  /* --- required register fields --------------------------------------- */
+  h.push('<div class="card"><h2>Register entry <span class="cite">390.15(b)(1)</span></h2>' +
+    '<p class="hint">These six items are what the rule requires in the register itself. Everything below is ' +
+    'context your own file will want.</p>' +
+    '<div class="grid g4">' +
+      f(a,"date","Date of accident",{type:"date"}) +
+      f(a,"city","City or town","",{sub:"or nearest"}) +
+      f(a,"stateCode","State",{select:[""].concat(STATES)}) +
+      f(a,"driverName","Driver name") +
+      f(a,"injuries","Number of injuries",{type:"number"}) +
+      f(a,"fatalities","Number of fatalities",{type:"number"}) +
+      f(a,"hazmat","Hazardous materials released?",{select:[
+        {v:"",l:"—"},{v:"no",l:"No"},{v:"yes",l:"Yes"}], sub:"other than fuel from the tanks", span2:true}) +
+    '</div>' +
+    (a.hazmat === "yes" ?
+      '<div class="grid g2" style="margin-top:12px">' +
+        f(a,"hazmatDetail","What was released",{span2:true}) +
+      '</div>' +
+      '<div class="callout warn" style="margin-top:14px"><strong>A hazmat release triggers separate reporting.</strong> ' +
+      'Immediate telephone notice under 49 CFR 171.15, and a written incident report on DOT Form F 5800.1 within ' +
+      '30 days under 49 CFR 171.16. Both are on the document checklist below.</div>' : '') +
+    validationHtml(a) +
+  '</div>');
+
+  /* --- context --------------------------------------------------------- */
+  h.push('<div class="card"><h2>Occurrence detail</h2>' +
+    '<p class="hint">Not required by 390.15(b)(1), but this is what makes the entry usable a year later when ' +
+    'an auditor asks about it.</p>' +
+    '<div class="grid g4">' +
+      f(a,"time","Time",{type:"time"}) +
+      f(a,"location","Exact location",{span2:true,sub:"road, milepost, intersection"}) +
+      f(a,"unitNumber","Unit number") +
+      f(a,"unitVin","Power unit VIN") +
+      f(a,"trailerNumber","Trailer number") +
+      f(a,"driverCdl","Driver CDL number") +
+      f(a,"driverCdlState","CDL state",{select:[""].concat(STATES)}) +
+      f(a,"policeAgency","Reporting agency",{span2:true}) +
+      f(a,"reportNumber","Police report number") +
+      f(a,"citation","Driver cited for a moving violation?",{select:[
+        {v:"",l:"—"},{v:"no",l:"No"},{v:"yes",l:"Yes"}], sub:"drives the 382.303 test"}) +
+    '</div>' +
+    (a.citation === "yes" ?
+      '<div class="grid g2" style="margin-top:12px">' + f(a,"citationDetail","Citation detail",{span2:true}) + '</div>' : '') +
+    '<div class="field" style="margin-top:14px"><label>What happened</label>' +
+      '<textarea data-f="description" placeholder="A short factual narrative. This prints on the entry sheet.">' + esc(a.description) + '</textarea></div>' +
+  '</div>');
+
+  /* --- testing --------------------------------------------------------- */
+  h.push('<div class="card"><h2>Post-accident testing <span class="cite">382.303</span></h2>' +
+    '<p class="hint">A different test from the register, on overlapping facts. Outside a fatality, testing also ' +
+    'requires that the driver was cited for a moving violation — and Part 382 covers a narrower class of ' +
+    'vehicle than Part 390 does.</p>' +
+    '<div class="grid g2" style="margin-bottom:15px">' +
+      f(a,"part382","Does Part 382 cover this driver and vehicle?",{select:[
+        {v:"",l:"—"},{v:"yes",l:"Yes — CDL driver, CMV under 382.107"},{v:"no",l:"No"}],
+        sub:"26,001 lbs, 16+ passengers, or placarded hazmat", span2:true}) +
+    '</div>' +
+    '<div class="verdict ' + (tv.req === true ? "on" : tv.req === false ? "off" : "inc") + '">' +
+      '<div><div class="vt">' + esc(tv.headline) + '</div><div class="vr">' + esc(tv.why) + '</div></div>' +
+    '</div>' +
+    (tv.req === true ?
+      '<div class="callout warn" style="margin-bottom:0"><strong>Clocks.</strong> Alcohol: test as soon as ' +
+      'practicable; if not done within 2 hours, keep a written record of why; stop trying at 8 hours. ' +
+      'Controlled substances: stop trying at 32 hours. Any test not administered needs a file record ' +
+      'explaining why — 49 CFR 382.303(d).</div>' : '') +
+  '</div>');
+
+  /* --- documents ------------------------------------------------------- */
+  h.push('<div class="card"><h2>Supporting documents <span class="cite">390.15(b)(2)</span></h2>' +
+    '<p class="hint">Tick what is actually in the file. The printed checklist carries the whole list either ' +
+    'way, so a gap is visible rather than invisible.</p>' +
+    docsFor(a).map(function(d, i){
+      return '<label class="checkrow"><input type="checkbox" data-doc="' + d.i + '"' +
+        (a.docs[d.i] ? ' checked' : '') + '><span>' + esc(d.row[0]) +
+        '<span class="c">' + (d.row[1] === "—" ? "" : "49 CFR " + esc(d.row[1])) +
+        (d.row[2] ? (d.row[1] === "—" ? "" : " · ") + esc(d.row[2]) : "") + '</span></span></label>';
+    }).join("") +
+  '</div>');
+
+  /* --- retention ------------------------------------------------------- */
+  var purge = addYears(a.date, 3), dLeft = daysUntil(purge);
+  h.push('<div class="card"><h2>Retention <span class="cite">390.15(b)</span></h2>' +
+    (a.date ?
+      '<div class="callout' + (dLeft != null && dLeft < 0 ? '' : ' warn') + '" style="margin-bottom:14px">' +
+        (dLeft != null && dLeft < 0
+          ? '<strong>Past the retention period.</strong> This accident dates from ' + esc(fmtDate(a.date)) +
+            '. The 3-year period ran out on ' + esc(fmtDate(purge)) + '. You may keep it for your own purposes, ' +
+            'but 390.15(b) no longer requires it, and by default it is left off the printed register.'
+          : '<strong>Retain through ' + esc(fmtDate(purge)) + '.</strong> ' +
+            (dLeft != null ? Math.floor(dLeft/30) + ' months remaining. ' : '') +
+            'The entry and every supporting report must stay on file for 3 years after the date of the accident.') +
+      '</div>' : '<p class="hint">Enter the accident date to calculate the retention period.</p>') +
+    '<div class="field"><label>Internal notes <span class="sub">not printed</span></label>' +
+      '<textarea data-f="notes" style="min-height:60px">' + esc(a.notes) + '</textarea></div>' +
+  '</div>');
+
+  /* --- print options --------------------------------------------------- */
+  h.push('<div class="card"><h2>What the register PDF includes</h2>' +
+    '<div class="grid g2"><div>' +
+      opt("entrySheets","An entry sheet for each recordable accident") +
+      opt("docSheets","A supporting-document checklist for each") +
+      opt("determinations","Determination sheets for occurrences left off the register") +
+    '</div><div>' +
+      opt("extraCols","Unit and report-number columns on the register") +
+      opt("onlyThreeYears","Only accidents within the 3-year retention period") +
+    '</div></div>' +
+    '<p class="hint" style="margin:14px 0 0">Keeping the determination sheets is worth it. When an auditor ' +
+    'asks why a crash on a police report is not on your register, a dated sheet showing the reasoning is a ' +
+    'far better answer than a recollection.</p>' +
+  '</div>');
+
+  host.innerHTML = h.join("");
+}
+
+function f(a, key, label, opts, extra){
+  opts = opts || {};
+  if (typeof opts === "string") opts = extra || {};
+  var v = a[key] == null ? "" : a[key];
+  var sub = opts.sub ? ' <span class="sub">' + esc(opts.sub) + '</span>' : '';
+  var cls = opts.span2 ? ' class="field span2"' : ' class="field"';
+  if (opts.select){
+    return '<div' + cls + '><label>' + esc(label) + sub + '</label><select data-f="' + key + '">' +
+      opts.select.map(function(o){
+        var val = (o && o.v !== undefined) ? o.v : o;
+        var lab = (o && o.l !== undefined) ? o.l : (o === "" ? "—" : o);
+        return '<option value="' + esc(val) + '"' + (String(v)===String(val)?' selected':'') + '>' + esc(lab) + '</option>';
+      }).join("") + '</select></div>';
+  }
+  return '<div' + cls + '><label>' + esc(label) + sub + '</label>' +
+    '<input type="' + (opts.type || "text") + '" data-f="' + key + '" value="' + esc(v) + '"></div>';
+}
+
+function opt(key, label){
+  return '<label class="checkrow"><input type="checkbox" data-opt="' + key + '"' +
+    (state.opts[key] ? ' checked' : '') + '><span>' + esc(label) + '</span></label>';
+}
+
+/* Contradictions between the narrative answers and the counted fields. These
+   are the mistakes that make a register look careless in an audit. */
+function validationHtml(a){
+  var msgs = [];
+  var inj = Number(a.injuries || 0), fat = Number(a.fatalities || 0);
+  if (fat > 0 && a.q.fatality === "no")
+    msgs.push("You recorded " + fat + " fatalities but answered “No” to the fatality question.");
+  if (a.q.fatality === "yes" && fat === 0)
+    msgs.push("You answered “Yes” to a fatality but the fatality count is zero.");
+  if (a.q.injuryTreated === "yes" && inj === 0)
+    msgs.push("Someone was treated away from the scene but the injury count is zero.");
+  if (a.hazmat === "yes" && a.q.cmv === "no")
+    msgs.push("A hazardous materials release is recorded, but you answered that no commercial motor vehicle was involved.");
+  if (!msgs.length) return "";
+  return '<div class="callout flag" style="margin:16px 0 0"><strong>Check these before you print.</strong> ' +
+    msgs.map(esc).join(" ") + '</div>';
+}
+
+function docsFor(a){
+  var out = [];
+  for (var i=0;i<DOCS.length;i++){
+    var when = DOCS[i][3];
+    if (when === "hm" && a.hazmat !== "yes") continue;
+    if (when === "cit" && a.citation !== "yes") continue;
+    out.push({i:i, row:DOCS[i]});
+  }
+  return out;
+}
+
+/* =========================================================================
+   7. DOCUMENT BUILDER
+   ====================================================================== */
+
+function sheet(docName, subline, bodyHtml, bodyClass, footNote){
+  var c = state.carrier;
+  var bits = [];
+  if (c.dot) bits.push("USDOT " + esc(c.dot));
+  if (c.mc) bits.push("MC " + esc(c.mc));
+  if (c.cityStateZip) bits.push(esc(c.cityStateZip));
+
+  return '<section class="sheet">' +
+    '<div class="sheet-head">' +
+      '<div class="carrier">' + or(c.name, "Carrier name") +
+        (bits.length ? '<div class="sub">' + bits.join("  ·  ") + '</div>' : '') + '</div>' +
+      '<div class="doc"><div class="t">' + esc(docName) + '</div>' +
+        '<div>' + (subline || "&nbsp;") + '</div>' +
+        '<div data-pagemark>&nbsp;</div></div>' +
+    '</div>' +
+    '<div class="sheet-body' + (bodyClass ? " " + bodyClass : "") + '">' + bodyHtml + '</div>' +
+    '<div class="sheet-foot"><div>' + (footNote || RETENTION_FOOT) + '</div>' +
+      '<div class="nowrap">Prepared ' + fmtDate(todayISO()) + '</div></div>' +
+  '</section>';
+}
+
+function kv(k, v, mono){
+  return '<div class="kv"><div class="k">' + esc(k) + '</div>' +
+    '<div class="v' + (mono?" mono":"") + '">' + (v || "&nbsp;") + '</div></div>';
+}
+function block(title, cite, rowsHtml){
+  return '<div class="blk"><div class="blk-h">' + esc(title) +
+    (cite ? '<span class="c">' + esc(cite) + '</span>' : '') + '</div>' +
+    '<div style="border:1px solid #000;border-top:none">' + rowsHtml + '</div></div>';
+}
+
+function estRowPx(cells){
+  var lines = 1;
+  for (var i=0;i<cells.length;i++){
+    var per = Math.max(6, Math.floor((cells[i].w - 12) / CHAR_PX));
+    var len = String(cells[i].text == null ? "" : cells[i].text).length;
+    if (len) lines = Math.max(lines, Math.ceil(len / per));
+  }
+  return Math.max(ROW_BLANK_PX, Math.round(lines * LINE_PX + 9));
+}
+
+function paginateH(rows, blankRow, extraBlankPages, firstBudget, contBudget){
+  var bf = firstBudget || BUDGET_FIRST, bc = contBudget || BUDGET_CONT;
+  var pages = [], cur = [], used = 0, budget = bf;
+  function flush(){
+    var pad = Math.max(0, Math.floor((budget - used) / ROW_BLANK_PX));
+    pages.push(cur.join("") + repeat(blankRow, pad));
+    cur = []; used = 0; budget = bc;
+  }
+  for (var i=0;i<rows.length;i++){
+    if (cur.length && used + rows[i].h > budget) flush();
+    cur.push(rows[i].html); used += rows[i].h;
+  }
+  if (cur.length) flush();
+  if (!pages.length) pages.push(repeat(blankRow, Math.floor(bf / ROW_BLANK_PX)));
+  for (var j=0;j<(extraBlankPages||0);j++) pages.push(repeat(blankRow, Math.floor(bc / ROW_BLANK_PX)));
+  return pages;
+}
+function repeat(s, n){ var o=""; for (var i=0;i<n;i++) o+=s; return o; }
+
+/* -- 1. register cover ---------------------------------------------------- */
+function buildCover(){
+  var c = state.carrier;
+  var all = state.accidents.length;
+  var on = recordable().length;
+  var shown = registerRows().length;
+  var oldest = registerRows()[registerRows().length-1];
+  var newest = registerRows()[0];
+
+  var body =
+    '<div class="doc-title">Accident register</div>' +
+    '<div class="doc-sub">Maintained under 49 CFR 390.15(b). Each entry is retained for 3 years after the date ' +
+    'of the accident, together with copies of all accident reports required by State or other governmental ' +
+    'entities or insurers.</div>' +
+    block("Carrier", null,
+      kv("Carrier", or(c.name)) +
+      kv("USDOT / MC", [or(c.dot), or(c.mc)].filter(Boolean).join("  ·  ")) +
+      kv("Address", [or(c.address), or(c.cityStateZip)].filter(Boolean).join(", ")) +
+      kv("Safety contact", [or(c.contact), or(c.phone)].filter(Boolean).join("  ·  ")) +
+      kv("Register kept at", or(c.recordLocation))
+    ) +
+    block("This register", null,
+      kv("Entries on the register", String(shown)) +
+      kv("Period covered", (newest && oldest) ? fmtDate(oldest.date) + "  to  " + fmtDate(newest.date) : "—") +
+      kv("Scope", state.opts.onlyThreeYears
+          ? "Accidents within the 3-year retention period"
+          : "All recorded accidents, including those past the 3-year period") +
+      kv("Occurrences reviewed", String(all) + (all !== on ? "   (" + (all - on) + " determined not to meet 49 CFR 390.5)" : "")) +
+      kv("Prepared", fmtDate(todayISO()))
+    ) +
+    block("What belongs on this register", "390.5",
+      '<div style="padding:6px 8px;font-size:8pt;line-height:1.5">' +
+      '<strong>An accident is an occurrence involving a commercial motor vehicle on a highway in interstate or ' +
+      'intrastate commerce that results in any one of:</strong> a fatality; bodily injury to a person who, as a ' +
+      'result of the injury, immediately receives medical treatment away from the scene; or one or more motor ' +
+      'vehicles incurring disabling damage requiring transport away from the scene by tow truck or other motor ' +
+      'vehicle.<br><br>' +
+      '<strong>It does not include</strong> an occurrence involving only boarding and alighting from a stationary ' +
+      'motor vehicle, or only the loading or unloading of cargo. Damage that can be fixed temporarily at the scene ' +
+      'without special tools or parts, tire disablement without other damage, headlamp or taillight damage, and ' +
+      'damage to turn signals, horn or wipers are all expressly excluded from disabling damage.' +
+      '</div>') +
+    '<div class="sig-row"><div class="sig">Prepared by</div><div class="sig">Title</div><div class="sig">Date</div></div>';
+
+  return [sheet("Accident register", "Cover", body)];
+}
+
+/* -- 2. the register itself ----------------------------------------------- */
+function buildRegister(){
+  var extra = !!state.opts.extraCols;
+  var rows = registerRows().map(function(a){
+    var v = extra
+      ? [{text:a.city, w:112}, {text:a.driverName, w:112}, {text:a.reportNumber, w:100}]
+      : [{text:a.city, w:160}, {text:a.driverName, w:165}];
+    return {
+      h: estRowPx(v),
+      html: '<tr>' +
+        '<td class="nowrap">' + fmtDate(a.date) + '</td>' +
+        '<td>' + or(a.city) + '</td>' +
+        '<td class="ctr nowrap">' + or(a.stateCode) + '</td>' +
+        '<td>' + or(a.driverName) + '</td>' +
+        '<td class="ctr">' + or(a.injuries, "0") + '</td>' +
+        '<td class="ctr">' + or(a.fatalities, "0") + '</td>' +
+        '<td class="ctr nowrap">' + (a.hazmat === "yes" ? "Yes" : a.hazmat === "no" ? "No" : "") + '</td>' +
+        (extra ? '<td class="nowrap">' + or(a.unitNumber) + '</td><td>' + or(a.reportNumber) + '</td>' : '') +
+      '</tr>'
+    };
+  });
+
+  var head = '<tr>' +
+    '<th class="nowrap" style="width:.74in">Date of<br>accident</th>' +
+    '<th style="width:' + (extra ? "1.2in" : "1.7in") + '">City or town</th>' +
+    '<th class="ctr nowrap" style="width:.42in">State</th>' +
+    '<th style="width:' + (extra ? "1.2in" : "1.75in") + '">Driver name</th>' +
+    '<th class="ctr nowrap" style="width:.5in">No. of<br>injuries</th>' +
+    '<th class="ctr nowrap" style="width:.5in">No. of<br>fatalities</th>' +
+    '<th class="ctr nowrap" style="width:.62in">HM<br>released</th>' +
+    (extra ? '<th class="nowrap" style="width:.7in">Unit</th><th>Report no.</th>' : '') +
+  '</tr>';
+
+  var blank = '<tr><td class="blank"></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
+    (extra ? '<td></td><td></td>' : '') + '</tr>';
+
+  return paginateH(rows, blank, 0).map(function(pg, i){
+    var intro = i === 0
+      ? '<div class="doc-title">Accident register</div>' +
+        '<div class="doc-sub">49 CFR 390.15(b)(1). The columns are the six items the rule requires' +
+        (state.opts.extraCols ? ', plus the unit and report number that tie each entry to its supporting documents' : '') +
+        '. “HM released” means hazardous materials other than fuel spilled from the fuel tanks of a vehicle ' +
+        'involved in the accident.</div>'
+      : '<div class="doc-title">Accident register — continued</div>';
+    return sheet("Accident register", state.opts.onlyThreeYears ? "3-year retention period" : "All entries",
+      intro + '<table class="grid-doc"><thead>' + head + '</thead><tbody>' + pg + '</tbody></table>' +
+      (i === 0 ? '<div class="strike-note">Occurrences reviewed and determined not to meet 49 CFR 390.5 are ' +
+        'deliberately absent from this register. Where a determination sheet was prepared, it is filed behind ' +
+        'these pages.</div>' : ''));
+  });
+}
+
+/* -- 3. entry / determination sheet --------------------------------------- */
+function buildEntry(a){
+  var v = verdict(a), on = v.status === "on";
+  var title = on ? "Accident register entry" : "Determination — not a recordable accident";
+
+  var basisRows = v.basis.map(function(b, i){
+    return '<tr' + (i%2?' class="zebra"':'') + '>' +
+      '<td>' + esc(b.q) + '</td>' +
+      '<td class="ctr nowrap"><strong>' + esc(b.a) + '</strong></td>' +
+      '<td class="tiny">' + esc(b.why) + '</td>' +
+      '<td class="nowrap tiny">49 CFR ' + esc(b.cite) + '</td>' +
+    '</tr>';
+  }).join("");
+
+  var body =
+    '<div class="doc-title">' + esc(title) + '</div>' +
+    '<div class="doc-sub">' + (on
+      ? 'This occurrence meets the definition of accident in 49 CFR 390.5 and appears on the carrier’s accident register.'
+      : 'This occurrence was reviewed against 49 CFR 390.5 and determined not to meet the definition of accident. ' +
+        'It is recorded here so the reasoning is on file, and it does not appear on the carrier’s accident register.') +
+    '</div>' +
+
+    '<div style="margin:0 0 11px"><span class="stamp' + (on?"":" off") + '">' +
+      (on ? "On the accident register" : "Not on the accident register") + '</span></div>' +
+
+    '<div class="two-col"><div>' +
+      block("Required register information", "390.15(b)(1)",
+        kv("Date of accident", fmtDate(a.date)) +
+        kv("City or town", or(a.city)) +
+        kv("State", or(a.stateCode)) +
+        kv("Driver name", or(a.driverName)) +
+        kv("No. of injuries", or(a.injuries, "0")) +
+        kv("No. of fatalities", or(a.fatalities, "0")) +
+        kv("HM released", a.hazmat === "yes" ? "Yes — " + or(a.hazmatDetail, "see file") : a.hazmat === "no" ? "No" : "")
+      ) +
+    '</div><div>' +
+      block("Occurrence", null,
+        kv("Time", or(a.time)) +
+        kv("Location", or(a.location)) +
+        kv("Power unit", [or(a.unitNumber), or(a.unitVin)].filter(Boolean).join("  ·  ")) +
+        kv("Trailer", or(a.trailerNumber)) +
+        kv("Driver CDL", [or(a.driverCdl), or(a.driverCdlState)].filter(Boolean).join("  ·  ")) +
+        kv("Reporting agency", or(a.policeAgency)) +
+        kv("Report number", or(a.reportNumber))
+      ) +
+    '</div></div>' +
+
+    '<div class="blk"><div class="blk-h">Determination<span class="c">49 CFR 390.5</span></div>' +
+      '<table class="grid-doc" style="border-top:none"><thead><tr>' +
+        '<th>Question</th><th class="ctr nowrap" style="width:.55in">Answer</th>' +
+        '<th style="width:3.1in">Effect</th><th class="nowrap" style="width:1in">Citation</th>' +
+      '</tr></thead><tbody>' + basisRows + '</tbody></table></div>' +
+
+    '<div class="blk grow"><div class="blk-h">Narrative</div>' +
+      '<div style="border:1px solid #000;border-top:none;padding:5px 7px;font-size:8.5pt;line-height:1.45;min-height:.7in">' +
+        (a.description ? esc(a.description).replace(/\n/g,"<br>") : "&nbsp;") + '</div></div>' +
+
+    '<div class="sig-row"><div class="sig">Determination made by</div><div class="sig">Title</div><div class="sig">Date</div></div>';
+
+  return [sheet(on ? "Register entry" : "Determination",
+    fmtDate(a.date) + (a.city ? "  ·  " + esc(a.city) : ""), body, "fill",
+    on ? null
+       : "This occurrence is not an entry under 49 CFR 390.15(b). The carrier keeps this determination on file " +
+         "as the record of why it was left off the accident register.")];
+}
+
+/* -- 4. supporting-document checklist ------------------------------------- */
+function buildDocs(a){
+  var tv = testingVerdict(a);
+  var list = docsFor(a);
+
+  var rows = list.map(function(d, i){
+    return {
+      h: estRowPx([{text:d.row[0], w:283}, {text:d.row[2], w:150}]),
+      html: '<tr' + (i%2?' class="zebra"':'') + '>' +
+        '<td class="ctr nowrap"><span class="chk"></span></td>' +
+        '<td>' + esc(d.row[0]) + '</td>' +
+        '<td class="nowrap tiny">' + (d.row[1] === "—" ? "" : "49 CFR " + esc(d.row[1])) + '</td>' +
+        '<td class="tiny">' + esc(d.row[2]) + '</td>' +
+        '<td></td>' +
+      '</tr>'
+    };
+  });
+
+  var purge = addYears(a.date, 3);
+  var blank = '<tr><td class="blank"></td><td></td><td></td><td></td><td></td></tr>';
+
+  var head = '<tr>' +
+    '<th class="ctr nowrap" style="width:.5in">On file</th><th>Document</th>' +
+    '<th class="nowrap" style="width:.95in">Citation</th><th style="width:1.55in">Note</th>' +
+    '<th style="width:1.1in">Location</th></tr>';
+
+  var testBlock = block("Post-accident testing determination", "382.303",
+    '<div style="padding:6px 8px;font-size:8.5pt;line-height:1.5">' +
+    '<strong>' + esc(tv.headline) + '.</strong> ' + esc(tv.why) +
+    (tv.req === true
+      ? '<br><br>Alcohol testing as soon as practicable; a written record is required if it was not administered ' +
+        'within 2 hours, and attempts cease at 8 hours. Controlled substances testing attempts cease at 32 hours. ' +
+        'Any required test not administered needs a file record explaining why — 49 CFR 382.303(d).'
+      : '') + '</div>');
+
+  /* The testing block is appended to the last page, so its space is reserved
+     out of every page's row budget — cheaper than a two-pass layout and it can
+     never be pushed past the fold. */
+  var pages = paginateH(rows, blank, 0, 566, 664);
+
+  var idLine = [fmtDate(a.date), [or(a.city), or(a.stateCode)].filter(Boolean).join(", "),
+                a.driverName ? "Driver " + esc(a.driverName) : "",
+                a.unitNumber ? "Unit " + esc(a.unitNumber) : "",
+                a.reportNumber ? "Report " + esc(a.reportNumber) : "",
+                a.date ? "Retain until " + fmtDate(purge) : ""].filter(Boolean).join("  ·  ");
+
+  return pages.map(function(pg, i){
+    var last = i === pages.length - 1;
+    var intro = i === 0
+      ? '<div class="doc-title">Supporting-document checklist</div>' +
+        '<div class="doc-sub">49 CFR 390.15(b)(2) requires copies of all accident reports required by State or ' +
+        'other governmental entities or insurers, and Part 385, Appendix B lists failing to keep them as a ' +
+        '<strong>critical violation</strong>. The remaining rows are not required by 390.15 but are what a file ' +
+        'needs to stand up.<br><strong>' + idLine + '</strong></div>'
+      : '<div class="doc-title">Supporting-document checklist — continued</div>';
+
+    return sheet("Document checklist", fmtDate(a.date) + (a.city ? "  ·  " + esc(a.city) : ""),
+      intro +
+      '<table class="grid-doc" style="margin-bottom:11px"><thead>' + head + '</thead><tbody>' + pg + '</tbody></table>' +
+      (last ? testBlock +
+        '<div class="strike-note">Driver vehicle inspection reports, records-of-duty-status packets and the ' +
+        'unit’s maintenance file are held under their own retention rules and may be purged on a different ' +
+        'schedule. Where one supports this accident, file a copy here so the 3-year period in 390.15(b) ' +
+        'governs it.</div>' : ''));
+  });
+}
+
+/* -- assemble -------------------------------------------------------------- */
+function stampPages(pages){
+  var n = pages.length;
+  return pages.map(function(p, i){
+    return p.replace("<div data-pagemark>&nbsp;</div>",
+      '<div data-pagemark>Page ' + (i+1) + " of " + n + '</div>');
+  });
+}
+
+function buildOne(a){
+  return stampPages([].concat(buildEntry(a), buildDocs(a)));
+}
+
+function buildFull(){
+  var out = stampPages([].concat(buildCover(), buildRegister()));
+  var list = registerRows();
+  list.forEach(function(a){
+    var pages = [];
+    if (state.opts.entrySheets) pages = pages.concat(buildEntry(a));
+    if (state.opts.docSheets)   pages = pages.concat(buildDocs(a));
+    if (pages.length) out = out.concat(stampPages(pages));
+  });
+  if (state.opts.determinations){
+    state.accidents.filter(function(a){ return verdict(a).status !== "on"; })
+      .sort(function(x,y){ return String(y.date||"").localeCompare(String(x.date||"")); })
+      .forEach(function(a){ out = out.concat(stampPages(buildEntry(a))); });
+  }
+  return out;
+}
+
+/* =========================================================================
+   8. PRINT + PREVIEW
+   ====================================================================== */
+
+function doPrint(pages){
+  if (!pages.length){ toast("Nothing to print yet."); return; }
+  if (!state.carrier.name) toast("Tip: fill in the carrier name — it heads every page.");
+  document.getElementById("print-root").innerHTML = pages.join("");
+  setTimeout(function(){ window.print(); }, 60);
+}
+
+function openPreview(pages, title){
+  if (!pages.length){ toast("Nothing to preview yet."); return; }
+  var s = document.getElementById("preview-scroll");
+  s.innerHTML = pages.join(""); s.scrollTop = 0;
+  document.getElementById("preview-title").textContent = title;
+  document.getElementById("preview-pages").textContent = pages.length + (pages.length===1?" page":" pages");
+  document.getElementById("preview").classList.add("open");
+  document.body.style.overflow = "hidden";
+  document.getElementById("print-root").innerHTML = pages.join("");
+}
+function closePreview(){
+  document.getElementById("preview").classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+/* =========================================================================
+   9. IMPORT / EXPORT
+   ====================================================================== */
+
+function download(name, text, mime){
+  var blob = new Blob([text], {type: mime || "application/octet-stream"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+}
+
+function slug(){
+  return (state.carrier.name || "carrier").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "carrier";
+}
+
+function exportJSON(){
+  download(slug() + "-accident-register.json", JSON.stringify({
+    format:"dot-accident-register", version:1, savedOn:todayISO(),
+    carrier:state.carrier, opts:state.opts, accidents:state.accidents
+  }, null, 2), "application/json");
+  dirty = false;
+  toast("Saved. Keep this file to pick up where you left off.");
+}
+
+function importJSON(text){
+  var d;
+  try { d = JSON.parse(text); } catch(e){ toast("That file could not be read."); return; }
+  if (!d || !Array.isArray(d.accidents)){ toast("That file is not a saved register."); return; }
+  state.carrier = Object.assign({}, state.carrier, d.carrier || {});
+  state.opts    = Object.assign({}, state.opts, d.opts || {});
+  state.accidents = d.accidents.map(function(x){
+    var base = newAccident();
+    var m = Object.assign(base, x);
+    m.id = x.id || uid();
+    m.q = Object.assign(base.q, x.q || {});
+    m.docs = x.docs || {};
+    return m;
+  });
+  state.selected = state.accidents.length ? state.accidents[0].id : null;
+  dirty = false; renderAll();
+  toast("Loaded " + state.accidents.length + (state.accidents.length===1?" occurrence." : " occurrences."));
+}
+
+var CSV_COLS = ["date","city","stateCode","driverName","injuries","fatalities","hazmat",
+                "unitNumber","reportNumber","policeAgency","location","citation","description"];
+
+function csvTemplate(){
+  var sample = [
+    ["2026-03-14","Baytown","TX","Marcus Ellery","1","0","no","104","TX-26-0091142","Baytown PD",
+     "I-10 eastbound at MM 792","yes","Rear-ended in slowed traffic; other driver transported by ambulance."],
+    ["2026-06-02","Grand Prairie","TX","Dana Whitcomb","0","0","no","112","","",
+     "Customer yard, dock 14","no","Backed into a light pole in a closed yard; unit driven away."]
+  ];
+  download("accident-register-template.csv",
+    CSV_COLS.join(",") + "\n" + sample.map(function(r){ return r.map(csvCell).join(","); }).join("\n") + "\n",
+    "text/csv");
+}
+function csvCell(v){
+  v = String(v==null?"":v);
+  return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+}
+
+function exportCSV(){
+  var list = registerRows();
+  if (!list.length){ toast("No entries on the register to export."); return; }
+  var head = ["Date of accident","City or town","State","Driver name","Number of injuries",
+              "Number of fatalities","HM released","Unit","Report number"];
+  var body = list.map(function(a){
+    return [fmtDate(a.date), a.city, a.stateCode, a.driverName, a.injuries||"0", a.fatalities||"0",
+            a.hazmat==="yes"?"Yes":a.hazmat==="no"?"No":"", a.unitNumber, a.reportNumber].map(csvCell).join(",");
+  }).join("\n");
+  download(slug() + "-accident-register.csv", head.join(",") + "\n" + body + "\n", "text/csv");
+  toast("Exported " + list.length + " register entries.");
+}
+
+/* Minimal RFC-4180 parser: quoted fields, embedded commas, doubled quotes, CRLF. */
+function parseCSV(text){
+  var rows=[], row=[], cur="", q=false, i=0;
+  text = String(text).replace(/^﻿/, "");
+  while (i < text.length){
+    var ch = text[i];
+    if (q){
+      if (ch === '"'){ if (text[i+1] === '"'){ cur += '"'; i+=2; continue; } q=false; i++; continue; }
+      cur += ch; i++; continue;
+    }
+    if (ch === '"'){ q = true; i++; continue; }
+    if (ch === ","){ row.push(cur); cur=""; i++; continue; }
+    if (ch === "\r"){ i++; continue; }
+    if (ch === "\n"){ row.push(cur); rows.push(row); row=[]; cur=""; i++; continue; }
+    cur += ch; i++;
+  }
+  if (cur !== "" || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(c){ return String(c).trim() !== ""; }); });
+}
+
+function importCSV(text){
+  var rows = parseCSV(text);
+  if (rows.length < 2){ toast("That CSV has no data rows."); return; }
+  var head = rows[0].map(function(h){ return String(h).trim(); });
+  var added = 0;
+  for (var r=1;r<rows.length;r++){
+    var rec = {};
+    head.forEach(function(h, ci){ rec[h] = (rows[r][ci]==null?"":String(rows[r][ci]).trim()); });
+    var a = newAccident();
+    CSV_COLS.forEach(function(k){ if (rec[k]) a[k] = rec[k]; });
+    if (a.stateCode) a.stateCode = a.stateCode.toUpperCase();
+    /* Imported rows arrive undetermined on purpose. The register is only as
+       trustworthy as the determination behind each line, and a spreadsheet
+       cannot answer whether the damage was disabling. */
+    state.accidents.push(a); added++;
+  }
+  if (added){
+    state.selected = state.accidents[state.accidents.length-1].id;
+    markDirty(); renderAll();
+    toast("Added " + added + (added===1?" occurrence. Run the determination on it." : " occurrences. Run the determination on each."));
+  }
+}
+
+/* =========================================================================
+   10. WIRING
+   ====================================================================== */
+
+function renderAll(){ renderCarrier(); renderList(); renderEditor(); }
+
+document.getElementById("carrier-fields").addEventListener("input", function(e){
+  var k = e.target.getAttribute("data-carrier");
+  if (!k) return;
+  state.carrier[k] = e.target.value; markDirty();
+});
+
+document.getElementById("ac-list").addEventListener("click", function(e){
+  var b = e.target.closest("[data-ac]");
+  if (!b) return;
+  state.selected = b.getAttribute("data-ac");
+  renderList(); renderEditor();
+});
+
+document.getElementById("btn-add").addEventListener("click", function(){
+  var a = newAccident();
+  a.date = todayISO();
+  state.accidents.push(a);
+  state.selected = a.id;
+  markDirty(); renderAll();
+});
+
+var editor = document.getElementById("editor");
+
+/* Gate answers re-render the whole editor: a change can open the disabling
+   sub-question, flip the verdict and change which documents apply. */
+editor.addEventListener("click", function(e){
+  var a = selected(); if (!a) return;
+  var b = e.target.closest("button"); if (!b) return;
+
+  var gate = b.getAttribute("data-gate");
+  if (gate){
+    /* Selecting the answer already showing is a no-op, not a toggle-off.
+       "Not yet known" is the explicit way to back out of a commitment. */
+    var val = b.getAttribute("data-v");
+    a.q[gate] = val;
+    if (gate === "towAway" && a.q.towAway !== "yes") a.q.disabling = "";
+    markDirty(); renderList(); renderEditor();
+    return;
+  }
+  if (b.getAttribute("data-act") === "del"){
+    if (!window.confirm("Delete this occurrence and its determination?")) return;
+    state.accidents = state.accidents.filter(function(x){ return x.id !== a.id; });
+    state.selected = state.accidents.length ? state.accidents[0].id : null;
+    markDirty(); renderAll();
+  }
+});
+
+editor.addEventListener("input", function(e){
+  var a = selected(); if (!a) return;
+  var k = e.target.getAttribute("data-f");
+  if (!k) return;
+  a[k] = e.target.value; markDirty();
+  if (k === "date" || k === "city" || k === "stateCode" || k === "driverName") renderList();
+});
+
+editor.addEventListener("change", function(e){
+  var a = selected(); if (!a) return;
+  var t = e.target, k = t.getAttribute("data-f");
+
+  if (k === "hazmat" || k === "citation" || k === "part382"){
+    a[k] = t.value; markDirty(); renderEditor(); return;
+  }
+  if (k){ a[k] = t.value; markDirty(); renderList(); return; }
+
+  var d = t.getAttribute("data-doc");
+  if (d !== null){ a.docs[d] = t.checked; markDirty(); return; }
+
+  var o = t.getAttribute("data-opt");
+  if (o){ state.opts[o] = t.checked; markDirty(); return; }
+});
+
+document.getElementById("btn-print-one").addEventListener("click", function(){
+  var a = selected();
+  doPrint(a ? buildOne(a) : []);
+});
+document.getElementById("btn-print-all").addEventListener("click", function(){
+  doPrint(state.accidents.length ? buildFull() : []);
+});
+document.getElementById("btn-preview").addEventListener("click", function(){
+  var a = selected();
+  if (a && state.accidents.length > 1) openPreview(buildOne(a), "Preview — " + (fmtDate(a.date) || "selected occurrence"));
+  else openPreview(state.accidents.length ? buildFull() : [], "Preview — full register");
+});
+document.getElementById("preview-close").addEventListener("click", closePreview);
+document.getElementById("preview-print").addEventListener("click", function(){ window.print(); });
+document.addEventListener("keydown", function(e){ if (e.key === "Escape") closePreview(); });
+
+document.getElementById("btn-export").addEventListener("click", exportJSON);
+document.getElementById("btn-import").addEventListener("click", function(){ document.getElementById("file-json").click(); });
+document.getElementById("btn-csv").addEventListener("click", function(){ document.getElementById("file-csv").click(); });
+document.getElementById("btn-csv-tpl").addEventListener("click", csvTemplate);
+document.getElementById("btn-csv-out").addEventListener("click", exportCSV);
+
+document.getElementById("file-json").addEventListener("change", function(e){
+  var f = e.target.files && e.target.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){ importJSON(String(fr.result)); };
+  fr.readAsText(f); e.target.value = "";
+});
+document.getElementById("file-csv").addEventListener("change", function(e){
+  var f = e.target.files && e.target.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){ importCSV(String(fr.result)); };
+  fr.readAsText(f); e.target.value = "";
+});
+
+/* Nothing is written to browser storage — deliberately, so the privacy line on
+   the page stays true and an accident file never lingers on a shared machine.
+   The trade-off is that a refresh loses unsaved work, so warn first. */
+window.addEventListener("beforeunload", function(e){
+  if (!dirty) return;
+  e.preventDefault(); e.returnValue = "";
+});
+
+renderAll();
+</script>
+</body>
+</html>

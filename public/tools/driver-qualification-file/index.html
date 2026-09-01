@@ -1,0 +1,963 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Driver Qualification File Builder: Generate Every 49 CFR 391 Document | We Heart Paperwork</title>
+<meta name="description" content="Free DQ file starter-packet builder. Answer a few questions to generate carrier-created forms, an organization checklist, and an action plan based on 49 CFR Part 391. Nothing leaves your browser.">
+<link rel="canonical" href="https://weheartpaperwork.com/tools/driver-qualification-file/">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<meta name="theme-color" content="#F1F3F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111518" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="We Heart Paperwork">
+<meta property="og:url" content="https://weheartpaperwork.com/tools/driver-qualification-file/">
+<meta property="og:title" content="The DQ File Builder — build a driver file starter packet">
+<meta property="og:description" content="Generate carrier-created DQ forms, an organization checklist, and the action steps that forms cannot complete.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The DQ File Builder — build a driver file starter packet">
+<meta name="twitter:description" content="Generate carrier-created DQ forms, an organization checklist, and the action steps that forms cannot complete.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+ {"@type":"WebApplication","name":"Driver Qualification File Builder",
+  "url":"https://weheartpaperwork.com/tools/driver-qualification-file/",
+  "applicationCategory":"BusinessApplication","operatingSystem":"Any",
+  "description":"Generates carrier-created starter forms, an organization checklist, and an action plan for a motor carrier driver qualification file under 49 CFR Part 391.",
+  "offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},
+  "publisher":{"@type":"Organization","name":"We Heart Paperwork","url":"https://weheartpaperwork.com"}},
+ {"@type":"FAQPage","mainEntity":[
+  {"@type":"Question","name":"Is there an official FMCSA form for a driver qualification file?",
+   "acceptedAnswer":{"@type":"Answer","text":"There is no single federal DQ-file form. FMCSA publishes optional sample forms, but carriers may use their own forms when those forms capture the information required by the regulations. Medical examination forms are completed through the certified medical-examiner process, not created by this builder."}},
+  {"@type":"Question","name":"What must be in a driver qualification file?",
+   "acceptedAnswer":{"@type":"Answer","text":"Under 49 CFR 391.51(b): the employment application under 391.21; the pre-employment motor vehicle record from each licensing authority; the road test certificate or an accepted equivalent under 391.33; the annual MVR; the note of the annual review of driving record; medical certification, which for non-CDL drivers is the paper medical examiner's certificate and for CDL holders is the CDLIS motor vehicle record; any medical variance or SPE certificate; and for non-CDL drivers a National Registry verification note."}},
+  {"@type":"Question","name":"Is the driver's annual certificate of violations still required?",
+   "acceptedAnswer":{"@type":"Answer","text":"No. 49 CFR 391.27, which required drivers to furnish an annual list of violations, was removed effective May 9, 2022 by the Record of Violations final rule published at 87 FR 13192. FMCSA found it largely duplicative of the annual MVR inquiry and review under 391.25. Compliance checklists that still list it are out of date."}},
+  {"@type":"Question","name":"Does a CDL replace the road test?",
+   "acceptedAnswer":{"@type":"Answer","text":"Usually. 49 CFR 391.33(a)(1) lets a motor carrier accept a valid CDL in place of the road test required by 391.31, and requires a legible copy of the licence to be kept in the qualification file. The substitution does not extend to double or triple trailer endorsements or tank vehicle endorsements — for those an actual road test under 391.31 is required, or a road test certificate issued within the preceding three years."}},
+  {"@type":"Question","name":"Do CDL drivers still need a paper medical card in the file?",
+   "acceptedAnswer":{"@type":"Answer","text":"Not as the primary proof. Since June 23, 2025 medical examiners transmit CDL and CLP driver results electronically to FMCSA, which passes medical certification status to the state licensing agency, and no paper certificate is issued to those drivers. The carrier documents medical certification by obtaining the CDLIS motor vehicle record under 391.51(b)(6)(ii). A temporary FMCSA exemption running through October 11, 2026 permits reliance on a paper certificate for up to 60 days from issuance. Non-CDL interstate drivers are unaffected and still require the paper certificate plus a National Registry verification note."}},
+  {"@type":"Question","name":"How long must a driver qualification file be kept?",
+   "acceptedAnswer":{"@type":"Answer","text":"Under 49 CFR 391.51(c) the file is retained for as long as the driver is employed and for three years after. 391.51(d) allows certain records to be removed three years after the date of execution: the annual MVR, the annual review note, the medical certificate or CDLIS MVR, medical variances, and the National Registry verification note. The application, the pre-employment MVR and the road test certificate cannot be purged early."}}
+ ]}
+]}
+</script>
+<style>
+:root{
+  --ground:#F1F3F1;
+  --surface:#FFFFFF;
+  --surface-2:#E9ECEA;
+  --ink:#14181B;
+  --ink-2:#4E5A60;
+  --ink-3:#78868D;
+  --line:#D6DBD8;
+  --line-strong:#B9C0BC;
+  --accent:#A85F06;
+  --accent-soft:#F5E7CF;
+  --good:#1C6647;
+  --good-soft:#DCEBE2;
+  --bad:#A32218;
+  --bad-soft:#F6DFDC;
+  --warn:#8A5A00;
+  --shadow:0 1px 2px rgba(20,24,27,.06),0 6px 20px -12px rgba(20,24,27,.22);
+  --radius:4px;
+  --maxw:900px;
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#111518;
+    --surface:#191F23;
+    --surface-2:#222A2F;
+    --ink:#E7EBE8;
+    --ink-2:#A7B2B7;
+    --ink-3:#7E8B91;
+    --line:#2B3439;
+    --line-strong:#3D484E;
+    --accent:#EBA33C;
+    --accent-soft:#3A2C14;
+    --good:#57C495;
+    --good-soft:#153328;
+    --bad:#FF7A6C;
+    --bad-soft:#3A1D1A;
+    --warn:#D9A441;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -14px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#111518;
+  --surface:#191F23;
+  --surface-2:#222A2F;
+  --ink:#E7EBE8;
+  --ink-2:#A7B2B7;
+  --ink-3:#7E8B91;
+  --line:#2B3439;
+  --line-strong:#3D484E;
+  --accent:#EBA33C;
+  --accent-soft:#3A2C14;
+  --good:#57C495;
+  --good-soft:#153328;
+  --bad:#FF7A6C;
+  --bad-soft:#3A1D1A;
+  --warn:#D9A441;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -14px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--body);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 20px 96px}
+h1,h2,h3,h4{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.015em}
+p{margin:0}
+a{color:var(--accent)}
+button{font:inherit;color:inherit}
+
+/* ---------- masthead ---------- */
+.mast{
+  border-bottom:2px solid var(--ink);
+  padding:34px 0 20px;
+  display:flex;flex-direction:column;gap:18px;
+}
+.eyebrow{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);
+}
+h1{font-size:clamp(34px,7vw,58px);font-weight:700;line-height:1.02}
+h1 .thin{font-weight:500;color:var(--ink-2)}
+.dek{max-width:60ch;color:var(--ink-2);font-size:17px}
+.mast-meta{display:flex;flex-wrap:wrap;gap:8px}
+.tag{
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  border:1px solid var(--line-strong);padding:4px 9px;border-radius:2px;color:var(--ink-2);
+}
+
+/* ---------- generic section ---------- */
+section{padding-top:52px}
+.sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:22px}
+.sec-head h2{font-size:clamp(22px,3.4vw,29px);font-weight:700}
+.sec-head .count{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.08em}
+.lede{color:var(--ink-2);max-width:66ch;margin-bottom:22px}
+
+/* ---------- clock card ---------- */
+.clock{
+  background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  padding:20px;margin-top:26px;
+  display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;
+}
+.clock-label{font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:8px}
+input[type="date"]{
+  font:inherit;font-family:var(--mono);font-size:15px;
+  background:var(--ground);color:var(--ink);
+  border:1px solid var(--line-strong);border-radius:3px;padding:9px 10px;width:100%;max-width:240px;
+}
+.clock-out{text-align:right}
+.clock-big{font-family:var(--display);font-weight:700;font-size:clamp(26px,5vw,40px);line-height:1;font-variant-numeric:tabular-nums}
+.clock-sub{font-family:var(--mono);font-size:12px;color:var(--ink-2);margin-top:6px;letter-spacing:.03em}
+.clock.is-late{border-left-color:var(--bad)}
+.clock.is-late .clock-big{color:var(--bad)}
+
+/* ---------- progress bar ---------- */
+.progress-strip{
+  position:sticky;top:0;z-index:20;
+  background:var(--ground);
+  border-bottom:1px solid var(--line);
+  padding:10px 0;margin-bottom:20px;
+  display:flex;align-items:center;gap:14px;
+}
+.bar{flex:1;height:8px;background:var(--surface-2);border-radius:99px;overflow:hidden;border:1px solid var(--line)}
+.bar span{display:block;height:100%;width:0;background:var(--accent);transition:width .28s ease}
+.bar.done span{background:var(--good)}
+.progress-num{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--ink-2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.reset{
+  background:none;border:1px solid var(--line-strong);border-radius:3px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+  padding:4px 8px;color:var(--ink-3);cursor:pointer;
+}
+.reset:hover{color:var(--ink);border-color:var(--ink-3)}
+
+/* ---------- document rows ---------- */
+.docs{display:flex;flex-direction:column;gap:10px}
+.doc{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;
+}
+.doc.checked{border-color:var(--good);background:var(--good-soft)}
+.doc-top{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;padding:14px 16px}
+.tick{
+  appearance:none;-webkit-appearance:none;margin:2px 0 0;
+  width:22px;height:22px;flex:none;cursor:pointer;
+  border:2px solid var(--line-strong);border-radius:3px;background:var(--ground);
+  display:grid;place-content:center;transition:.15s;
+}
+.tick:checked{background:var(--good);border-color:var(--good)}
+.tick:checked::after{content:"";width:11px;height:6px;border-left:2.5px solid var(--surface);border-bottom:2.5px solid var(--surface);transform:rotate(-45deg) translate(1px,-2px)}
+.tick:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.doc-title{font-family:var(--display);font-weight:600;font-size:17px;line-height:1.25}
+.doc-ask{color:var(--ink-2);font-size:14.5px;margin-top:4px}
+.doc-cite{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.04em;margin-top:6px;display:block}
+.more{
+  background:none;border:1px solid var(--line-strong);border-radius:3px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  padding:5px 9px;color:var(--ink-2);white-space:nowrap;
+}
+.more:hover{border-color:var(--ink-3);color:var(--ink)}
+.doc-body{display:none;padding:0 16px 16px 52px;border-top:1px dashed var(--line);margin-top:2px;padding-top:14px}
+.doc.open .doc-body{display:block}
+.kv{margin-bottom:12px}
+.kv:last-child{margin-bottom:0}
+.kv b{
+  display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);margin-bottom:3px;font-weight:600;
+}
+.kv p{font-size:15px;color:var(--ink)}
+.kv.trap b{color:var(--bad)}
+
+/* ---------- questions ---------- */
+.qnote{
+  background:var(--accent-soft);border:1px solid var(--line);border-left:4px solid var(--accent);
+  border-radius:var(--radius);padding:14px 16px;margin-bottom:22px;font-size:15px;color:var(--ink);
+}
+.qnote strong{font-family:var(--display)}
+.q{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:13px 15px;margin-bottom:8px;box-shadow:var(--shadow);
+  display:grid;grid-template-columns:1fr auto;gap:12px 16px;align-items:start;
+}
+.q.wrong{border-color:var(--bad);background:var(--bad-soft)}
+.q.right{border-color:var(--good)}
+.q-meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:5px}
+.qnum{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--ink-3)}
+.chip{
+  font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  padding:2px 6px;border-radius:2px;border:1px solid currentColor;
+}
+.chip.critical{color:var(--warn)}
+.chip.acute{color:var(--bad)}
+.chip.autofail{color:var(--bad);background:var(--bad-soft)}
+.chip.factor{color:var(--ink-3)}
+.q-text{font-size:15.5px;line-height:1.45}
+.q-why{font-size:14px;color:var(--ink-2);margin-top:7px;display:none}
+.q.answered .q-why{display:block}
+.q-cite{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-top:6px;display:block;letter-spacing:.03em}
+.choices{display:flex;gap:5px;flex:none}
+.choices button{
+  font-family:var(--mono);font-size:11.5px;font-weight:600;letter-spacing:.06em;
+  background:var(--ground);border:1px solid var(--line-strong);border-radius:3px;
+  padding:7px 11px;cursor:pointer;color:var(--ink-2);transition:.12s;
+}
+.choices button:hover{border-color:var(--ink-3);color:var(--ink)}
+.choices button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--ground)}
+.choices button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* ---------- scoreboard ---------- */
+.score{
+  position:sticky;bottom:0;z-index:25;margin-top:18px;
+  background:var(--surface);border:1px solid var(--line-strong);border-radius:var(--radius);
+  box-shadow:0 -6px 24px -14px rgba(0,0,0,.5);padding:14px 16px;
+}
+.score-head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.verdict{font-family:var(--display);font-weight:700;font-size:21px;letter-spacing:-.01em}
+.verdict.pass{color:var(--good)}
+.verdict.fail{color:var(--bad)}
+.verdict.idle{color:var(--ink-3)}
+.score-sub{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);letter-spacing:.04em}
+.factors{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:12px}
+.factor{border:1px solid var(--line);border-radius:3px;padding:8px 9px;background:var(--ground)}
+.factor .fname{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.factor .fpts{font-family:var(--display);font-weight:700;font-size:19px;font-variant-numeric:tabular-nums;margin-top:2px}
+.factor.failed{border-color:var(--bad);background:var(--bad-soft)}
+.factor.failed .fpts{color:var(--bad)}
+
+/* ---------- after / tables ---------- */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px;box-shadow:var(--shadow);
+}
+.card h3{font-size:16px;font-weight:600;margin-bottom:7px}
+.card p{font-size:14.5px;color:var(--ink-2)}
+.card .stat{font-family:var(--display);font-weight:700;font-size:30px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums;margin-bottom:6px}
+
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:14.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;background:var(--surface-2)}
+tr:last-child td{border-bottom:none}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* ---------- cta / footer ---------- */
+.cta{
+  margin-top:56px;border:2px solid var(--ink);border-radius:var(--radius);
+  background:var(--surface);padding:26px;
+}
+.cta h2{font-size:clamp(20px,3.6vw,28px);font-weight:700;margin-bottom:8px}
+.cta p{color:var(--ink-2);max-width:58ch;margin-bottom:16px}
+.contact{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.btn{
+  display:inline-block;text-decoration:none;background:var(--ink);color:var(--ground);
+  font-family:var(--mono);font-size:12.5px;font-weight:600;letter-spacing:.06em;
+  padding:11px 16px;border-radius:3px;border:1px solid var(--ink);
+}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line-strong)}
+.btn:hover{opacity:.88}
+footer{margin-top:44px;padding-top:18px;border-top:1px solid var(--line);color:var(--ink-3);font-size:13px}
+footer p{margin-bottom:8px;max-width:74ch}
+
+@media (max-width:640px){
+  .clock{grid-template-columns:1fr;gap:14px}
+  .clock-out{text-align:left}
+  .q{grid-template-columns:1fr}
+  .doc-body{padding-left:16px}
+  .doc-top{grid-template-columns:auto 1fr;grid-template-areas:"tick title" ". more"}
+  .doc-top .tick{grid-area:tick}
+  .doc-top .doc-main{grid-area:title}
+  .doc-top .more{grid-area:more;justify-self:start;margin-top:8px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style><style>
+/* ============ We Heart Paperwork site chrome + PDF gate ============ */
+/* Brand hook: change --brand and --brand-ink to match the app. Everything
+   downstream reads these two tokens, so one edit reskins the page. */
+:root{ --brand:#A85F06; --brand-ink:#FFFFFF; }
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ --brand:#EBA33C; --brand-ink:#14181B; } }
+:root[data-theme="dark"]{ --brand:#EBA33C; --brand-ink:#14181B; }
+
+/* --- top bar --- */
+.topbar{
+  border-bottom:1px solid var(--line);
+  background:var(--surface);
+}
+.topbar-in{
+  max-width:var(--maxw);margin:0 auto;padding:11px 20px;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.brand{
+  font-family:var(--display);font-weight:700;font-size:16px;letter-spacing:-.01em;
+  color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:7px;
+}
+.brand .heart{color:var(--bad)}
+.topnav{display:flex;gap:16px;margin-left:auto;align-items:center;flex-wrap:wrap}
+.topnav a{
+  font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--ink-2);text-decoration:none;
+}
+.topnav a:hover{color:var(--ink)}
+.topnav a.pill{
+  background:var(--ink);color:var(--ground);border-radius:3px;padding:7px 12px;
+  text-transform:none;letter-spacing:.02em;font-size:12.5px;font-weight:600;
+}
+.topnav a.pill:hover{opacity:.88;color:var(--ground)}
+
+/* --- gate --- */
+.gate{
+  margin-top:20px;
+  background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--brand);
+  border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;
+}
+.gate h3{font-size:19px;font-weight:700;margin-bottom:5px}
+.gate .sell{color:var(--ink-2);font-size:15px;max-width:58ch;margin-bottom:15px}
+.gate form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);font-weight:600;
+}
+.field input{
+  font:inherit;font-size:15px;background:var(--ground);color:var(--ink);
+  border:1px solid var(--line-strong);border-radius:3px;padding:9px 10px;width:100%;
+}
+.field input:focus-visible{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+.field .hint{font-size:11.5px;color:var(--ink-3)}
+.gate .full{grid-column:1/-1}
+.hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.gate button[type="submit"]{
+  background:var(--ink);color:var(--ground);border:1px solid var(--ink);border-radius:3px;
+  font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.04em;
+  padding:12px 18px;cursor:pointer;justify-self:start;
+}
+.gate button[type="submit"]:hover:not(:disabled){opacity:.88}
+.gate button[type="submit"]:disabled{opacity:.5;cursor:progress}
+.gate .fine{font-size:12px;color:var(--ink-3);margin-top:10px;max-width:62ch}
+.gate-msg{margin-top:12px;font-size:14.5px;display:none}
+.gate-msg.show{display:block}
+.gate-msg.err{color:var(--bad)}
+.gate-msg.ok{color:var(--good)}
+.gate-msg .dl{
+  display:inline-block;margin-top:9px;background:var(--good);color:var(--surface);
+  border-radius:3px;padding:11px 16px;text-decoration:none;
+  font-family:var(--mono);font-size:13px;font-weight:600;letter-spacing:.04em;
+}
+.gate.done form,.gate.done .sell{display:none}
+
+/* --- product bridge --- */
+.bridge{
+  margin-top:56px;border:2px solid var(--brand);border-radius:var(--radius);
+  background:var(--surface);padding:26px;box-shadow:var(--shadow);
+}
+.bridge .eyebrow{margin-bottom:9px;display:block}
+.bridge h2{font-size:clamp(21px,3.6vw,30px);font-weight:700;margin-bottom:10px}
+.bridge p{color:var(--ink-2);max-width:60ch;margin-bottom:8px}
+.bridge .price{
+  font-family:var(--display);font-weight:700;font-size:clamp(26px,5vw,36px);
+  color:var(--ink);margin:16px 0 4px;font-variant-numeric:tabular-nums;
+}
+.bridge .price small{font-family:var(--body);font-size:15px;font-weight:400;color:var(--ink-2)}
+.bridge ul{margin:12px 0 18px;padding:0;list-style:none;display:grid;gap:6px}
+.bridge li{position:relative;padding-left:22px;font-size:15px;color:var(--ink)}
+.bridge li::before{
+  content:"";position:absolute;left:2px;top:7px;width:9px;height:5px;
+  border-left:2px solid var(--good);border-bottom:2px solid var(--good);transform:rotate(-45deg);
+}
+.bridge .btn:not(.ghost){background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+
+@media (max-width:640px){
+  .topnav{margin-left:0;width:100%;gap:12px}
+  .gate form{grid-template-columns:1fr}
+}
+</style><style>
+/* ================= DQ builder — page-specific ================= */
+.build{
+  display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:22px;align-items:start;
+}
+.panel{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:20px;
+}
+.panel > h3{
+  font-family:var(--display);font-size:12px;font-weight:700;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:14px;
+}
+fieldset{border:0;padding:0;margin:0 0 20px}
+fieldset:last-of-type{margin-bottom:0}
+legend{
+  font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ink-3);padding:0 0 9px;
+  border-bottom:1px solid var(--line);width:100%;margin-bottom:13px;
+}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f.wide{grid-column:1/-1}
+.f label{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);font-weight:600;
+}
+.f input, .f select{
+  font:inherit;font-size:15px;background:var(--ground);color:var(--ink);
+  border:1px solid var(--line-strong);border-radius:3px;padding:9px 10px;width:100%;
+}
+.f input:focus-visible, .f select:focus-visible{outline:2px solid var(--brand);outline-offset:1px;border-color:var(--brand)}
+.f .hint{font-size:11.5px;color:var(--ink-3);line-height:1.35}
+
+/* segmented choice */
+.seg{display:flex;gap:0;border:1px solid var(--line-strong);border-radius:3px;overflow:hidden}
+.seg button{
+  flex:1;background:var(--ground);border:0;border-right:1px solid var(--line-strong);
+  font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.03em;
+  padding:10px 6px;cursor:pointer;color:var(--ink-2);transition:.12s;
+}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--ground)}
+.seg button:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+
+.toggles{display:flex;flex-direction:column;gap:9px}
+.tog{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.tog input{
+  appearance:none;-webkit-appearance:none;margin:2px 0 0;flex:none;
+  width:20px;height:20px;border:2px solid var(--line-strong);border-radius:3px;
+  background:var(--ground);cursor:pointer;display:grid;place-content:center;
+}
+.tog input:checked{background:var(--ink);border-color:var(--ink)}
+.tog input:checked::after{content:"";width:10px;height:5px;border-left:2.5px solid var(--ground);border-bottom:2.5px solid var(--ground);transform:rotate(-45deg) translate(1px,-2px)}
+.tog input:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.tog span{font-size:14.5px;line-height:1.4}
+.tog em{display:block;font-style:normal;font-size:12.5px;color:var(--ink-3);margin-top:1px}
+
+/* live packet list */
+.packet{position:sticky;top:16px}
+.packet ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.packet li{
+  padding:10px 0;border-bottom:1px dashed var(--line);
+  display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;
+}
+.packet li:last-child{border-bottom:0}
+.packet .n{
+  font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink-3);
+  padding-top:2px;font-variant-numeric:tabular-nums;
+}
+.packet .t{display:block;font-size:14.5px;font-weight:600;font-family:var(--display);line-height:1.25}
+.packet .w{display:block;font-size:12.5px;color:var(--ink-2);margin-top:3px;line-height:1.4}
+.packet li.added{animation:pop .3s ease}
+@keyframes pop{from{background:var(--accent-soft)}to{background:transparent}}
+.packet .tally{
+  display:flex;justify-content:space-between;align-items:baseline;
+  margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+}
+.packet .tally b{font-family:var(--display);font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.packet .tally span{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+
+.buildbtn{
+  width:100%;margin-top:16px;background:var(--ink);color:var(--ground);
+  border:1px solid var(--ink);border-radius:3px;cursor:pointer;
+  font-family:var(--mono);font-size:13.5px;font-weight:600;letter-spacing:.04em;padding:14px;
+}
+.buildbtn:hover:not(:disabled){opacity:.88}
+.buildbtn:disabled{opacity:.45;cursor:not-allowed}
+
+.privacy{
+  font-size:12.5px;color:var(--ink-3);margin-top:11px;line-height:1.45;
+}
+
+/* result */
+.result{display:none;margin-top:16px;border-top:1px solid var(--line);padding-top:16px}
+.result.show{display:block}
+.ready{
+  font-family:var(--display);font-weight:700;font-size:17px;color:var(--good);margin-bottom:4px;
+}
+.ready-sub{font-size:13.5px;color:var(--ink-2);margin-bottom:14px}
+.result form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.result .full{grid-column:1/-1}
+.dlbtn{
+  display:block;width:100%;text-align:center;background:var(--good);color:var(--surface);
+  border:1px solid var(--good);border-radius:3px;padding:14px;text-decoration:none;cursor:pointer;
+  font-family:var(--mono);font-size:13.5px;font-weight:600;letter-spacing:.04em;
+}
+.rmsg{margin-top:10px;font-size:14px;display:none}
+.rmsg.show{display:block}
+.rmsg.err{color:var(--bad)}
+.rmsg.ok{color:var(--good)}
+
+@media (max-width:840px){
+  .build{grid-template-columns:1fr}
+  .packet{position:static}
+  .result form{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="/">We <span class="heart">&hearts;</span> Paperwork</a>
+    <nav class="topnav">
+      <a href="/features">Features</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/compliance">Guides</a>
+      <a class="pill" href="/pricing">Get started &mdash; $3/mo</a>
+    </nav>
+  </div>
+</header><div class="wrap">
+
+  <header class="mast">
+    <span class="eyebrow">49 CFR Part 391 &middot; Driver qualification files</span>
+    <h1>The DQ File<br><span class="thin">Builder</span></h1>
+    <p class="dek">There is no single federal DQ-file form. FMCSA tells you what records have to be collected, and the carrier must assemble them. Answer a few questions and this builds the carrier-created starter forms, an organization checklist, and an action plan. You must still obtain the official records identified in the packet.</p>
+    <div class="mast-meta">
+      <span class="tag">Up to 11 documents</span>
+      <span class="tag">Branches on CDL</span>
+      <span class="tag">Driver data stays in your browser</span>
+      <span class="tag">Free</span>
+    </div>
+  </header>
+
+  <section id="builder">
+    <div class="sec-head">
+      <h2>Build the packet</h2>
+      <span class="count">Answers change what gets generated</span>
+    </div>
+
+    <div class="build">
+      <!-- ============ FORM ============ -->
+      <div class="panel">
+        <form id="dqform" autocomplete="off">
+          <fieldset>
+            <legend>The motor carrier</legend>
+            <div class="grid">
+              <div class="f wide">
+                <label for="carrierName">Legal company name</label>
+                <input id="carrierName" type="text" placeholder="Ed's Concrete Delivery LLC">
+              </div>
+              <div class="f">
+                <label for="dot">USDOT number</label>
+                <input id="dot" type="text" inputmode="numeric" placeholder="3990863">
+              </div>
+              <div class="f">
+                <label for="carrierPhone">Phone</label>
+                <input id="carrierPhone" type="tel" placeholder="509-555-0142">
+              </div>
+              <div class="f wide">
+                <label for="carrierAddress">Address</label>
+                <input id="carrierAddress" type="text" placeholder="120 Shannon Rd, Yakima, WA 98908">
+              </div>
+              <div class="f">
+                <label for="safetyContact">Who signs off on safety</label>
+                <input id="safetyContact" type="text" placeholder="Edward Rowe">
+              </div>
+              <div class="f">
+                <label for="safetyTitle">Title</label>
+                <input id="safetyTitle" type="text" placeholder="Owner">
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>The driver</legend>
+            <div class="grid">
+              <div class="f wide">
+                <label for="driverName">Full name</label>
+                <input id="driverName" type="text" placeholder="Marcus T. Alvarez">
+              </div>
+              <div class="f">
+                <label for="driverDob">Date of birth</label>
+                <input id="driverDob" type="date">
+              </div>
+              <div class="f">
+                <label for="hireDate">Date of hire</label>
+                <input id="hireDate" type="date">
+                <span class="hint">Sets your 30-day investigation deadline</span>
+              </div>
+              <div class="f">
+                <label for="licState">License state</label>
+                <input id="licState" type="text" maxlength="2" placeholder="WA" style="text-transform:uppercase">
+              </div>
+              <div class="f">
+                <label for="licNum">License number</label>
+                <input id="licNum" type="text" placeholder="ALVARMT881QK">
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Which rules apply</legend>
+
+            <div class="f wide" style="margin-bottom:14px">
+              <label for="segCdl">Will this driver operate a vehicle that requires a CDL?</label>
+              <div class="seg" id="segCdl" role="group" aria-label="CDL-required operation">
+                <button type="button" data-k="cdl" data-v="1" aria-pressed="true">CDL required</button>
+                <button type="button" data-k="cdl" data-v="0" aria-pressed="false">CDL not required</button>
+              </div>
+              <span class="hint" id="cdlHint"></span>
+            </div>
+
+            <div class="f wide" style="margin-bottom:14px">
+              <label for="segHasCdl">Does the driver have a valid CDL covering the assigned vehicle?</label>
+              <div class="seg" id="segHasCdl" role="group" aria-label="CDL available as road-test equivalent">
+                <button type="button" data-k="hasCdl" data-v="1" aria-pressed="true">Yes</button>
+                <button type="button" data-k="hasCdl" data-v="0" aria-pressed="false">No</button>
+              </div>
+              <span class="hint" id="roadTestHint"></span>
+            </div>
+
+            <div class="qnote" id="roadTestNote" style="margin-bottom:14px">
+              <strong>What “road-test certificate or equivalent” means.</strong>
+              For most drivers assigned a standard vehicle covered by their valid CDL, a legible copy of the CDL is the equivalent. The carrier does not have to give another road test. An actual employer road test is needed when there is no acceptable equivalent, or when the assignment involves the double/triple-trailer or tank-vehicle endorsement exceptions. A valid employer road-test certificate issued within the previous three years may also be accepted.
+            </div>
+
+            <div class="f wide" style="margin-bottom:14px">
+              <label for="segPrior">DOT-regulated employers in the past 3 years?</label>
+              <div class="seg" id="segPrior" role="group" aria-label="Previous employers">
+                <button type="button" data-k="priorEmployers" data-v="yes" aria-pressed="true">Yes</button>
+                <button type="button" data-k="priorEmployers" data-v="no" aria-pressed="false">None</button>
+              </div>
+              <span class="hint">If none, you document that no investigation was possible rather than sending requests.</span>
+            </div>
+
+            <div class="toggles">
+              <label class="tog">
+                <input type="checkbox" id="endDoubles">
+                <span>Will pull double or triple trailers
+                  <em>A CDL stops substituting for the road test</em></span>
+              </label>
+              <label class="tog">
+                <input type="checkbox" id="endTank">
+                <span>Will operate a tank vehicle
+                  <em>Same carve-out &mdash; an actual road test is required</em></span>
+              </label>
+              <label class="tog">
+                <input type="checkbox" id="selfEmployed">
+                <span>This driver is also the motor carrier
+                  <em>Owner-operator running under their own authority</em></span>
+              </label>
+              <label class="tog">
+                <input type="checkbox" id="medicalVariance">
+                <span>The driver has a medical variance, SPE certificate, or exemption
+                  <em>The current document must be attached; this builder cannot issue it</em></span>
+              </label>
+              <label class="tog">
+                <input type="checkbox" id="lcv">
+                <span>The driver will operate an LCV covered by Part 380
+                  <em>Attach the provider-issued training or grandfathering certificate</em></span>
+              </label>
+            </div>
+          </fieldset>
+        </form>
+      </div>
+
+      <!-- ============ LIVE PACKET ============ -->
+      <div class="panel packet">
+        <h3>Your packet</h3>
+        <ol id="packetlist"></ol>
+        <div class="tally">
+          <span>Documents</span>
+          <b id="tally">0</b>
+        </div>
+
+        <button class="buildbtn" id="buildbtn" type="button">Build my packet</button>
+        <p class="privacy">Everything is generated in your browser. The company information and driver information entered here are not sent to We Heart Paperwork.</p>
+
+        <div class="result" id="result">
+          <div class="ready" id="readyline">Your packet is ready</div>
+          <div class="ready-sub" id="readysub"></div>
+          <button class="dlbtn" id="downloadbtn" type="button">Download the packet</button>
+          <div class="rmsg" id="rmsg" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ WHAT'S IN IT ============ -->
+  <section id="whats-inside">
+    <div class="sec-head"><h2>What the file has to contain</h2></div>
+    <p class="lede">49 CFR 391.51(b) is the list. The trap is retention: three of these items stay in the file for as long as the driver works for you plus three years, and the rest can be purged three years after each one is executed. Mixing those up is how files get thin in the wrong places.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Section</th><th>Document</th><th>Retention</th></tr></thead>
+        <tbody>
+          <tr><td class="num">391.51(b)(1)</td><td>Application for employment</td><td>Employment + 3 years</td></tr>
+          <tr><td class="num">391.51(b)(2)</td><td>Pre-employment MVR from each licensing authority</td><td>Employment + 3 years</td></tr>
+          <tr><td class="num">391.51(b)(3)</td><td>Road test certificate, or the CDL accepted in its place</td><td>Employment + 3 years</td></tr>
+          <tr><td class="num">391.51(b)(4)</td><td>Annual MVR</td><td>3 years from execution</td></tr>
+          <tr><td class="num">391.51(b)(5)</td><td>Note of the annual review of driving record</td><td>3 years from execution</td></tr>
+          <tr><td class="num">391.51(b)(6)</td><td>Medical certification &mdash; the paper certificate for non-CDL drivers, the CDLIS motor vehicle record for CDL holders</td><td>3 years from execution</td></tr>
+          <tr><td class="num">391.51(b)(7)</td><td>Medical variance, SPE certificate or exemption, if any</td><td>3 years from execution</td></tr>
+          <tr><td class="num">391.51(b)(8)</td><td>National Registry verification note &mdash; non-CDL drivers only</td><td>3 years from execution</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="qnote" style="margin-top:20px">
+      <strong>One thing to delete from your checklist.</strong> 49 CFR 391.27, the driver's annual certificate of violations, was removed effective May 9, 2022. It is not required, this builder does not generate it, and a compliance checklist that still lists it has not been updated in four years. Several of the big compliance vendors' public pages still show it.
+    </div>
+  </section>
+
+  <!-- ============ CLEARINGHOUSE ============ -->
+  <section id="not-paperwork">
+    <div class="sec-head">
+      <h2>What paperwork cannot fix</h2>
+      <span class="count">CDL-required operations</span>
+    </div>
+    <p class="lede">A complete packet will not perform the required Clearinghouse queries or drug test. These are separate actions for drivers subject to Part 382.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>No pre-employment Clearinghouse query</h3>
+        <p>&sect;382.701(a). A full query, with the driver's specific electronic consent given inside the Clearinghouse, is required before they perform any safety-sensitive function.</p>
+      </div>
+      <div class="card">
+        <h3>No annual Clearinghouse query</h3>
+        <p>&sect;382.701(b)(1). Query at least once every twelve months for every driver subject to Part 382 testing. A limited query may be used with general written consent.</p>
+      </div>
+      <div class="card">
+        <h3>Carrier not registered in the Clearinghouse</h3>
+        <p>&sect;382.711(b). The employer must be registered in the Clearinghouse to perform its required actions.</p>
+      </div>
+      <div class="card">
+        <h3>Driver used before the pre-employment result</h3>
+        <p>&sect;382.301(a). The employer must receive the verified negative pre-employment controlled-substances result before the driver first performs a safety-sensitive function.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MED CERT ============ -->
+  <section id="med-cert">
+    <div class="sec-head">
+      <h2>Medical certification is mid-transition</h2>
+      <span class="count">CDL drivers only</span>
+    </div>
+    <p class="lede">This is the change most likely to be sitting wrong in a file right now, because the instruction that was correct for years stopped being correct in June 2025.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3>Non-CDL interstate drivers &mdash; unchanged</h3>
+        <p>The examiner issues a paper certificate, Form MCSA-5876. You keep a legible copy in the file under &sect;391.51(b)(6)(i), plus a note verifying the examiner is on the National Registry under &sect;391.23(m)(1). Both are in your packet.</p>
+      </div>
+      <div class="card">
+        <h3>CDL and CLP holders &mdash; changed</h3>
+        <p>Since June 23, 2025 the examiner transmits results electronically to FMCSA, which passes certification status to the state. No paper card is issued. You document medical certification by pulling the CDLIS motor vehicle record, &sect;391.51(b)(6)(ii). The National Registry note is no longer required for these drivers.</p>
+      </div>
+    </div>
+    <div class="qnote" style="margin-top:14px">
+      <strong>Why you may still be seeing paper.</strong> States were slow to implement, so FMCSA has granted a series of temporary exemptions letting carriers rely on a paper certificate. The current one runs through <strong>October 11, 2026</strong> and allows a paper card for up to 60 days from issuance. FMCSA has said it does not anticipate another nationwide exemption &mdash; though it has said similar before and extended anyway, three times now. Until it settles, do both: pull the CDLIS MVR, and keep any paper card the driver still has.
+    </div>
+  </section>
+
+  <!-- ============ BRIDGE ============ -->
+  <div class="bridge">
+    <span class="eyebrow">After the packet</span>
+    <h2>Some records are initial. The recurring ones still need a clock.</h2>
+    <p>The application, road-test record, and previous-employer investigation are generally initial tasks. But the motor vehicle record, driver's license, and medical qualification require continuing attention. For drivers subject to Part 382, the Clearinghouse query repeats annually too.</p>
+    <p>We Heart Paperwork tracks the dates that apply to each driver and tells you before they hit.</p>
+    <div class="price">$2<small> /month for the company, plus $1 per active driver</small></div>
+    <ul>
+      <li>Motor vehicle record and annual review, every 12 months</li>
+      <li>Clearinghouse query every 12 months when Part 382 applies</li>
+      <li>Driver's license expiration</li>
+      <li>Medical certification, up to 24 months</li>
+    </ul>
+    <div class="contact">
+      <a class="btn" href="/pricing">See pricing &mdash; starts at $3/mo</a>
+      <a class="btn ghost" href="/tools/new-entrant-audit/">The new entrant audit tool</a>
+    </div>
+  </div>
+
+  <footer>
+    <p><strong>About this builder.</strong> The generated documents were reviewed against 49 CFR Parts 382 and 391 as in effect August 2026, including the removal of &sect;391.27 effective May 9, 2022 and the medical-certification changes effective June 23, 2025.</p>
+    <p><a href="https://csa.fmcsa.dot.gov/SafetyPlanner/GetFile.aspx?d=44" target="_blank" rel="noopener">FMCSA Driver Qualification File Checklist</a> &middot; <a href="https://www.ecfr.gov/current/title-49/subtitle-B/chapter-III/subchapter-B/part-391" target="_blank" rel="noopener">Current 49 CFR Part 391</a></p>
+    <p>Compliance with 49 CFR Part 391 is the sole responsibility of the motor carrier. These templates are a drafting aid. They are not a determination that a driver qualification file is complete or compliant, they are not legal advice, and they are not approved or endorsed by FMCSA. Multiple-employer drivers, specialized passenger operations, intrastate rules, waivers, and other exceptions can change what belongs in a file. Verify current requirements at ecfr.gov before use.</p>
+    <p>&copy; We Heart Paperwork &middot; <a href="/">weheartpaperwork.com</a> &middot; <a href="mailto:aaron@weheartpaperwork.com">aaron@weheartpaperwork.com</a></p>
+  </footer>
+</div>
+<script src="pdf-lib.min.js"></script>
+<script src="dq-docs.js"></script>
+<script>
+/* ================= DQ builder — page controller ================= */
+(function(){
+"use strict";
+
+var state = { cdl: true, hasCdl: true, priorEmployers: "yes", endDoubles: false, endTank: false, selfEmployed: false, medicalVariance: false, lcv: false };
+var packetBytes = null, packetName = "";
+
+var $ = function(id){ return document.getElementById(id); };
+var TEXT_IDS = ["carrierName","dot","carrierPhone","carrierAddress","safetyContact","safetyTitle",
+                "driverName","driverDob","hireDate","licState","licNum"];
+
+/* ---------- collect ---------- */
+function collect(){
+  var d = {};
+  TEXT_IDS.forEach(function(k){ d[k] = $(k).value.trim(); });
+  d.licState = d.licState.toUpperCase();
+  d.cdl = state.cdl;
+  d.hasCdl = state.hasCdl;
+  d.priorEmployers = state.priorEmployers;
+  d.endDoubles = state.endDoubles;
+  d.endTank = state.endTank;
+  d.selfEmployed = state.selfEmployed;
+  d.medicalVariance = state.medicalVariance;
+  d.lcv = state.lcv;
+  return d;
+}
+
+/* ---------- live packet list ---------- */
+var lastKeys = "";
+function render(){
+  var d = window.DQ.derive(collect());
+  var plan = window.DQ.plan(d);
+  var keys = plan.map(function(p){ return p.key; }).join(",");
+  var listEl = $("packetlist");
+
+  if (keys !== lastKeys) {
+    var prev = lastKeys.split(",");
+    listEl.innerHTML = "";
+    plan.forEach(function(p, i){
+      var li = document.createElement("li");
+      if (lastKeys && prev.indexOf(p.key) === -1) li.className = "added";
+      li.innerHTML = '<span class="n">' + String(i + 1).padStart(2, "0") + '</span>' +
+                     '<span><span class="t">' + p.label + '</span>' +
+                     '<span class="w">' + p.why + '</span></span>';
+      listEl.appendChild(li);
+    });
+    lastKeys = keys;
+  }
+  $("tally").textContent = plan.length;
+
+  $("cdlHint").textContent = state.cdl
+    ? "Part 382 drug-and-alcohol and Clearinghouse requirements apply. Medical certification is documented through the CDLIS motor vehicle record."
+    : "Part 382 and Clearinghouse documents are not added solely for this assignment. The paper medical certificate and National Registry verification note belong in the file.";
+  $("roadTestHint").textContent = state.cdl && !state.hasCdl
+    ? "A carrier road test cannot replace a legally required CDL. The driver cannot operate this vehicle until properly licensed."
+    : state.hasCdl && !state.endDoubles && !state.endTank
+      ? "Keep a legible copy of the CDL as the road-test equivalent. No new employer road test is normally required."
+      : "Complete the employer road test and keep both the signed rating form and the road-test certificate.";
+}
+
+/* ---------- wiring ---------- */
+TEXT_IDS.forEach(function(k){ $(k).addEventListener("input", render); });
+
+Array.prototype.forEach.call(document.querySelectorAll(".seg button"), function(b){
+  b.addEventListener("click", function(){
+    var k = b.dataset.k, v = b.dataset.v;
+    state[k] = (k === "cdl" || k === "hasCdl") ? (v === "1") : v;
+    Array.prototype.forEach.call(b.parentNode.children, function(sib){
+      sib.setAttribute("aria-pressed", sib === b ? "true" : "false");
+    });
+    render();
+  });
+});
+
+["endDoubles","endTank","selfEmployed","medicalVariance","lcv"].forEach(function(k){
+  $(k).addEventListener("change", function(){ state[k] = $(k).checked; render(); });
+});
+
+render();
+
+/* ---------- build ---------- */
+function slug(s){
+  return (s || "driver").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+}
+
+$("buildbtn").addEventListener("click", function(){
+  var d = collect();
+  if (!d.driverName) { $("driverName").focus(); flash("Add the driver's name first — it goes on every document."); return; }
+  if (!d.carrierName) { $("carrierName").focus(); flash("Add the company name — it goes on every document."); return; }
+
+  var btn = $("buildbtn");
+  btn.disabled = true; btn.textContent = "Building…";
+
+  window.DQ.buildPacket(d).then(function(r){
+    packetBytes = r.bytes;
+    packetName = "dq-file-" + slug(d.driverName) + ".pdf";
+    var pages = r.pages;
+    $("readysub").textContent = r.plan.length + " documents, " + pages + " pages, built for " +
+      d.driverName + ". Review the packet, then download it.";
+    $("result").classList.add("show");
+    btn.textContent = "Rebuild with my changes";
+    btn.disabled = false;
+    $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }).catch(function(e){
+    btn.disabled = false; btn.textContent = "Build my packet";
+    flash("The packet did not build. Email aaron@weheartpaperwork.com and I'll send it over.");
+    if (window.console) console.error(e);
+  });
+});
+
+function flash(msg, kind){
+  var el = $("rmsg");
+  el.className = "rmsg show " + (kind || "err");
+  el.textContent = msg;
+  $("result").classList.add("show");
+}
+
+function download(){
+  if (!packetBytes) return;
+  var blob = new Blob([packetBytes], { type: "application/pdf" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = packetName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+}
+
+$("downloadbtn").addEventListener("click", function(){
+  download();
+  if (window.gtag) window.gtag("event", "generate_document", { event_category: "free_tool", event_label: "dq-file-builder" });
+});
+
+})();
+</script>
+
+</html>

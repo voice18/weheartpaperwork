@@ -1,0 +1,1695 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vehicle Maintenance File Builder: 49 CFR Part 396 Records | We Heart Paperwork</title>
+<meta name="description" content="Free DOT vehicle maintenance file builder. Create an identity sheet, preventive-maintenance schedule, repair log, annual-inspection history, and printable fleet file in your browser.">
+<link rel="canonical" href="https://weheartpaperwork.com/tools/vehicle-maintenance-file/">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<meta name="theme-color" content="#F1F3F1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111518" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="article"><meta property="og:site_name" content="We Heart Paperwork">
+<meta property="og:url" content="https://weheartpaperwork.com/tools/vehicle-maintenance-file/">
+<meta property="og:title" content="The Vehicle Maintenance File Builder — every controlled unit, organized">
+<meta property="og:description" content="Build the vehicle identity, maintenance schedule, repair history, and annual-inspection record your fleet file needs.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Vehicle Maintenance File Builder","url":"https://weheartpaperwork.com/tools/vehicle-maintenance-file/","applicationCategory":"BusinessApplication","operatingSystem":"Any","description":"Builds printable vehicle inspection, repair, and maintenance records for motor carriers under 49 CFR Part 396.","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"publisher":{"@type":"Organization","name":"We Heart Paperwork","url":"https://weheartpaperwork.com"}}</script>
+<style>
+/* ============================================================================
+   DOT VEHICLE MAINTENANCE FILE BUILDER
+   Single-file tool. No dependencies, no network calls, no storage APIs.
+   PDF output is produced by the browser's own print engine (@page + print CSS),
+   which yields selectable text, exact US Letter geometry, and no library weight.
+
+   INTEGRATION NOTES
+   - Drop this file anywhere on the site. Nothing outside it is referenced.
+   - To namespace styles for an existing layout, wrap the app markup and prefix
+     the screen rules; the @media print block must stay at document level.
+   - Persistence is deliberately export/import only (see note at bottom of JS).
+   ========================================================================= */
+
+:root{
+  --ink:#14181B;
+  --ink-2:#4E5A60;
+  --ink-3:#78868D;
+  --rule:#D6DBD8;
+  --rule-2:#E9ECEA;
+  --bg:#F1F3F1;
+  --panel:#ffffff;
+  --accent:#A85F06;
+  --accent-2:#A85F06;
+  --accent-soft:#F5E7CF;
+  --warn:#8A5A00;
+  --warn-soft:#FFF4DD;
+  --ok:#1C6647;
+  --ok-soft:#DCEBE2;
+  --radius:4px;
+  --shadow:0 1px 2px rgba(20,24,27,.06),0 6px 20px -12px rgba(20,24,27,.22);
+  --display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --sans:"IBM Plex Sans","Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+
+@media (prefers-color-scheme:dark){:root{
+  --ink:#E7EBE8;--ink-2:#A7B2B7;--ink-3:#7E8B91;--rule:#2B3439;--rule-2:#222A2F;
+  --bg:#111518;--panel:#191F23;--accent:#EBA33C;--accent-2:#EBA33C;--accent-soft:#3A2C14;
+  --warn-soft:#3A2C14;--ok:#57C495;--ok-soft:#153328;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px -14px rgba(0,0,0,.7);
+}}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--sans);
+  color:var(--ink);
+  background:var(--bg);
+  font-size:15px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ---------------------------------------------------------------- app bar */
+.appbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:10px max(20px,calc((100vw - 1180px)/2));
+  background:var(--bg);color:var(--ink);border-bottom:1px solid var(--rule);
+}
+.appbar h1{
+  margin:0;font-size:16px;font-weight:650;letter-spacing:.01em;
+  display:flex;align-items:baseline;gap:10px;
+}
+.appbar h1 small{font-family:var(--mono);font-weight:500;font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.appbar .spacer{flex:1}
+.appbar .actions{display:flex;gap:8px;flex-wrap:wrap}
+
+button{font-family:inherit;font-size:13px;cursor:pointer}
+.btn{
+  border:1px solid transparent;border-radius:var(--radius);
+  padding:7px 13px;font-weight:550;line-height:1.2;
+  background:#fff;color:var(--accent);
+  transition:background .12s,border-color .12s,color .12s;
+  white-space:nowrap;
+}
+.btn:hover{background:#eef3f7}
+.btn-ghost{background:transparent;color:var(--ink-2);border-color:var(--rule)}
+.btn-ghost:hover{background:var(--panel);color:var(--ink)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-sm{padding:4px 9px;font-size:12px}
+.btn-quiet{background:transparent;color:var(--ink-2);border-color:var(--rule)}
+.btn-quiet:hover{background:#fff;color:var(--ink)}
+.btn-danger{background:transparent;color:#9a2b2b;border-color:#e3c4c4}
+.btn-danger:hover{background:#fbeeee}
+
+/* ----------------------------------------------------------------- layout */
+.mast{max-width:1180px;margin:0 auto;padding:34px 20px 22px;border-bottom:2px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-bottom:14px}
+.mast h1{font-family:var(--display);font-size:clamp(34px,6vw,58px);line-height:1.02;letter-spacing:-.02em;margin:0}
+.mast h1 span{font-weight:500;color:var(--ink-2)}
+.dek{max-width:67ch;color:var(--ink-2);font-size:17px;margin:16px 0 18px}
+.mast-meta{display:flex;gap:8px;flex-wrap:wrap}
+.mast-tag{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--rule);padding:4px 9px;border-radius:2px;color:var(--ink-2)}
+.layout{display:grid;grid-template-columns:298px minmax(0,1fr);gap:0;align-items:start;max-width:1180px;margin:0 auto}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+
+.sidebar{
+  background:var(--panel);
+  border-right:1px solid var(--rule);
+  min-height:calc(100vh - 57px);
+  padding:18px 16px 40px;
+}
+.editor{padding:22px 26px 80px;max-width:1080px}
+
+.sec-label{
+  font-size:11px;text-transform:uppercase;letter-spacing:.09em;
+  color:var(--ink-3);font-weight:650;margin:0 0 9px;
+}
+
+/* ------------------------------------------------------------- unit list */
+.unitlist{list-style:none;margin:0 0 12px;padding:0}
+.unitlist li{margin-bottom:4px}
+.unit-btn{
+  width:100%;text-align:left;border:1px solid var(--rule);border-radius:var(--radius);
+  background:#fff;padding:8px 10px;display:flex;align-items:center;gap:9px;
+}
+.unit-btn:hover{border-color:var(--accent-2)}
+.unit-btn.active{background:var(--accent-soft);border-color:var(--accent-2)}
+.unit-btn .num{font-weight:650;font-size:13px;color:var(--ink)}
+.unit-btn .meta{font-size:11px;color:var(--ink-3);margin-top:1px}
+.unit-btn .grow{flex:1;min-width:0}
+.unit-btn .grow>div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{
+  font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:650;
+  padding:2px 6px;border-radius:3px;background:var(--rule-2);color:var(--ink-2);
+}
+.tag.power{background:#e4edf4;color:#1a5f92}
+.tag.trailer{background:#eceae2;color:#6b5d33}
+.tag.bus{background:#eae4f0;color:#5c3d78}
+.empty-note{font-size:12.5px;color:var(--ink-3);padding:10px 2px 14px;line-height:1.5}
+
+/* ---------------------------------------------------------------- fields */
+.card{
+  background:var(--panel);border:1px solid var(--rule);border-radius:var(--radius);
+  padding:18px 20px 20px;margin-bottom:18px;box-shadow:var(--shadow);
+}
+.card>h2{
+  margin:0 0 3px;font-size:14px;font-weight:650;letter-spacing:.005em;
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+}
+.cite{
+  font-size:11px;font-weight:600;color:var(--accent-2);
+  background:var(--accent-soft);padding:2px 7px;border-radius:3px;letter-spacing:.01em;
+}
+.card>.hint{margin:0 0 15px;font-size:12.5px;color:var(--ink-3);line-height:1.5}
+
+.grid{display:grid;gap:12px 14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g4{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:760px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}
+@media (max-width:460px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.span2{grid-column:span 2}
+@media (max-width:460px){.span2{grid-column:span 1}}
+
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:11.5px;font-weight:600;color:var(--ink-2);letter-spacing:.01em}
+.field .sub{font-size:11px;color:var(--ink-3);font-weight:400}
+input[type=text],input[type=date],input[type=number],select,textarea{
+  font-family:inherit;font-size:13.5px;color:var(--ink);
+  border:1px solid var(--rule);border-radius:5px;padding:7px 9px;background:#fff;
+  width:100%;min-width:0;
+}
+input:focus,select:focus,textarea:focus{
+  outline:none;border-color:var(--accent-2);box-shadow:0 0 0 3px rgba(26,95,146,.13);
+}
+textarea{resize:vertical;min-height:62px;line-height:1.45}
+input:disabled{background:#f6f7f8;color:var(--ink-3)}
+
+.checkrow{display:flex;align-items:flex-start;gap:9px;padding:5px 0;font-size:13px}
+.checkrow input{margin-top:3px;flex:none}
+.checkrow span{color:var(--ink-2)}
+
+/* -------------------------------------------------------- editable tables */
+.tbl-wrap{overflow-x:auto;margin:0 -4px}
+table.edit{border-collapse:collapse;width:100%;font-size:12.5px;min-width:640px}
+table.edit th{
+  text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--ink-3);font-weight:650;padding:6px 6px;border-bottom:1px solid var(--rule);
+  white-space:nowrap;
+}
+table.edit td{padding:3px 4px;border-bottom:1px solid var(--rule-2);vertical-align:middle}
+table.edit input,table.edit select{padding:5px 7px;font-size:12.5px;border-color:var(--rule-2)}
+table.edit tr:hover td{background:#fbfcfd}
+.rowdel{
+  border:none;background:transparent;color:var(--ink-3);font-size:16px;line-height:1;
+  padding:2px 6px;border-radius:4px;
+}
+.rowdel:hover{background:#fbeeee;color:#9a2b2b}
+.due-cell{font-size:12px;color:var(--ink-2);white-space:nowrap}
+.due-cell.over{color:#9a2b2b;font-weight:650}
+.due-cell.soon{color:var(--warn);font-weight:600}
+.tbl-actions{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap;align-items:center}
+
+.callout{
+  border-left:3px solid var(--accent-2);background:var(--accent-soft);
+  padding:11px 14px;border-radius:0 5px 5px 0;font-size:12.5px;color:var(--ink-2);
+  line-height:1.55;margin:0 0 16px;
+}
+.callout strong{color:var(--ink)}
+.callout.warn{border-left-color:#c07a2e;background:var(--warn-soft)}
+
+.file-note{font-size:12px;color:var(--ink-3);line-height:1.6;margin-top:26px;border-top:1px solid var(--rule);padding-top:16px}
+.file-note a{color:var(--accent-2)}
+
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+  background:var(--ink);color:#fff;padding:10px 18px;border-radius:6px;font-size:13px;
+  opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:80;
+  box-shadow:0 4px 14px rgba(0,0,0,.22);max-width:min(90vw,460px);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* =========================================================================
+   PRINTED DOCUMENT
+   Sheets are built into #print-root. On screen they are hidden unless the
+   preview overlay is open; on print everything except #print-root is hidden.
+   ====================================================================== */
+#print-root{display:none}
+
+.sheet{
+  width:7.5in;              /* 8.5in Letter less 0.5in margins each side */
+  min-height:10in;
+  background:#fff;
+  color:#000;
+  font-family:var(--sans);
+  font-size:9.5pt;
+  line-height:1.32;
+  display:flex;flex-direction:column;
+  padding:0;
+}
+.sheet-head{
+  display:flex;justify-content:space-between;align-items:flex-end;gap:14px;
+  border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:9px;
+}
+.sheet-head .carrier{font-size:12pt;font-weight:700;line-height:1.15}
+.sheet-head .carrier .sub{font-size:8pt;font-weight:400;margin-top:2px;letter-spacing:.02em}
+.sheet-head .doc{text-align:right;font-size:8pt;line-height:1.35;white-space:nowrap}
+.sheet-head .doc .t{font-size:10.5pt;font-weight:700;letter-spacing:.02em;text-transform:uppercase}
+.sheet-body{flex:1}
+/* The identity sheet has room to spare once its blocks are paired into two
+   columns, so the notes box grows to take it and the signature strip settles
+   at the foot of the page instead of floating mid-sheet. */
+.sheet-body.fill{display:flex;flex-direction:column}
+.sheet-body.fill .grow{flex:1;display:flex;flex-direction:column}
+.sheet-body.fill .grow>div:last-child{flex:1}
+.sheet-foot{
+  border-top:1px solid #999;margin-top:9px;padding-top:4px;
+  display:flex;justify-content:space-between;gap:12px;
+  font-size:7pt;color:#333;line-height:1.35;
+}
+
+.doc-title{
+  font-size:11pt;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  margin:0 0 3px;
+}
+.doc-sub{font-size:8pt;color:#333;margin:0 0 10px;line-height:1.4}
+
+.blk{margin-bottom:11px;break-inside:avoid}
+.blk-h{
+  font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  background:#e9edf1;border:1px solid #000;border-bottom:none;padding:3px 6px;
+}
+.blk-h .c{float:right;font-weight:600;letter-spacing:.02em;text-transform:none;font-size:7.5pt}
+
+table.doc{border-collapse:collapse;width:100%;font-size:9pt}
+table.doc th,table.doc td{border:1px solid #000;padding:0}
+.kv{display:flex;min-height:.29in}
+.kv .k{
+  width:1.45in;flex:none;background:#f4f6f8;border-right:1px solid #000;
+  padding:3px 6px;font-size:7.5pt;font-weight:650;text-transform:uppercase;
+  letter-spacing:.04em;color:#111;display:flex;align-items:center;line-height:1.2;
+}
+.kv .v{flex:1;padding:3px 7px;display:flex;align-items:center;font-size:9.5pt;min-width:0;word-break:break-word}
+
+/* The identity sheet pairs its blocks into two columns. One column of 22
+   key/value rows overruns Letter as soon as a unit is leased and has notes;
+   two columns of eleven leave room for the notes and signature strip. */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 11px;align-items:start}
+.two-col .kv{min-height:.27in}
+.two-col .kv .k{width:1.12in;font-size:6.8pt;letter-spacing:.03em}
+.two-col .kv .v{font-size:8.5pt}
+.two-col .kv .v.mono{font-size:8pt}
+.kv .v.mono{font-family:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;font-size:9pt;letter-spacing:.04em}
+
+table.grid-doc{border-collapse:collapse;width:100%;border:1px solid #000}
+table.grid-doc th{
+  background:#e9edf1;border:1px solid #000;padding:4px 5px;
+  font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  text-align:left;line-height:1.25;
+}
+table.grid-doc td{
+  border:1px solid #000;padding:4px 5px;font-size:8.5pt;vertical-align:top;
+  line-height:1.3;
+}
+table.grid-doc td.blank{height:.31in}
+table.grid-doc tr.zebra td{background:#fafbfc}
+.nowrap{white-space:nowrap}
+.ctr{text-align:center}
+.rt{text-align:right}
+.tiny{font-size:7pt;color:#333}
+.strike-note{font-size:7.5pt;color:#333;margin-top:4px;line-height:1.4}
+
+.sig-row{display:flex;gap:16px;margin-top:14px}
+.sig{flex:1;border-top:1px solid #000;padding-top:3px;font-size:7pt;text-transform:uppercase;letter-spacing:.05em;color:#333}
+
+.chk{display:inline-block;width:9pt;height:9pt;border:1px solid #000;vertical-align:-1px}
+
+.label-sheet{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.flabel{
+  border:1px dashed #999;padding:7px 9px;height:.85in;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.flabel .l1{font-size:12pt;font-weight:700;line-height:1.1}
+.flabel .l2{font-size:7.5pt;margin-top:2px;color:#222}
+.flabel .l3{font-size:6.5pt;margin-top:1px;color:#444;letter-spacing:.03em}
+
+/* ------------------------------------------------------- preview overlay */
+.preview{
+  position:fixed;inset:0;background:rgba(22,25,29,.62);z-index:60;
+  display:none;flex-direction:column;
+}
+.preview.open{display:flex}
+.preview-bar{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:10px 18px;background:var(--ink);color:#fff;font-size:13px;
+}
+.preview-bar .spacer{flex:1}
+.preview-scroll{flex:1;overflow:auto;padding:26px 18px 60px;-webkit-overflow-scrolling:touch}
+.preview-scroll .sheet{
+  margin:0 auto 22px;box-shadow:0 3px 16px rgba(0,0,0,.3);
+  padding:.5in;min-height:10in;
+}
+@media (max-width:860px){
+  .preview-scroll{padding:16px 8px 60px}
+  .preview-scroll .sheet{transform-origin:top center}
+}
+
+@media print{
+  html,body{background:#fff !important;margin:0 !important;padding:0 !important}
+  body>*{display:none !important}
+  #print-root{display:block !important}
+  .preview{display:none !important}
+  .sheet{
+    width:100% !important;
+    box-shadow:none !important;margin:0 !important;padding:0 !important;
+    page-break-after:always;break-after:page;
+    /* min-height, not height: the flex column still drops the footer to the
+       foot of a normal page, but a log row with an unusually long description
+       makes the sheet taller and flows onto another physical page instead of
+       being clipped at the fold. 9.9in leaves 0.1in of slack against the
+       10in printable area so rounding never yields a stray blank page. */
+    min-height:9.9in !important;
+  }
+  .sheet:last-child{page-break-after:auto;break-after:auto}
+  table.grid-doc{page-break-inside:auto}
+  tr{page-break-inside:avoid}
+}
+@page{size:Letter;margin:.5in}
+</style>
+</head>
+<body>
+
+<header class="appbar">
+  <h1>We Heart Paperwork <small>Free fleet tool</small></h1>
+  <div class="spacer"></div>
+  <div class="actions">
+    <button class="btn btn-ghost" id="btn-import">Load file</button>
+    <button class="btn btn-ghost" id="btn-export">Save file</button>
+    <button class="btn btn-ghost" id="btn-preview">Preview</button>
+    <button class="btn btn-primary" id="btn-print-unit">PDF — this unit</button>
+    <button class="btn btn-primary" id="btn-print-all">PDF — whole fleet</button>
+  </div>
+</header>
+
+<section class="mast">
+  <div class="eyebrow">Built by a trucking company · shared with yours</div>
+  <h1>The Vehicle Maintenance <span>File Builder</span></h1>
+  <p class="dek">Build a clean maintenance file for every truck and trailer you control. Set the service schedule, record completed work, organize annual inspections, and print one unit or the whole fleet.</p>
+  <div class="mast-meta">
+    <span class="mast-tag">49 CFR Part 396</span>
+    <span class="mast-tag">Built in your browser</span>
+    <span class="mast-tag">No signup</span>
+    <span class="mast-tag">Free PDF</span>
+  </div>
+</section>
+
+<div class="layout">
+  <aside class="sidebar">
+    <p class="sec-label">Carrier</p>
+    <div class="grid" style="gap:9px" id="carrier-fields"></div>
+
+    <p class="sec-label" style="margin-top:22px">Units <span id="unit-count" style="color:var(--ink-3);font-weight:500"></span></p>
+    <ul class="unitlist" id="unit-list"></ul>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn btn-quiet btn-sm" data-add="tractor">+ Power unit</button>
+      <button class="btn btn-quiet btn-sm" data-add="trailer">+ Trailer</button>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn btn-quiet btn-sm" id="btn-csv">Import CSV</button>
+      <button class="btn btn-quiet btn-sm" id="btn-csv-tpl">CSV template</button>
+    </div>
+
+    <p class="file-note">
+      Everything you type stays in this browser. Nothing is uploaded, and nothing is saved
+      automatically — use <strong>Save file</strong> to keep a copy of your fleet and
+      <strong>Load file</strong> to pick it back up.
+    </p>
+  </aside>
+
+  <main class="editor" id="editor"></main>
+</div>
+
+<div class="preview" id="preview">
+  <div class="preview-bar">
+    <strong id="preview-title">Preview</strong>
+    <span id="preview-pages" style="opacity:.7"></span>
+    <div class="spacer"></div>
+    <button class="btn btn-ghost btn-sm" id="preview-print">Save as PDF</button>
+    <button class="btn btn-ghost btn-sm" id="preview-close">Close</button>
+  </div>
+  <div class="preview-scroll" id="preview-scroll"></div>
+</div>
+
+<div id="print-root"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="file-json" accept="application/json,.json" hidden>
+<input type="file" id="file-csv" accept=".csv,text/csv" hidden>
+
+<script>
+"use strict";
+/* =========================================================================
+   1. CONSTANTS
+   ====================================================================== */
+
+var UNIT_TYPES = [
+  {v:"tractor",  l:"Truck tractor",       cls:"power"},
+  {v:"straight", l:"Straight truck",      cls:"power"},
+  {v:"trailer",  l:"Semitrailer",         cls:"trailer"},
+  {v:"fulltrl",  l:"Full trailer / pup",  cls:"trailer"},
+  {v:"bus",      l:"Bus / passenger CMV", cls:"bus"},
+  {v:"other",    l:"Other CMV",           cls:"power"}
+];
+
+var POWER_TYPES = {tractor:1, straight:1, bus:1, other:1};
+
+/* Preventive-maintenance templates. Intervals are defaults a carrier is
+   expected to edit — 396.3(b)(2) requires a means to show the nature and due
+   date of each operation, not any particular interval. */
+var PM_POWER = [
+  ["PM-A — lube, oil and filter change", 15000, 6],
+  ["PM-B — A service plus fuel filters, air filter, chassis lube", 30000, 12],
+  ["PM-C — B service plus transmission and differential service", 100000, 24],
+  ["Annual (periodic) inspection — 49 CFR 396.17, App. A", 0, 12],
+  ["Brake inspection, lining measurement and adjustment", 15000, 3],
+  ["Tire inspection, pressure check and rotation", 15000, 3],
+  ["Steering and suspension inspection", 30000, 6],
+  ["Wheel-end / hub oil and seal check", 30000, 6],
+  ["Fifth wheel inspection, lube and mounting check", 30000, 3],
+  ["Air dryer cartridge replacement", 0, 12],
+  ["Coolant test and supplemental additive check", 0, 6],
+  ["Battery, charging and starting system check", 0, 6],
+  ["Aftertreatment / DPF cleaning service", 200000, 24],
+  ["Emergency equipment check — 49 CFR 393.95", 0, 3],
+  ["HVAC service", 0, 12]
+];
+
+var PM_TRAILER = [
+  ["Annual (periodic) inspection — 49 CFR 396.17, App. A", 0, 12],
+  ["Brake inspection, lining measurement and adjustment", 0, 6],
+  ["ABS operation and warning lamp check", 0, 6],
+  ["Air system, hoses and gladhand inspection", 0, 6],
+  ["Wheel bearing service / hub oil check", 0, 12],
+  ["Suspension, air bags and shock inspection", 0, 6],
+  ["Landing gear inspection and lube", 0, 6],
+  ["Kingpin and upper coupler inspection", 0, 12],
+  ["Tire inspection and pressure check", 0, 3],
+  ["Lighting, wiring and conspicuity tape inspection", 0, 3],
+  ["Floor, walls, roof and door inspection", 0, 12],
+  ["Cargo securement anchor points, winches and straps", 0, 6]
+];
+
+var PM_BUS_EXTRA = [
+  ["Pushout windows, emergency doors and emergency door marking lights test — 49 CFR 396.3(a)(2)", 0, 3]
+];
+
+var LOG_TYPES = ["PM service","Repair","DVIR defect repair","Annual inspection","Roadside repair","Tire","Warranty","Recall / campaign","Other"];
+
+/* The inspection-document index. Each row is a document a maintenance file is
+   expected to hold, with the citation and retention rule that governs it. */
+var DOC_INDEX = [
+  ["Annual (periodic) inspection report", "396.17, 396.21", "14 months from report date, where the vehicle is housed or maintained"],
+  ["Proof of periodic inspection carried on the vehicle (report copy, sticker or decal)", "396.17(c)", "Current inspection period; kept on the vehicle"],
+  ["Inspector qualification records for the annual inspector", "396.19", "While the inspector performs inspections, plus 1 year"],
+  ["Brake inspector qualification records", "396.25", "While the inspector performs brake work, plus 1 year"],
+  ["Driver vehicle inspection reports listing defects, with repair certification", "396.11", "3 months from the date the report was prepared"],
+  ["Roadside inspection reports and signed certification of repairs", "396.9(d)", "12 months from the inspection date"],
+  ["Repair orders, invoices and parts receipts supporting the log", "396.3(b)(3)", "1 year, plus 6 months after the vehicle leaves your control"],
+  ["Preventive-maintenance schedule and completed service records", "396.3(b)(2)", "1 year, plus 6 months after the vehicle leaves your control"],
+  ["Lease or interchange agreement (vehicle not owned by the carrier)", "Part 376", "Term of the lease, plus 1 year"],
+  ["Registration / cab card, apportioned plate, IFTA credentials", "—", "Carrier policy"],
+  ["Warranty documents, recall and campaign notices", "—", "Carrier policy"],
+  ["Tire records, brake lining and drum measurements", "396.3(b)(3)", "1 year, plus 6 months after the vehicle leaves your control"]
+];
+
+var RETENTION_FOOT = "Retain where the vehicle is housed or maintained for 1 year, and for 6 months after the vehicle leaves the carrier’s control — 49 CFR 396.3(c).";
+
+/* Pagination is by estimated height, not by a fixed row count. A log entry
+   whose description wraps to three lines is three times the height of a blank
+   row, so a fixed count silently pushed long entries past the fold. These
+   budgets are the space left for table rows once the page header, footer,
+   title and column headings are taken out of the 10in printable area
+   (960 css px at 96dpi), with ~20px of slack. */
+var PAGE_PX      = 960;
+var BUDGET_FIRST = 780;   // first page of a table: title plus a lead paragraph
+var BUDGET_CONT  = 815;   // continuation page: title only
+var ROW_BLANK_PX = 31;    // a blank ruled row (.31in plus borders)
+var LINE_PX      = 14.8;  // one wrapped line at 8.5pt
+var CHAR_PX      = 5.55;  // average advance width at 8.5pt
+
+/* =========================================================================
+   2. STATE
+   ====================================================================== */
+
+var state = {
+  carrier:{name:"",dot:"",mc:"",address:"",cityStateZip:"",phone:"",
+           terminal:"",recordLocation:"",contact:""},
+  units:[],
+  selected:null,
+  opts:{cost:true, index:true, labels:true, blankLog:2, blankPm:0}
+};
+var dirty = false;
+
+function uid(){ return "u" + Math.random().toString(36).slice(2,9); }
+
+function newUnit(type){
+  var power = !!POWER_TYPES[type];
+  var tpl = power ? PM_POWER.slice() : PM_TRAILER.slice();
+  if (type === "bus") tpl = PM_BUS_EXTRA.concat(tpl);
+  return {
+    id:uid(), type:type||"tractor",
+    unitNumber:"", make:"", model:"", year:"", vin:"",
+    plate:"", plateState:"", plateExp:"", gvwr:"",
+    tireSteer:"", tireDrive:"", tireTrailer:"", tireSpare:"",
+    ownership:"owned", ownerName:"", ownerAddress:"", leaseNo:"", leaseStart:"", leaseEnd:"",
+    inService:"", outService:"", odoUnit:"mi", odoCurrent:"", odoDate:"",
+    engine:"", transmission:"", fuel:"", housedAt:"",
+    notes:"",
+    pm: tpl.map(function(t){
+      return {task:t[0], miles:t[1]||"", months:t[2]||"", lastDate:"", lastOdo:""};
+    }),
+    log: [],
+    insp: []
+  };
+}
+
+function selectedUnit(){
+  if (!state.selected) return null;
+  for (var i=0;i<state.units.length;i++) if (state.units[i].id===state.selected) return state.units[i];
+  return null;
+}
+
+/* =========================================================================
+   3. SMALL HELPERS
+   ====================================================================== */
+
+function esc(s){
+  return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function or(v, fallback){
+  v = (v==null?"":String(v)).trim();
+  return v ? esc(v) : (fallback===undefined ? "" : fallback);
+}
+function typeLabel(t){
+  for (var i=0;i<UNIT_TYPES.length;i++) if (UNIT_TYPES[i].v===t) return UNIT_TYPES[i].l;
+  return "Commercial motor vehicle";
+}
+function typeClass(t){
+  for (var i=0;i<UNIT_TYPES.length;i++) if (UNIT_TYPES[i].v===t) return UNIT_TYPES[i].cls;
+  return "power";
+}
+function isPower(u){ return !!POWER_TYPES[u.type]; }
+
+function fmtDate(iso){
+  if (!iso) return "";
+  var p = String(iso).split("-");
+  if (p.length !== 3) return iso;
+  return p[1] + "/" + p[2] + "/" + p[0];
+}
+function addMonths(iso, months){
+  if (!iso || !months) return "";
+  var p = String(iso).split("-");
+  if (p.length !== 3) return "";
+  var d = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
+  var day = d.getDate();
+  d.setMonth(d.getMonth() + Number(months));
+  if (d.getDate() < day) d.setDate(0); // clamp to end of shorter month
+  var m = String(d.getMonth()+1);
+  var dd = String(d.getDate());
+  return d.getFullYear() + "-" + (m.length<2?"0"+m:m) + "-" + (dd.length<2?"0"+dd:dd);
+}
+function num(v){
+  var n = String(v==null?"":v).replace(/[^0-9.\-]/g,"");
+  return n === "" ? null : Number(n);
+}
+function fmtNum(n){
+  if (n == null || isNaN(n)) return "";
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+function todayISO(){
+  var d = new Date();
+  var m = String(d.getMonth()+1), dd = String(d.getDate());
+  return d.getFullYear()+"-"+(m.length<2?"0"+m:m)+"-"+(dd.length<2?"0"+dd:dd);
+}
+function daysUntil(iso){
+  if (!iso) return null;
+  var p = String(iso).split("-");
+  if (p.length !== 3) return null;
+  var t = new Date(Number(p[0]), Number(p[1])-1, Number(p[2]));
+  var n = new Date(); n.setHours(0,0,0,0);
+  return Math.round((t - n) / 86400000);
+}
+
+/* Next-due is derived, never stored, so an edit to the interval or the last
+   service date can never leave a stale due date behind in the printed file. */
+function nextDue(row, unit){
+  var nd = row.months ? addMonths(row.lastDate, row.months) : "";
+  var no = "";
+  if (row.miles && row.lastOdo !== "" && num(row.lastOdo) != null) {
+    no = fmtNum(num(row.lastOdo) + Number(row.miles));
+  }
+  return {date:nd, odo:no, unit:(unit && unit.odoUnit) || "mi"};
+}
+function dueText(nd){
+  var bits = [];
+  if (nd.date) bits.push(fmtDate(nd.date));
+  if (nd.odo)  bits.push(nd.odo + " " + nd.unit);
+  return bits.join("  ·  ");
+}
+function intervalText(row){
+  var bits = [];
+  if (row.miles)  bits.push(fmtNum(num(row.miles)) + " mi");
+  if (row.months) bits.push(row.months + " mo");
+  return bits.join(" / ");
+}
+
+function toast(msg){
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ t.classList.remove("show"); }, 2600);
+}
+function markDirty(){ dirty = true; }
+
+/* =========================================================================
+   4. SIDEBAR
+   ====================================================================== */
+
+var CARRIER_FIELDS = [
+  ["name","Carrier name",""],
+  ["dot","USDOT number",""],
+  ["mc","MC / docket number","optional"],
+  ["address","Street address",""],
+  ["cityStateZip","City, state, ZIP",""],
+  ["phone","Phone","optional"],
+  ["recordLocation","Where this file is kept","Terminal or shop — 396.3(c)"],
+  ["contact","Maintenance contact","optional"]
+];
+
+function renderCarrier(){
+  var host = document.getElementById("carrier-fields");
+  host.innerHTML = CARRIER_FIELDS.map(function(f){
+    return '<div class="field">' +
+      '<label>' + esc(f[1]) + (f[2] ? ' <span class="sub">' + esc(f[2]) + '</span>' : '') + '</label>' +
+      '<input type="text" data-carrier="' + f[0] + '" value="' + esc(state.carrier[f[0]]) + '">' +
+    '</div>';
+  }).join("");
+}
+
+function renderUnitList(){
+  var ul = document.getElementById("unit-list");
+  document.getElementById("unit-count").textContent = state.units.length ? "(" + state.units.length + ")" : "";
+  if (!state.units.length){
+    ul.innerHTML = '<li class="empty-note">No units yet. Add a power unit or a trailer to start a maintenance file. ' +
+      'A record is required for every vehicle you control for 30 consecutive days or more.</li>';
+    return;
+  }
+  ul.innerHTML = state.units.map(function(u){
+    var meta = [u.year, u.make, u.model].filter(Boolean).join(" ") ||
+               (u.vin ? "VIN " + u.vin.slice(-8) : "Details not entered");
+    return '<li><button class="unit-btn' + (u.id===state.selected?' active':'') + '" data-unit="' + u.id + '">' +
+      '<span class="tag ' + typeClass(u.type) + '">' + (isPower(u)?"PWR":"TRL") + '</span>' +
+      '<span class="grow"><div class="num">' + (or(u.unitNumber) || "Unnumbered unit") + '</div>' +
+      '<div class="meta">' + esc(meta) + '</div></span>' +
+    '</button></li>';
+  }).join("");
+}
+
+/* =========================================================================
+   5. EDITOR
+   ====================================================================== */
+
+function fieldHtml(u, key, label, opts){
+  opts = opts || {};
+  var type = opts.type || "text";
+  var v = u[key] == null ? "" : u[key];
+  var sub = opts.sub ? ' <span class="sub">' + esc(opts.sub) + '</span>' : '';
+  var cls = opts.span2 ? ' class="field span2"' : ' class="field"';
+  if (opts.select){
+    return '<div' + cls + '><label>' + esc(label) + sub + '</label><select data-f="' + key + '">' +
+      opts.select.map(function(o){
+        var val = o.v!==undefined?o.v:o, lab = o.l!==undefined?o.l:o;
+        return '<option value="' + esc(val) + '"' + (String(v)===String(val)?' selected':'') + '>' + esc(lab) + '</option>';
+      }).join("") + '</select></div>';
+  }
+  return '<div' + cls + '><label>' + esc(label) + sub + '</label>' +
+    '<input type="' + type + '" data-f="' + key + '" value="' + esc(v) + '"' +
+    (opts.ph ? ' placeholder="' + esc(opts.ph) + '"' : '') + '></div>';
+}
+
+function renderEditor(){
+  var host = document.getElementById("editor");
+  var u = selectedUnit();
+
+  if (!u){
+    host.innerHTML =
+      '<div class="card"><h2>Build a maintenance file for every controlled vehicle</h2>' +
+      '<p class="hint">49 CFR 396.3(b) requires a record for each vehicle a carrier controls for 30 consecutive days ' +
+      'or more. This tool assembles that record and prints it as a file you can put in a drawer or a PDF you can archive.</p>' +
+      '<div class="callout"><strong>What each unit produces:</strong> a one-page vehicle identity sheet, ' +
+      'a preventive-maintenance schedule showing the nature and due date of each operation, a repair and ' +
+      'maintenance log, an inspection-document index with the retention rule for each document, and blank ' +
+      'continuation pages to keep filling in by hand.</div>' +
+      '<p class="hint" style="margin-bottom:0">Add a unit in the left panel to begin. Fill in the carrier block once ' +
+      'and it appears at the top of every printed page.</p></div>';
+    return;
+  }
+
+  var owned = u.ownership === "owned";
+  var power = isPower(u);
+  var h = [];
+
+  /* --- identity ------------------------------------------------------- */
+  h.push('<div class="card"><h2>Vehicle identification <span class="cite">396.3(b)(1)</span>' +
+    '<span style="flex:1"></span>' +
+    '<button class="btn btn-quiet btn-sm" data-act="dup">Duplicate</button>' +
+    '<button class="btn btn-danger btn-sm" data-act="del">Delete unit</button></h2>' +
+    '<p class="hint">The rule names the company number, make, serial number, year and tire size, plus the name of ' +
+    'the person furnishing the vehicle when the carrier does not own it. The rest is here because auditors and ' +
+    'shops ask for it.</p>' +
+    '<div class="grid g4">' +
+      fieldHtml(u,"unitNumber","Company / unit number",{sub:"if so marked"}) +
+      fieldHtml(u,"type","Vehicle type",{select:UNIT_TYPES.map(function(t){return {v:t.v,l:t.l};})}) +
+      fieldHtml(u,"year","Year") +
+      fieldHtml(u,"make","Make") +
+      fieldHtml(u,"model","Model") +
+      fieldHtml(u,"vin","VIN / serial number",{span2:true}) +
+      fieldHtml(u,"gvwr","GVWR / GCWR",{sub:"lbs"}) +
+    '</div>' +
+    '<div class="grid g4" style="margin-top:12px">' +
+      fieldHtml(u,"plate","License plate") +
+      fieldHtml(u,"plateState","Plate state") +
+      fieldHtml(u,"plateExp","Plate expires",{type:"date"}) +
+      fieldHtml(u,"housedAt","Housed / maintained at",{sub:"396.3(c)"}) +
+    '</div></div>');
+
+  /* --- tires ---------------------------------------------------------- */
+  h.push('<div class="card"><h2>Tire size <span class="cite">396.3(b)(1)</span></h2>' +
+    '<div class="grid g4">' +
+      (power ? fieldHtml(u,"tireSteer","Steer axle") : '') +
+      (power ? fieldHtml(u,"tireDrive","Drive axle") : '') +
+      fieldHtml(u,"tireTrailer", power ? "Other axles" : "All axles") +
+      fieldHtml(u,"tireSpare","Spare") +
+    '</div></div>');
+
+  /* --- ownership ------------------------------------------------------ */
+  h.push('<div class="card"><h2>Ownership <span class="cite">396.3(b)(1)</span></h2>' +
+    '<p class="hint">If the vehicle is not owned by the carrier, the record must identify the person furnishing it.</p>' +
+    '<div class="grid g3">' +
+      fieldHtml(u,"ownership","Ownership",{select:[
+        {v:"owned",l:"Carrier-owned"},
+        {v:"leased",l:"Leased from a lessor"},
+        {v:"owner_operator",l:"Owner-operator / contractor"},
+        {v:"interchange",l:"Interchanged intermodal equipment"}
+      ]}) +
+      (owned ? '' : fieldHtml(u,"ownerName","Name of person furnishing the vehicle",{span2:true})) +
+    '</div>' +
+    (owned ? '' :
+      '<div class="grid g3" style="margin-top:12px">' +
+      fieldHtml(u,"ownerAddress","Owner address",{span2:true}) +
+      fieldHtml(u,"leaseNo","Lease / agreement no.") +
+      fieldHtml(u,"leaseStart","Lease start",{type:"date"}) +
+      fieldHtml(u,"leaseEnd","Lease end",{type:"date"}) +
+      '</div>') +
+    '</div>');
+
+  /* --- service life --------------------------------------------------- */
+  h.push('<div class="card"><h2>Service life and odometer</h2>' +
+    '<p class="hint">The out-of-service date starts the six-month tail in 396.3(c). Leave it blank while the unit is active.</p>' +
+    '<div class="grid g4">' +
+      fieldHtml(u,"inService","Placed in service",{type:"date"}) +
+      fieldHtml(u,"outService","Left carrier control",{type:"date",sub:"blank if active"}) +
+      fieldHtml(u,"odoUnit","Meter reads in",{select:[{v:"mi",l:"Miles"},{v:"km",l:"Kilometres"},{v:"hr",l:"Engine hours"}]}) +
+      fieldHtml(u,"odoCurrent","Current reading") +
+      fieldHtml(u,"odoDate","Reading as of",{type:"date"}) +
+      (power ? fieldHtml(u,"engine","Engine") : '') +
+      (power ? fieldHtml(u,"transmission","Transmission") : '') +
+      (power ? fieldHtml(u,"fuel","Fuel type") : '') +
+    '</div></div>');
+
+  /* --- PM schedule ---------------------------------------------------- */
+  h.push('<div class="card"><h2>Preventive-maintenance schedule <span class="cite">396.3(b)(2)</span></h2>' +
+    '<p class="hint">A means to indicate the nature and due date of each inspection and maintenance operation. ' +
+    'Due dates are calculated from the last service, so they stay correct as you update the file.</p>' +
+    pmTable(u) + '</div>');
+
+  /* --- annual inspections --------------------------------------------- */
+  h.push('<div class="card"><h2>Annual inspection history <span class="cite">396.17 / 396.21</span></h2>' +
+    '<p class="hint">The report itself is retained for 14 months where the vehicle is housed or maintained. ' +
+    'This table is the index to those reports, not a substitute for them.</p>' +
+    inspTable(u) + '</div>');
+
+  /* --- repair log ----------------------------------------------------- */
+  h.push('<div class="card"><h2>Repair and maintenance log <span class="cite">396.3(b)(3)</span></h2>' +
+    '<p class="hint">A record of inspections, repairs and maintenance showing their date and nature. ' +
+    'Entries you add here are printed first; blank rows follow so the log can keep going by hand.</p>' +
+    logTable(u) + '</div>');
+
+  /* --- print options -------------------------------------------------- */
+  h.push('<div class="card"><h2>File contents</h2>' +
+    '<div class="grid g2">' +
+    '<div>' +
+      optCheck("index","Include the inspection-document index page") +
+      optCheck("cost","Include a cost column in the repair log") +
+      optCheck("labels","Include folder labels on the fleet printout") +
+    '</div>' +
+    '<div class="grid g2" style="align-content:start">' +
+      '<div class="field"><label>Blank log continuation pages</label>' +
+        '<input type="number" min="0" max="20" data-opt-n="blankLog" value="' + Number(state.opts.blankLog) + '"></div>' +
+      '<div class="field"><label>Blank PM continuation pages</label>' +
+        '<input type="number" min="0" max="20" data-opt-n="blankPm" value="' + Number(state.opts.blankPm) + '"></div>' +
+    '</div></div>' +
+    '<div class="field" style="margin-top:14px"><label>Notes printed on the identity sheet</label>' +
+      '<textarea data-f="notes" placeholder="Anything a shop or an auditor should know about this unit.">' + esc(u.notes) + '</textarea></div>' +
+    '</div>');
+
+  host.innerHTML = h.join("");
+}
+
+function optCheck(key, label){
+  return '<label class="checkrow"><input type="checkbox" data-opt="' + key + '"' +
+    (state.opts[key] ? ' checked' : '') + '><span>' + esc(label) + '</span></label>';
+}
+
+function pmTable(u){
+  var rows = u.pm.map(function(r,i){
+    var nd = nextDue(r,u);
+    var d = daysUntil(nd.date);
+    var cls = d==null ? "" : (d < 0 ? " over" : (d <= 30 ? " soon" : ""));
+    return '<tr>' +
+      '<td><input type="text" data-pm="' + i + '" data-k="task" value="' + esc(r.task) + '"></td>' +
+      '<td style="width:82px"><input type="text" data-pm="' + i + '" data-k="miles" value="' + esc(r.miles) + '" placeholder="mi"></td>' +
+      '<td style="width:66px"><input type="text" data-pm="' + i + '" data-k="months" value="' + esc(r.months) + '" placeholder="mo"></td>' +
+      '<td style="width:132px"><input type="date" data-pm="' + i + '" data-k="lastDate" value="' + esc(r.lastDate) + '"></td>' +
+      '<td style="width:92px"><input type="text" data-pm="' + i + '" data-k="lastOdo" value="' + esc(r.lastOdo) + '"></td>' +
+      '<td class="due-cell' + cls + '" style="width:150px">' + (esc(dueText(nd)) || '<span style="color:var(--ink-3)">—</span>') + '</td>' +
+      '<td style="width:30px"><button class="rowdel" data-pmdel="' + i + '" title="Remove">×</button></td>' +
+    '</tr>';
+  }).join("");
+  return '<div class="tbl-wrap"><table class="edit">' +
+    '<thead><tr><th>Operation</th><th>Every (mi)</th><th>Every (mo)</th><th>Last done</th><th>At reading</th><th>Next due</th><th></th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>' +
+    '<div class="tbl-actions"><button class="btn btn-quiet btn-sm" data-act="pm-add">+ Add operation</button>' +
+    '<button class="btn btn-quiet btn-sm" data-act="pm-reset">Reset to default schedule</button></div>';
+}
+
+function inspTable(u){
+  var rows = u.insp.map(function(r,i){
+    return '<tr>' +
+      '<td style="width:136px"><input type="date" data-in="' + i + '" data-k="date" value="' + esc(r.date||"") + '"></td>' +
+      '<td><input type="text" data-in="' + i + '" data-k="inspector" value="' + esc(r.inspector||"") + '" placeholder="Inspector name"></td>' +
+      '<td><input type="text" data-in="' + i + '" data-k="facility" value="' + esc(r.facility||"") + '" placeholder="Facility"></td>' +
+      '<td style="width:110px"><select data-in="' + i + '" data-k="result">' +
+        ["Passed","Failed — repaired","Failed"].map(function(o){
+          return '<option' + ((r.result||"Passed")===o?' selected':'') + '>' + esc(o) + '</option>';
+        }).join("") + '</select></td>' +
+      '<td><input type="text" data-in="' + i + '" data-k="reportLoc" value="' + esc(r.reportLoc||"") + '" placeholder="Where the report is filed"></td>' +
+      '<td style="width:30px"><button class="rowdel" data-indel="' + i + '">×</button></td>' +
+    '</tr>';
+  }).join("");
+  if (!rows) rows = '<tr><td colspan="6" style="color:var(--ink-3);padding:10px 4px;font-size:12.5px">No inspections recorded. The printed page still carries blank rows.</td></tr>';
+  return '<div class="tbl-wrap"><table class="edit">' +
+    '<thead><tr><th>Date</th><th>Inspector</th><th>Facility</th><th>Result</th><th>Report location</th><th></th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>' +
+    '<div class="tbl-actions"><button class="btn btn-quiet btn-sm" data-act="in-add">+ Add inspection</button></div>';
+}
+
+function logTable(u){
+  var rows = u.log.map(function(r,i){
+    return '<tr>' +
+      '<td style="width:136px"><input type="date" data-lg="' + i + '" data-k="date" value="' + esc(r.date||"") + '"></td>' +
+      '<td style="width:88px"><input type="text" data-lg="' + i + '" data-k="odo" value="' + esc(r.odo||"") + '"></td>' +
+      '<td style="width:140px"><select data-lg="' + i + '" data-k="kind">' +
+        LOG_TYPES.map(function(o){ return '<option' + ((r.kind||LOG_TYPES[0])===o?' selected':'') + '>' + esc(o) + '</option>'; }).join("") +
+      '</select></td>' +
+      '<td><input type="text" data-lg="' + i + '" data-k="desc" value="' + esc(r.desc||"") + '" placeholder="Nature of the work performed"></td>' +
+      '<td style="width:140px"><input type="text" data-lg="' + i + '" data-k="by" value="' + esc(r.by||"") + '" placeholder="Shop or technician"></td>' +
+      '<td style="width:104px"><input type="text" data-lg="' + i + '" data-k="invoice" value="' + esc(r.invoice||"") + '" placeholder="WO / inv."></td>' +
+      '<td style="width:86px"><input type="text" data-lg="' + i + '" data-k="cost" value="' + esc(r.cost||"") + '"></td>' +
+      '<td style="width:30px"><button class="rowdel" data-lgdel="' + i + '">×</button></td>' +
+    '</tr>';
+  }).join("");
+  if (!rows) rows = '<tr><td colspan="8" style="color:var(--ink-3);padding:10px 4px;font-size:12.5px">No entries yet. The printed log will be blank rows ready to fill in.</td></tr>';
+  return '<div class="tbl-wrap"><table class="edit" style="min-width:860px">' +
+    '<thead><tr><th>Date</th><th>Reading</th><th>Nature</th><th>Work performed</th><th>Performed by</th><th>WO / invoice</th><th>Cost</th><th></th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>' +
+    '<div class="tbl-actions"><button class="btn btn-quiet btn-sm" data-act="lg-add">+ Add entry</button></div>';
+}
+
+/* =========================================================================
+   6. DOCUMENT BUILDER
+   Each function returns one or more .sheet strings. Page numbers are stamped
+   afterwards, per unit, so a unit's file reads "Page 2 of 6" on its own.
+   ====================================================================== */
+
+function sheet(unit, docName, bodyHtml, bodyClass){
+  var c = state.carrier;
+  var carrierLine = or(c.name, "Carrier name");
+  var subBits = [];
+  if (c.dot) subBits.push("USDOT " + esc(c.dot));
+  if (c.mc) subBits.push("MC " + esc(c.mc));
+  if (c.cityStateZip) subBits.push(esc(c.cityStateZip));
+  var unitLine = unit ? (or(unit.unitNumber,"Unit —") + "  ·  " + typeLabel(unit.type)) : "All units";
+
+  return '<section class="sheet">' +
+    '<div class="sheet-head">' +
+      '<div class="carrier">' + carrierLine +
+        (subBits.length ? '<div class="sub">' + subBits.join("  ·  ") + '</div>' : '') +
+      '</div>' +
+      '<div class="doc"><div class="t">' + esc(docName) + '</div>' +
+        '<div>' + unitLine + '</div>' +
+        '<div data-pagemark>&nbsp;</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="sheet-body' + (bodyClass ? " " + bodyClass : "") + '">' + bodyHtml + '</div>' +
+    '<div class="sheet-foot">' +
+      '<div>' + RETENTION_FOOT + '</div>' +
+      '<div class="nowrap">Prepared ' + fmtDate(todayISO()) + '</div>' +
+    '</div>' +
+  '</section>';
+}
+
+function kv(k, v, mono){
+  return '<div class="kv"><div class="k">' + esc(k) + '</div>' +
+    '<div class="v' + (mono?" mono":"") + '">' + (v || "&nbsp;") + '</div></div>';
+}
+function block(title, cite, rowsHtml){
+  return '<div class="blk"><div class="blk-h">' + esc(title) +
+    (cite ? '<span class="c">' + esc(cite) + '</span>' : '') + '</div>' +
+    '<div style="border:1px solid #000;border-top:none">' + rowsHtml + '</div></div>';
+}
+
+/* -- 1. identity sheet ---------------------------------------------------- */
+function buildIdentity(u){
+  var c = state.carrier;
+  var b = [];
+
+  b.push('<div class="doc-title">Vehicle identification, inspection and maintenance record</div>' +
+    '<div class="doc-sub">Maintained under 49 CFR 396.3(b) for each vehicle controlled for 30 consecutive days or more. ' +
+    'This sheet is the cover of the unit’s maintenance file.</div>');
+
+  var left = [], right = [];
+
+  left.push(block("Vehicle identification", "396.3(b)(1)",
+    kv("Company / unit no.", or(u.unitNumber)) +
+    kv("Make", or(u.make)) +
+    kv("Model", or(u.model)) +
+    kv("Year", or(u.year)) +
+    kv("Serial no. / VIN", or(u.vin), true) +
+    kv("Vehicle type", esc(typeLabel(u.type))) +
+    kv("Tire size", tireLine(u)) +
+    kv("GVWR / GCWR", or(u.gvwr))
+  ));
+
+  var ownRows;
+  if (u.ownership === "owned"){
+    ownRows = kv("Owner", or(c.name, "Carrier-owned")) +
+              kv("Status", "Owned by the motor carrier");
+  } else {
+    var label = u.ownership === "owner_operator" ? "Owner-operator / contractor"
+              : u.ownership === "interchange" ? "Interchanged intermodal equipment"
+              : "Leased from a lessor";
+    ownRows = kv("Status", esc(label)) +
+              kv("Person furnishing", or(u.ownerName)) +
+              kv("Address", or(u.ownerAddress)) +
+              kv("Agreement no.", or(u.leaseNo)) +
+              kv("Agreement term", [fmtDate(u.leaseStart), fmtDate(u.leaseEnd)].filter(Boolean).join(" – ") || "&nbsp;");
+  }
+  left.push(block("Ownership", "396.3(b)(1)", ownRows));
+
+  right.push(block("Registration and service life", null,
+    kv("License plate", [or(u.plate), or(u.plateState)].filter(Boolean).join("  ·  ")) +
+    kv("Plate expires", fmtDate(u.plateExp)) +
+    kv("Placed in service", fmtDate(u.inService)) +
+    kv("Left carrier control", u.outService ? fmtDate(u.outService) : "Still in service") +
+    kv("Meter reading", (or(u.odoCurrent) ? or(u.odoCurrent) + " " + esc(u.odoUnit) : "") +
+        (u.odoDate ? "  as of  " + fmtDate(u.odoDate) : "")) +
+    (isPower(u) ? kv("Engine", or(u.engine)) + kv("Transmission", or(u.transmission)) + kv("Fuel", or(u.fuel)) : "")
+  ));
+
+  right.push(block("Record location and retention", "396.3(c)",
+    kv("Housed / maintained at", or(u.housedAt) || or(c.recordLocation)) +
+    kv("File kept at", or(c.recordLocation)) +
+    kv("Contact", or(c.contact)) +
+    kv("Retention", "1 year under carrier control, plus 6 months after it leaves")
+  ));
+
+  b.push('<div class="two-col"><div>' + left.join("") + '</div><div>' + right.join("") + '</div></div>');
+
+  b.push('<div class="blk grow">' +
+    '<div class="blk-h">Notes<span class="c">Defects, modifications, standing instructions</span></div>' +
+    '<div style="border:1px solid #000;border-top:none;padding:5px 7px;font-size:8.5pt;line-height:1.45;min-height:.62in">' +
+      (u.notes ? esc(u.notes).replace(/\n/g,"<br>") : "&nbsp;") +
+    '</div></div>');
+
+  b.push('<div class="sig-row">' +
+    '<div class="sig">Prepared by</div><div class="sig">Title</div><div class="sig">Date</div></div>');
+
+  return [sheet(u, "Vehicle identity", b.join(""), "fill")];
+}
+
+function tireLine(u){
+  var parts = [];
+  if (isPower(u)){
+    if (u.tireSteer) parts.push("Steer " + esc(u.tireSteer));
+    if (u.tireDrive) parts.push("Drive " + esc(u.tireDrive));
+    if (u.tireTrailer) parts.push("Other " + esc(u.tireTrailer));
+  } else if (u.tireTrailer) {
+    parts.push(esc(u.tireTrailer));
+  }
+  if (u.tireSpare) parts.push("Spare " + esc(u.tireSpare));
+  return parts.join("  ·  ");
+}
+
+/* -- 2. PM schedule ------------------------------------------------------- */
+function buildPM(u){
+  var head = '<tr><th style="width:2.9in">Nature of the operation</th><th class="nowrap">Interval</th>' +
+    '<th class="nowrap">Last done</th><th class="nowrap">At reading</th>' +
+    '<th class="nowrap">Next due</th><th class="nowrap">Done / initials</th></tr>';
+
+  var rows = u.pm.map(function(r){
+    var nd = nextDue(r,u);
+    return {
+      h: estRowPx([{text:r.task, w:278}]),
+      html: '<tr>' +
+        '<td>' + or(r.task) + '</td>' +
+        '<td class="nowrap">' + esc(intervalText(r)) + '</td>' +
+        '<td class="nowrap">' + fmtDate(r.lastDate) + '</td>' +
+        '<td class="nowrap">' + or(r.lastOdo) + '</td>' +
+        '<td class="nowrap"><strong>' + esc(dueText(nd)) + '</strong></td>' +
+        '<td class="blank"></td>' +
+      '</tr>'
+    };
+  });
+
+  var blankRow = '<tr><td class="blank"></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  var pages = paginateH(rows, blankRow, Number(state.opts.blankPm)||0);
+
+  return pages.map(function(pg, i){
+    var intro = i === 0
+      ? '<div class="doc-title">Preventive-maintenance schedule</div>' +
+        '<div class="doc-sub">A means to indicate the nature and due date of the inspection and maintenance ' +
+        'operations to be performed on this vehicle — 49 CFR 396.3(b)(2). Due dates are calculated from the ' +
+        'last completed service. Record the completed work in the repair and maintenance log.</div>'
+      : '<div class="doc-title">Preventive-maintenance schedule — continued</div>';
+    return sheet(u, "PM schedule",
+      intro + '<table class="grid-doc"><thead>' + head + '</thead><tbody>' + pg + '</tbody></table>' +
+      (i === pages.length-1 ? '<div class="strike-note">Intervals are the carrier’s own schedule. ' +
+        'The annual inspection line is fixed by 49 CFR 396.17 at once every 12 months.</div>' : ''));
+  });
+}
+
+/* -- 3. repair and maintenance log --------------------------------------- */
+function buildLog(u){
+  var cost = !!state.opts.cost;
+  var head = '<tr><th class="nowrap" style="width:.78in">Date</th>' +
+    '<th class="nowrap" style="width:.66in">Reading</th>' +
+    '<th class="nowrap" style="width:.92in">Nature</th>' +
+    '<th>Description of the inspection, repair or maintenance performed</th>' +
+    '<th style="width:1.05in">Performed by</th>' +
+    '<th class="nowrap" style="width:.7in">WO / inv.</th>' +
+    (cost ? '<th class="nowrap rt" style="width:.62in">Cost</th>' : '') + '</tr>';
+
+  /* Description column width: 7.5in of table less the fixed columns, in px.
+     Narrower when the cost column is switched on. */
+  var descW = 720 - (0.78+0.66+0.92+1.05+0.7 + (cost?0.62:0)) * 96;
+
+  var rows = u.log.slice().sort(function(a,b){
+    return String(a.date||"").localeCompare(String(b.date||""));
+  }).map(function(r){
+    return {
+      h: estRowPx([{text:r.desc, w:descW}, {text:r.by, w:101}, {text:r.kind, w:88}]),
+      html: '<tr>' +
+        '<td class="nowrap">' + fmtDate(r.date) + '</td>' +
+        '<td class="nowrap">' + or(r.odo) + '</td>' +
+        '<td>' + or(r.kind) + '</td>' +
+        '<td>' + or(r.desc) + '</td>' +
+        '<td>' + or(r.by) + '</td>' +
+        '<td class="nowrap">' + or(r.invoice) + '</td>' +
+        (cost ? '<td class="rt nowrap">' + or(r.cost) + '</td>' : '') +
+      '</tr>'
+    };
+  });
+
+  var blankRow = '<tr><td class="blank"></td><td></td><td></td><td></td><td></td><td></td>' +
+    (cost ? '<td></td>' : '') + '</tr>';
+  var pages = paginateH(rows, blankRow, Number(state.opts.blankLog)||0);
+
+  return pages.map(function(pg, i){
+    var intro = i === 0
+      ? '<div class="doc-title">Repair and maintenance log</div>' +
+        '<div class="doc-sub">A record of inspections, repairs and maintenance indicating their date and nature ' +
+        '— 49 CFR 396.3(b)(3). Keep the supporting repair orders, invoices and parts receipts filed behind this log.</div>'
+      : '<div class="doc-title">Repair and maintenance log — continued</div>';
+    return sheet(u, "Maintenance log",
+      intro + '<table class="grid-doc"><thead>' + head + '</thead><tbody>' + pg + '</tbody></table>');
+  });
+}
+
+/* -- 4. inspection-document index ---------------------------------------- */
+function buildIndex(u){
+  var docRows = DOC_INDEX.map(function(d, i){
+    return '<tr' + (i%2?' class="zebra"':'') + '>' +
+      '<td>' + esc(d[0]) + '</td>' +
+      '<td class="nowrap tiny">49 CFR ' + esc(d[1]) + '</td>' +
+      '<td class="tiny">' + esc(d[2]) + '</td>' +
+      '<td class="ctr nowrap"><span class="chk"></span></td>' +
+      '<td></td>' +
+    '</tr>';
+  }).join("");
+
+  var body =
+    '<div class="doc-title">Inspection-document index</div>' +
+    '<div class="doc-sub">What belongs in this unit’s file, the rule that requires it, and how long it must be kept. ' +
+    'Tick each document that is on file and note where it sits. Retention periods run from the date of the ' +
+    'document, not from the date the vehicle left service.</div>' +
+    '<table class="grid-doc"><thead><tr>' +
+      '<th>Document</th><th class="nowrap" style="width:.85in">Citation</th>' +
+      '<th style="width:1.9in">Retention</th>' +
+      '<th class="ctr nowrap" style="width:.5in">On file</th><th style="width:1.2in">Location</th>' +
+    '</tr></thead><tbody>' + docRows + '</tbody></table>' +
+    '<div class="strike-note">Driver vehicle inspection reports that list no defects need not be retained ' +
+    '(49 CFR 396.11(a)(3)). Reports that list a defect, together with the certification of repair, must be.</div>';
+
+  return [sheet(u, "Document index", body)];
+}
+
+/* -- 4b. annual inspection history --------------------------------------- */
+function buildInspHistory(u){
+  var rows = u.insp.slice().sort(function(a,b){
+    return String(a.date||"").localeCompare(String(b.date||""));
+  }).map(function(r){
+    return {
+      h: estRowPx([{text:r.inspector, w:150}, {text:r.facility, w:150}, {text:r.reportLoc, w:125}]),
+      html: '<tr>' +
+        '<td class="nowrap">' + fmtDate(r.date) + '</td>' +
+        '<td>' + or(r.inspector) + '</td>' +
+        '<td>' + or(r.facility) + '</td>' +
+        '<td class="nowrap">' + or(r.result) + '</td>' +
+        '<td class="nowrap">' + fmtDate(addMonths(r.date, 12)) + '</td>' +
+        '<td>' + or(r.reportLoc) + '</td>' +
+      '</tr>'
+    };
+  });
+
+  var blankRow = '<tr><td class="blank"></td><td></td><td></td><td></td><td></td><td></td></tr>';
+  var head = '<tr><th class="nowrap" style="width:.8in">Date</th><th>Inspector</th><th>Facility</th>' +
+    '<th class="nowrap" style="width:.9in">Result</th><th class="nowrap" style="width:.8in">Next due</th>' +
+    '<th style="width:1.3in">Report filed at</th></tr>';
+
+  return paginateH(rows, blankRow, 0).map(function(pg, i){
+    var intro = i === 0
+      ? '<div class="doc-title">Annual (periodic) inspection history</div>' +
+        '<div class="doc-sub">49 CFR 396.17 requires an inspection of every component in appendix A at least once ' +
+        'every 12 months. The report itself is retained for 14 months from its date, where the vehicle is housed ' +
+        'or maintained — 49 CFR 396.21. This page is the index to those reports, not a substitute for them.</div>'
+      : '<div class="doc-title">Annual inspection history — continued</div>';
+    return sheet(u, "Annual inspections",
+      intro + '<table class="grid-doc"><thead>' + head + '</thead><tbody>' + pg + '</tbody></table>' +
+      (i === 0 ? '<div class="strike-note">Proof of the current inspection must be carried on the vehicle ' +
+        '— 49 CFR 396.17(c). Keep the inspector’s qualification records on file for as long as they inspect ' +
+        'for you, plus one year — 49 CFR 396.19.</div>' : ''));
+  });
+}
+
+/* -- 5. fleet cover ------------------------------------------------------- */
+function buildFleetCover(units){
+  var rows = units.map(function(u, i){
+    var last = u.insp.slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")); })[0];
+    return '<tr' + (i%2?' class="zebra"':'') + '>' +
+      '<td class="nowrap"><strong>' + (or(u.unitNumber) || "—") + '</strong></td>' +
+      '<td class="nowrap">' + esc(typeLabel(u.type)) + '</td>' +
+      '<td class="nowrap">' + [or(u.year), or(u.make)].filter(Boolean).join(" ") + '</td>' +
+      '<td class="nowrap tiny">' + or(u.vin) + '</td>' +
+      '<td class="nowrap">' + (u.ownership==="owned" ? "Carrier" : or(u.ownerName, "Not carrier-owned")) + '</td>' +
+      '<td class="nowrap">' + (last ? fmtDate(last.date) : "") + '</td>' +
+      '<td class="nowrap">' + (last ? fmtDate(addMonths(last.date,12)) : "") + '</td>' +
+    '</tr>';
+  }).join("");
+
+  var c = state.carrier;
+  var body =
+    '<div class="doc-title">Fleet maintenance file index</div>' +
+    '<div class="doc-sub">One maintenance file follows for each unit. Records are required for every vehicle the ' +
+    'carrier controls for 30 consecutive days or more — 49 CFR 396.3(b).</div>' +
+    block("Carrier", null,
+      kv("Carrier", or(c.name)) +
+      kv("USDOT / MC", [or(c.dot), or(c.mc)].filter(Boolean).join("  ·  ")) +
+      kv("Address", [or(c.address), or(c.cityStateZip)].filter(Boolean).join(", ")) +
+      kv("Records kept at", or(c.recordLocation)) +
+      kv("Maintenance contact", [or(c.contact), or(c.phone)].filter(Boolean).join("  ·  ")) +
+      kv("Units in this file", String(units.length))
+    ) +
+    '<table class="grid-doc"><thead><tr>' +
+      '<th class="nowrap">Unit</th><th class="nowrap">Type</th><th class="nowrap">Year / make</th>' +
+      '<th>VIN</th><th class="nowrap">Furnished by</th>' +
+      '<th class="nowrap">Last annual</th><th class="nowrap">Next due</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+  return [sheet(null, "Fleet index", body)];
+}
+
+/* -- 6. folder labels ----------------------------------------------------- */
+function buildLabels(units){
+  var cells = units.map(function(u){
+    return '<div class="flabel">' +
+      '<div class="l1">' + (or(u.unitNumber) || "—") + '</div>' +
+      '<div class="l2">' + [or(u.year), or(u.make), or(u.model)].filter(Boolean).join(" ") + '</div>' +
+      '<div class="l3">' + (u.vin ? "VIN " + esc(u.vin) : "&nbsp;") + '</div>' +
+    '</div>';
+  });
+  while (cells.length % 2) cells.push('<div class="flabel"></div>');
+
+  var pages = [];
+  for (var i=0; i<cells.length; i+=20){
+    pages.push(sheet(null, "Folder labels",
+      '<div class="doc-title">File folder labels</div>' +
+      '<div class="doc-sub">Cut along the dashed lines and fix one to each unit’s folder.</div>' +
+      '<div class="label-sheet">' + cells.slice(i, i+20).join("") + '</div>'));
+  }
+  return pages;
+}
+
+/* -- pagination ----------------------------------------------------------
+   Rows carry an estimated height so a wrapped description is budgeted for the
+   space it actually takes. Short pages are padded out with blank ruled rows so
+   every printed page looks like a finished form rather than a truncated one.
+   ---------------------------------------------------------------------- */
+
+/* Estimated rendered height of a row, from the widest-wrapping cell.
+   cells: [{text, w}] where w is the column width in css px. */
+function estRowPx(cells){
+  var lines = 1;
+  for (var i=0;i<cells.length;i++){
+    var perLine = Math.max(6, Math.floor((cells[i].w - 12) / CHAR_PX));
+    var len = String(cells[i].text == null ? "" : cells[i].text).length;
+    if (len) lines = Math.max(lines, Math.ceil(len / perLine));
+  }
+  return Math.max(ROW_BLANK_PX, Math.round(lines * LINE_PX + 9));
+}
+
+function paginateH(rows, blankRow, extraBlankPages){
+  var pages = [], cur = [], used = 0, budget = BUDGET_FIRST;
+
+  function flush(){
+    var pad = Math.max(0, Math.floor((budget - used) / ROW_BLANK_PX));
+    pages.push(cur.join("") + repeat(blankRow, pad));
+    cur = []; used = 0; budget = BUDGET_CONT;
+  }
+
+  for (var i=0; i<rows.length; i++){
+    if (cur.length && used + rows[i].h > budget) flush();
+    cur.push(rows[i].html);
+    used += rows[i].h;
+  }
+  if (cur.length) flush();
+  if (!pages.length){
+    pages.push(repeat(blankRow, Math.floor(BUDGET_FIRST / ROW_BLANK_PX)));
+    budget = BUDGET_CONT;
+  }
+  for (var j=0; j<(extraBlankPages||0); j++){
+    pages.push(repeat(blankRow, Math.floor(BUDGET_CONT / ROW_BLANK_PX)));
+  }
+  return pages;
+}
+function repeat(s, n){ var out=""; for (var i=0;i<n;i++) out += s; return out; }
+
+/* -- assemble ------------------------------------------------------------- */
+function buildUnitFile(u){
+  var pages = [].concat(
+    buildIdentity(u),
+    buildPM(u),
+    buildLog(u),
+    buildInspHistory(u),
+    state.opts.index ? buildIndex(u) : []
+  );
+  return stampPages(pages);
+}
+
+function stampPages(pages){
+  var n = pages.length;
+  return pages.map(function(p, i){
+    return p.replace("<div data-pagemark>&nbsp;</div>",
+      '<div data-pagemark>Page ' + (i+1) + " of " + n + '</div>');
+  });
+}
+
+function buildDocument(units, withCover){
+  var out = [];
+  if (withCover && units.length > 1) out = out.concat(stampPages(buildFleetCover(units)));
+  units.forEach(function(u){ out = out.concat(buildUnitFile(u)); });
+  if (withCover && state.opts.labels && units.length) out = out.concat(stampPages(buildLabels(units)));
+  return out;
+}
+
+/* =========================================================================
+   7. PRINT + PREVIEW
+   ====================================================================== */
+
+function renderTo(units, withCover){
+  var pages = buildDocument(units, withCover);
+  document.getElementById("print-root").innerHTML = pages.join("");
+  return pages.length;
+}
+
+function doPrint(units, withCover){
+  if (!units.length){ toast("Add a unit first."); return; }
+  if (!state.carrier.name) toast("Tip: fill in the carrier name — it heads every page.");
+  renderTo(units, withCover);
+  setTimeout(function(){ window.print(); }, 60);
+}
+
+function openPreview(units, withCover, title){
+  if (!units.length){ toast("Add a unit first."); return; }
+  var pages = buildDocument(units, withCover);
+  var scroll = document.getElementById("preview-scroll");
+  scroll.innerHTML = pages.join("");
+  scroll.scrollTop = 0;
+  document.getElementById("preview-title").textContent = title;
+  document.getElementById("preview-pages").textContent = pages.length + (pages.length===1?" page":" pages");
+  document.getElementById("preview").classList.add("open");
+  document.body.style.overflow = "hidden";
+  /* Keep the print target in sync so "Save as PDF" from the preview bar
+     prints exactly what is on screen. */
+  document.getElementById("print-root").innerHTML = pages.join("");
+}
+function closePreview(){
+  document.getElementById("preview").classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+/* =========================================================================
+   8. IMPORT / EXPORT
+   ====================================================================== */
+
+function download(name, text, mime){
+  var blob = new Blob([text], {type: mime || "application/octet-stream"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+}
+
+function exportJSON(){
+  var payload = {
+    format:"dot-maintenance-file", version:1,
+    savedOn: todayISO(),
+    carrier: state.carrier, opts: state.opts, units: state.units
+  };
+  var slug = (state.carrier.name || "fleet").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"") || "fleet";
+  download(slug + "-maintenance-file.json", JSON.stringify(payload, null, 2), "application/json");
+  dirty = false;
+  toast("Saved. Keep this file to pick up where you left off.");
+}
+
+function importJSON(text){
+  var data;
+  try { data = JSON.parse(text); }
+  catch(e){ toast("That file could not be read as a saved fleet."); return; }
+  if (!data || !Array.isArray(data.units)){ toast("That file is not a saved fleet."); return; }
+  state.carrier = Object.assign({}, state.carrier, data.carrier || {});
+  state.opts    = Object.assign({}, state.opts, data.opts || {});
+  state.units   = data.units.map(function(u){
+    var base = newUnit(u.type || "tractor");
+    var merged = Object.assign(base, u);
+    merged.id = u.id || uid();
+    merged.pm   = Array.isArray(u.pm)   ? u.pm   : base.pm;
+    merged.log  = Array.isArray(u.log)  ? u.log  : [];
+    merged.insp = Array.isArray(u.insp) ? u.insp : [];
+    return merged;
+  });
+  state.selected = state.units.length ? state.units[0].id : null;
+  dirty = false;
+  renderAll();
+  toast("Loaded " + state.units.length + (state.units.length===1?" unit.":" units."));
+}
+
+var CSV_COLS = ["unitNumber","type","year","make","model","vin","plate","plateState","gvwr",
+                "tireSteer","tireDrive","tireTrailer","ownership","ownerName","inService","odoCurrent"];
+
+function csvTemplate(){
+  var sample = [
+    ["101","tractor","2022","Freightliner","Cascadia","3AKJHHDR0NSNL1234","AB12345","TX","52000",
+     "295/75R22.5","295/75R22.5","","owned","","2022-04-11","318450"],
+    ["T-540","trailer","2019","Great Dane","Everest","1GRAA0625KB123456","TR9911","TX","68000",
+     "","","295/75R22.5","leased","Midwest Trailer Leasing","2021-08-02",""]
+  ];
+  var text = CSV_COLS.join(",") + "\n" + sample.map(function(r){
+    return r.map(csvCell).join(",");
+  }).join("\n") + "\n";
+  download("maintenance-file-units-template.csv", text, "text/csv");
+}
+function csvCell(v){
+  v = String(v==null?"":v);
+  return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+}
+
+/* Minimal RFC-4180 parser: handles quoted fields, embedded commas, doubled
+   quotes and CRLF. Enough for a spreadsheet export, no dependency needed. */
+function parseCSV(text){
+  var rows=[], row=[], cur="", q=false, i=0;
+  text = String(text).replace(/^﻿/, "");
+  while (i < text.length){
+    var ch = text[i];
+    if (q){
+      if (ch === '"'){
+        if (text[i+1] === '"'){ cur += '"'; i += 2; continue; }
+        q = false; i++; continue;
+      }
+      cur += ch; i++; continue;
+    }
+    if (ch === '"'){ q = true; i++; continue; }
+    if (ch === ","){ row.push(cur); cur=""; i++; continue; }
+    if (ch === "\r"){ i++; continue; }
+    if (ch === "\n"){ row.push(cur); rows.push(row); row=[]; cur=""; i++; continue; }
+    cur += ch; i++;
+  }
+  if (cur !== "" || row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(c){ return String(c).trim() !== ""; }); });
+}
+
+function importCSV(text){
+  var rows = parseCSV(text);
+  if (rows.length < 2){ toast("That CSV has no data rows."); return; }
+  var head = rows[0].map(function(h){ return String(h).trim(); });
+  var added = 0;
+  for (var r=1; r<rows.length; r++){
+    var rec = {};
+    head.forEach(function(h, ci){ rec[h] = (rows[r][ci]==null?"":String(rows[r][ci]).trim()); });
+    var type = (rec.type || "tractor").toLowerCase();
+    if (!POWER_TYPES[type] && type!=="trailer" && type!=="fulltrl") type = "trailer";
+    var u = newUnit(type);
+    CSV_COLS.forEach(function(k){ if (rec[k] !== undefined && rec[k] !== "") u[k] = rec[k]; });
+    if (u.ownership && !/^(owned|leased|owner_operator|interchange)$/.test(u.ownership)) u.ownership = "leased";
+    state.units.push(u); added++;
+  }
+  if (added){ state.selected = state.units[state.units.length-1].id; markDirty(); renderAll(); }
+  toast("Added " + added + (added===1?" unit from the CSV.":" units from the CSV."));
+}
+
+/* =========================================================================
+   9. WIRING
+   ====================================================================== */
+
+function renderAll(){ renderCarrier(); renderUnitList(); renderEditor(); }
+
+/* --- carrier + unit-list panel --- */
+document.getElementById("carrier-fields").addEventListener("input", function(e){
+  var k = e.target.getAttribute("data-carrier");
+  if (!k) return;
+  state.carrier[k] = e.target.value;
+  markDirty();
+});
+
+document.getElementById("unit-list").addEventListener("click", function(e){
+  var btn = e.target.closest("[data-unit]");
+  if (!btn) return;
+  state.selected = btn.getAttribute("data-unit");
+  renderUnitList(); renderEditor();
+  document.getElementById("editor").scrollIntoView({block:"start", behavior:"smooth"});
+});
+
+document.querySelectorAll("[data-add]").forEach(function(b){
+  b.addEventListener("click", function(){
+    var u = newUnit(b.getAttribute("data-add"));
+    state.units.push(u);
+    state.selected = u.id;
+    markDirty(); renderAll();
+    var first = document.querySelector('#editor input[data-f="unitNumber"]');
+    if (first) first.focus();
+  });
+});
+
+/* --- editor: text/select input --- */
+var editor = document.getElementById("editor");
+
+editor.addEventListener("input", function(e){
+  var u = selectedUnit(); if (!u) return;
+  var t = e.target, k;
+
+  if ((k = t.getAttribute("data-f")) !== null && k !== undefined && k){
+    u[k] = t.value; markDirty();
+    if (k === "unitNumber" || k === "year" || k === "make" || k === "model") renderUnitList();
+    return;
+  }
+  if ((k = t.getAttribute("data-pm")) !== null && k !== undefined && k !== ""){
+    u.pm[Number(k)][t.getAttribute("data-k")] = t.value; markDirty();
+    refreshDueCell(t, u, Number(k));
+    return;
+  }
+  if ((k = t.getAttribute("data-lg")) !== null && k !== undefined && k !== ""){
+    u.log[Number(k)][t.getAttribute("data-k")] = t.value; markDirty(); return;
+  }
+  if ((k = t.getAttribute("data-in")) !== null && k !== undefined && k !== ""){
+    u.insp[Number(k)][t.getAttribute("data-k")] = t.value; markDirty(); return;
+  }
+  var on = t.getAttribute("data-opt-n");
+  if (on){ state.opts[on] = Math.max(0, Math.min(20, Number(t.value)||0)); markDirty(); return; }
+});
+
+/* Selects fire "change", not "input", in some browsers — mirror the handler
+   so a vehicle-type or ownership change re-renders the dependent fields. */
+editor.addEventListener("change", function(e){
+  var u = selectedUnit(); if (!u) return;
+  var t = e.target;
+  var k = t.getAttribute("data-f");
+  if (k === "type"){
+    u.type = t.value;
+    if (confirmReset(u)) resetPM(u);
+    markDirty(); renderAll(); return;
+  }
+  if (k === "ownership"){ u.ownership = t.value; markDirty(); renderEditor(); return; }
+  if (t.getAttribute("data-opt")){
+    state.opts[t.getAttribute("data-opt")] = t.checked; markDirty(); return;
+  }
+});
+
+function confirmReset(u){
+  /* Only offer to swap the template when nothing has been recorded against it,
+     so a change of vehicle type can never wipe real service history. */
+  var touched = u.pm.some(function(r){ return r.lastDate || r.lastOdo; });
+  if (touched) return false;
+  return true;
+}
+function resetPM(u){
+  var tpl = isPower(u) ? PM_POWER.slice() : PM_TRAILER.slice();
+  if (u.type === "bus") tpl = PM_BUS_EXTRA.concat(tpl);
+  u.pm = tpl.map(function(t){ return {task:t[0], miles:t[1]||"", months:t[2]||"", lastDate:"", lastOdo:""}; });
+}
+
+function refreshDueCell(input, u, i){
+  var tr = input.closest("tr");
+  if (!tr) return;
+  var cell = tr.querySelector(".due-cell");
+  if (!cell) return;
+  var nd = nextDue(u.pm[i], u);
+  var txt = dueText(nd);
+  cell.textContent = txt || "—";
+  var d = daysUntil(nd.date);
+  cell.className = "due-cell" + (d==null ? "" : (d < 0 ? " over" : (d <= 30 ? " soon" : "")));
+}
+
+/* --- editor: buttons --- */
+editor.addEventListener("click", function(e){
+  var u = selectedUnit(); if (!u) return;
+  var t = e.target.closest("button"); if (!t) return;
+  var act = t.getAttribute("data-act");
+  var d;
+
+  if ((d = t.getAttribute("data-pmdel")) !== null){ u.pm.splice(Number(d),1); markDirty(); renderEditor(); return; }
+  if ((d = t.getAttribute("data-lgdel")) !== null){ u.log.splice(Number(d),1); markDirty(); renderEditor(); return; }
+  if ((d = t.getAttribute("data-indel")) !== null){ u.insp.splice(Number(d),1); markDirty(); renderEditor(); return; }
+
+  if (act === "pm-add"){ u.pm.push({task:"",miles:"",months:"",lastDate:"",lastOdo:""}); markDirty(); renderEditor(); return; }
+  if (act === "pm-reset"){ resetPM(u); markDirty(); renderEditor(); toast("Schedule reset to the default for this vehicle type."); return; }
+  if (act === "lg-add"){ u.log.push({date:todayISO(),odo:u.odoCurrent||"",kind:LOG_TYPES[0],desc:"",by:"",invoice:"",cost:""}); markDirty(); renderEditor(); return; }
+  if (act === "in-add"){ u.insp.push({date:"",inspector:"",facility:"",result:"Passed",reportLoc:""}); markDirty(); renderEditor(); return; }
+
+  if (act === "dup"){
+    var copy = JSON.parse(JSON.stringify(u));
+    copy.id = uid();
+    copy.unitNumber = "";
+    copy.vin = "";
+    copy.log = [];
+    copy.insp = [];
+    state.units.push(copy);
+    state.selected = copy.id;
+    markDirty(); renderAll();
+    toast("Duplicated. The unit number and VIN were left blank.");
+    return;
+  }
+  if (act === "del"){
+    if (!window.confirm("Delete " + (u.unitNumber || "this unit") + " and everything recorded against it?")) return;
+    state.units = state.units.filter(function(x){ return x.id !== u.id; });
+    state.selected = state.units.length ? state.units[0].id : null;
+    markDirty(); renderAll();
+    return;
+  }
+});
+
+/* --- app bar --- */
+document.getElementById("btn-print-unit").addEventListener("click", function(){
+  var u = selectedUnit();
+  doPrint(u ? [u] : [], false);
+});
+document.getElementById("btn-print-all").addEventListener("click", function(){
+  doPrint(state.units, true);
+});
+document.getElementById("btn-preview").addEventListener("click", function(){
+  var u = selectedUnit();
+  if (state.units.length > 1 && u){
+    openPreview([u], false, "Preview — " + (u.unitNumber || "selected unit"));
+  } else {
+    openPreview(state.units, true, "Preview — whole fleet");
+  }
+});
+document.getElementById("preview-close").addEventListener("click", closePreview);
+document.getElementById("preview-print").addEventListener("click", function(){ window.print(); });
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape") closePreview();
+});
+
+document.getElementById("btn-export").addEventListener("click", exportJSON);
+document.getElementById("btn-import").addEventListener("click", function(){
+  document.getElementById("file-json").click();
+});
+document.getElementById("btn-csv").addEventListener("click", function(){
+  document.getElementById("file-csv").click();
+});
+document.getElementById("btn-csv-tpl").addEventListener("click", csvTemplate);
+
+document.getElementById("file-json").addEventListener("change", function(e){
+  var f = e.target.files && e.target.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){ importJSON(String(fr.result)); };
+  fr.readAsText(f);
+  e.target.value = "";
+});
+document.getElementById("file-csv").addEventListener("change", function(e){
+  var f = e.target.files && e.target.files[0]; if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){ importCSV(String(fr.result)); };
+  fr.readAsText(f);
+  e.target.value = "";
+});
+
+/* Nothing is written to browser storage — deliberately, so the tool makes no
+   claim on a visitor's machine and the privacy line on the page stays true.
+   The trade-off is that a refresh loses unsaved work, so warn first. */
+window.addEventListener("beforeunload", function(e){
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+
+renderAll();
+</script>
+</body>
+</html>

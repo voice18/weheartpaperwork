@@ -10,7 +10,7 @@ import { getFunctions } from "firebase/functions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-const firebaseConfig = {
+const productionFirebaseConfig = {
   apiKey: "AIzaSyBSu5O0uUqn76auE4JqOEUoeHG8nljM5Zg",
   authDomain: "dot-compliance-dashboard.firebaseapp.com",
   projectId: "dot-compliance-dashboard",
@@ -18,6 +18,24 @@ const firebaseConfig = {
   messagingSenderId: "1037743970765",
   appId: "1:1037743970765:web:0e49608a3d8cbb10a18c84",
 };
+
+const stagingFirebaseConfig = {
+  apiKey: "AIzaSyC8FwEn8jI4Mw7EOcHeomVZHaZfFn-VcGI",
+  authDomain: "weheartpaperwork-staging.firebaseapp.com",
+  projectId: "weheartpaperwork-staging",
+  storageBucket: "weheartpaperwork-staging.firebasestorage.app",
+  messagingSenderId: "672173656801",
+  appId: "1:672173656801:web:9e1f2a3525a416f23d45a0",
+};
+
+export const appEnvironment =
+  process.env.EXPO_PUBLIC_APP_ENV === "staging" ? "staging" : "production";
+
+export const isStaging = appEnvironment === "staging";
+
+const firebaseConfig = isStaging
+  ? stagingFirebaseConfig
+  : productionFirebaseConfig;
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 

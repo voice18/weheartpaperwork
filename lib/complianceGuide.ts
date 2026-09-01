@@ -8,6 +8,7 @@ export type ComplianceGuideEntryId =
   | "fmcsa-portal"
   | "ucr"
   | "ifta"
+  | "ifta-quarterly"
   | "irp"
   | "drug"
   | "boc3"
@@ -245,7 +246,47 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
       "Annual license and decal renewals can be retained in Compliance History and the newest completion can be reversed safely.",
 
     helpfulToKnow:
-      "This tracker is for the annual IFTA license and decals. It does not track the separate quarterly IFTA fuel-tax return filing schedule.",
+      "This tracker is for the annual IFTA license and decals. Use the separate IFTA Quarterly tracker for fuel-tax return deadlines.",
+
+    sources: [
+      {
+        label: "IFTA, Inc. - Carrier Information",
+        url: "https://www.iftach.org/carriers/",
+      },
+    ],
+  },
+
+  {
+    id: "ifta-quarterly",
+    category: "company",
+
+    title: "IFTA Quarterly Fuel Tax Return",
+    shortTitle: "IFTA Quarterly",
+    iconText: "QTR",
+
+    summary:
+      "Track the four quarterly IFTA fuel-tax return deadlines separately from annual license renewal.",
+
+    whatItIs:
+      "Carriers operating qualified motor vehicles in more than one IFTA jurisdiction generally report mileage and fuel activity to their base jurisdiction each quarter.",
+
+    whatYouEnter:
+      "The app supplies the normal quarterly due dates: April 30, July 31, October 31, and January 31.",
+
+    howItWorks:
+      "This is a fixed quarterly calendar. It applies to IFTA licensees, while an intrastate-only carrier can mark the requirement Does not apply.",
+
+    markComplete:
+      "Marking a return complete records that quarter in history and advances the tracker to the next quarterly due date.",
+
+    notifications:
+      "We Heart Paperwork can send reminders 30, 15, and 5 days before each tracked quarterly deadline.",
+
+    history:
+      "Each completed quarter is retained in Compliance History with its previous and next due dates.",
+
+    helpfulToKnow:
+      "A base jurisdiction may require an IFTA return even when no taxable travel occurred during the quarter. Follow your base jurisdiction's instructions when a normal deadline falls on a weekend or holiday.",
 
     sources: [
       {
@@ -290,7 +331,7 @@ export const complianceGuideEntries: ComplianceGuideEntry[] = [
     sources: [
       {
         label: "International Registration Plan, Inc.",
-        url: "https://www.irpinc.org/",
+        url: "https://www.irponline.org/",
       },
     ],
   },

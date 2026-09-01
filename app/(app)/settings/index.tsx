@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Platform,
   Share,
   SafeAreaView,
@@ -22,6 +23,7 @@ import {
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
+  arrayUnion,
   doc,
   getDoc,
   setDoc,
@@ -29,7 +31,7 @@ import {
   collection,
   onSnapshot,
 } from "firebase/firestore";
-import { auth, db, functions, } from "../../../lib/firebase";
+import { auth, db, functions, isStaging } from "../../../lib/firebase";
 import { registerForPushNotifications } from "../../../lib/registerPushNotifications";
 import SettingsRow from "../../../components/settings/SettingsRow";
 import { useComplianceStore } from "../../../store/useComplianceStore";
@@ -549,6 +551,7 @@ const updateNotificationStatus = async (
       {
         notificationsEnabled: true,
         expoPushToken: registration.expoPushToken,
+        expoPushTokens: arrayUnion(registration.expoPushToken),
         notificationTokenUpdatedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       },
@@ -790,8 +793,14 @@ const loadReferralCode =
     return;
   }
 
+  const referralBaseUrl =
+    Platform.OS === "web" && typeof window !== "undefined"
+      ? window.location.origin
+      : isStaging
+        ? "https://weheartpaperwork-staging.web.app"
+        : "https://weheartpaperwork.com";
   const referralLink =
-    `https://weheartpaperwork.com/login?ref=${referralCode}`;
+    `${referralBaseUrl}/login?mode=create&ref=${referralCode}`;
 
   try {
     if (Platform.OS === "web") {
@@ -1044,6 +1053,9 @@ const trialEndLabel = (() => {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
       >
         {Platform.OS === "web" && (
         <TouchableOpacity
@@ -1340,7 +1352,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         Company name
@@ -1383,7 +1399,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
 <Modal
@@ -1397,7 +1413,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         USDOT Number
@@ -1437,7 +1457,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
 <Modal
@@ -1451,7 +1471,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         Phone number
@@ -1492,7 +1516,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
 <Modal
@@ -1506,7 +1530,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         Change login email
@@ -1553,7 +1581,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
     </SafeAreaView>

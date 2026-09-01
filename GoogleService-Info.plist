@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>1037743970765-8c7oe3lhiup87qos54majuiocdpvp01h.apps.googleusercontent.com</string>
+	<string>1037743970765-e9jb2kl9v13c3q45o4qobsan4ipijdbc.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1037743970765-8c7oe3lhiup87qos54majuiocdpvp01h</string>
+	<string>com.googleusercontent.apps.1037743970765-e9jb2kl9v13c3q45o4qobsan4ipijdbc</string>
 	<key>API_KEY</key>
 	<string>AIzaSyBw9UyIoWpHy3XyIRhakw8Alyvnz-Ll0jM</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.dotcompliance.dotdashboard</string>
+	<string>com.weheartpaperwork.app</string>
 	<key>PROJECT_ID</key>
 	<string>dot-compliance-dashboard</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1037743970765:ios:491e24fca1045865a18c84</string>
+	<string>1:1037743970765:ios:4926d355bcc55865a18c84</string>
 </dict>
 </plist>

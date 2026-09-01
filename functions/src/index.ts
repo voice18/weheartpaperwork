@@ -6,7 +6,7 @@
 // Or from root: firebase deploy --only functions
 //
 // Firebase Functions backend.
-//   dailyComplianceCheck — runs every day at 8am, scans all carriers,
+//   dailyComplianceCheck — runs every day at 11am Pacific, scans all carriers,
 //      sends push notifications for items due in 30 days / 15 days / 5 days
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,12 @@ import {
   handleCheckoutCompleted,
   syncSubscriptionToCarrier,
 } from "./stripeWebhookHandlers";
+import {
+  recordReferralRewardForPaidInvoice,
+  recordRefundAdjustments,
+  holdRewardForDispute,
+  resolveRewardDispute,
+} from "./referralRewards";
 
 
 admin.initializeApp();
@@ -34,36 +40,183 @@ const stripeDriverPriceId = defineSecret("STRIPE_DRIVER_PRICE_ID");
 const stripeWebhookSecret =
   defineSecret("STRIPE_WEBHOOK_SECRET");
 
+function publicAppBaseUrl(): string {
+  const projectId =
+    process.env.GCLOUD_PROJECT ??
+    process.env.GCP_PROJECT ??
+    admin.app().options.projectId;
+
+  return projectId === "weheartpaperwork-staging"
+    ? "https://weheartpaperwork-staging.web.app"
+    : "https://weheartpaperwork.com";
+}
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type AlertType = "30_days" | "15_days" | "5_days";
+type AlertType = "30_days" | "15_days" | "5_days" | "1_day";
+type ReminderPolicy = "standard" | "five-day-only" | "one-day-only";
+
+type ReminderState = {
+  dueDate: string;
+  notified30: boolean;
+  notified15: boolean;
+  notified5: boolean;
+  notified1: boolean;
+};
+
+type ReminderUpdate = {
+  ref: admin.firestore.DocumentReference;
+  fieldPath: string;
+  state: ReminderState;
+  metadata?: Record<string, unknown>;
+};
+
+type ReminderCandidate = {
+  itemId: string;
+  label: string;
+  days: number;
+  dueDate: string;
+  requirementId?: string;
+  policy?: ReminderPolicy;
+  legacyState?: unknown;
+};
 
 type DailyNotificationSummary = {
   carrierId: string;
   userId: string;
-  expoPushToken: string;
+  expoPushTokens: string[];
   dueIn30DaysIds: string[];
   dueIn15DaysIds: string[];
   dueIn5DaysIds: string[];
+  dueIn1DayIds: string[];
 };
 
-function getAlertType(
+function customReminderPolicy(data: admin.firestore.DocumentData): ReminderPolicy {
+  if (data.scheduleType !== "rolling") return "standard";
+  if (
+    data.recurrenceKind === "calendar-monthly" ||
+    data.recurrenceKind === "calendar-quarterly"
+  ) return "five-day-only";
+
+  const value = typeof data.intervalValue === "number" ? data.intervalValue : 1;
+  const approximateDays =
+    data.intervalUnit === "day" ? value :
+    data.intervalUnit === "week" ? value * 7 :
+    data.intervalUnit === "month" ? value * 30 :
+    data.intervalUnit === "year" ? value * 365 : 365;
+
+  if (approximateDays <= 7) return "one-day-only";
+  if (approximateDays < 365) return "five-day-only";
+  return "standard";
+}
+
+function getAlertDecision(
   days: number,
-  requirementId?: string
-): AlertType | null {
-  // FMCSA portal maintenance is intentionally quieter:
-  // one push notification at 5 days remaining only.
-  if (requirementId === "fmcsa-portal") {
-    return days === 5 ? "5_days" : null;
+  dueDate: string,
+  savedState: unknown,
+  requirementId?: string,
+  policy: ReminderPolicy = "standard"
+): { alertType: AlertType; state: ReminderState } | null {
+  if (days < 0) return null;
+
+  const data =
+    savedState && typeof savedState === "object"
+      ? savedState as Partial<ReminderState>
+      : {};
+  const sameOccurrence = data.dueDate === dueDate;
+  const state: ReminderState = {
+    dueDate,
+    notified30: sameOccurrence && data.notified30 === true,
+    notified15: sameOccurrence && data.notified15 === true,
+    notified5: sameOccurrence && data.notified5 === true,
+    notified1: sameOccurrence && data.notified1 === true,
+  };
+
+  // Short-cycle items are intentionally quieter: Portal maintenance and
+  // quarterly IFTA each receive one push at five days remaining.
+  if (requirementId === "fmcsa-portal" || requirementId === "ifta-quarterly") {
+    if (days <= 5 && !state.notified5) {
+      return {
+        alertType: "5_days",
+        state: { ...state, notified5: true },
+      };
+    }
+    return null;
   }
 
-  // Standard notification schedule for all other requirements.
-  if (days === 30) return "30_days";
-  if (days === 15) return "15_days";
-  if (days === 5) return "5_days";
+  if (policy === "one-day-only") {
+    if (days <= 1 && !state.notified1) {
+      return { alertType: "1_day", state: { ...state, notified1: true } };
+    }
+    return null;
+  }
+
+  if (policy === "five-day-only") {
+    if (days <= 5 && !state.notified5) {
+      return { alertType: "5_days", state: { ...state, notified5: true } };
+    }
+    return null;
+  }
+
+  // Recover a missed scheduler day by sending the most urgent unsent
+  // threshold, while marking broader thresholds complete so reminders
+  // never run backward (for example, 5 days followed by 15 days).
+  if (days <= 5 && !state.notified5) {
+    return {
+      alertType: "5_days",
+      state: { ...state, notified30: true, notified15: true, notified5: true },
+    };
+  }
+  if (days <= 15 && !state.notified15) {
+    return {
+      alertType: "15_days",
+      state: { ...state, notified30: true, notified15: true },
+    };
+  }
+  if (days <= 30 && !state.notified30) {
+    return {
+      alertType: "30_days",
+      state: { ...state, notified30: true },
+    };
+  }
 
   return null;
+}
+
+async function saveReminderUpdates(updates: ReminderUpdate[]): Promise<void> {
+  const byDocument = new Map<
+    string,
+    { ref: admin.firestore.DocumentReference; fields: Record<string, unknown> }
+  >();
+
+  for (const update of updates) {
+    const current = byDocument.get(update.ref.path) ?? {
+      ref: update.ref,
+      fields: { ...(update.metadata || {}) },
+    };
+    current.fields[update.fieldPath] = update.state;
+    byDocument.set(update.ref.path, current);
+  }
+
+  const entries = [...byDocument.values()];
+  for (let index = 0; index < entries.length; index += 450) {
+    const batch = db.batch();
+    for (const entry of entries.slice(index, index + 450)) {
+      batch.set(entry.ref, entry.fields, { merge: true });
+    }
+    await batch.commit();
+  }
+}
+
+function reminderStateRef(
+  carrierId: string,
+  userId: string,
+  itemId: string
+): admin.firestore.DocumentReference {
+  const safeItemId = Buffer.from(itemId, "utf8").toString("base64url");
+  return db.collection("notificationReminderStates")
+    .doc(`${userId}__${carrierId}__${safeItemId}`);
 }
 
 function getTodayKey(): string {
@@ -167,7 +320,9 @@ const REQUIREMENT_LABELS: Record<string, string> = {
   "fmcsa-portal": "FMCSA Portal Account Maintenance",
   ucr: "UCR Registration",
   ifta: "IFTA License Renewal",
+  "ifta-quarterly": "IFTA Quarterly Fuel Tax Return",
   irp: "IRP Registration Renewal",
+  insurance: "Commercial Auto Insurance Renewal",
   drug: "Drug & Alcohol Consortium Enrollment",
   boc3: "BOC-3 Process Agent Filing",
 };
@@ -175,11 +330,67 @@ const REQUIREMENT_LABELS: Record<string, string> = {
 const COMPANY_REQUIREMENT_IDS =
   new Set(Object.keys(REQUIREMENT_LABELS));
 
+function calculatedMcs150DueDate(usdotNumber: unknown): string | null {
+  if (typeof usdotNumber !== "string") return null;
+  const raw = usdotNumber.replace(/\D/g, "");
+  if (raw.length < 2) return null;
+  const year = Number(getTodayKey().slice(0, 4));
+  const filingYear = Number(raw[raw.length - 2]) % 2 === year % 2 ? year : year + 1;
+  const lastDigit = Number(raw[raw.length - 1]);
+  const month = lastDigit === 0 ? 10 : lastDigit;
+  const lastDay = new Date(Date.UTC(filingYear, month, 0)).getUTCDate();
+  return `${filingYear}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+}
+
+function nextIftaDueDate(referenceDate: string): string {
+  const year = Number(referenceDate.slice(0, 4));
+  return [
+    `${year}-04-30`, `${year}-07-31`, `${year}-10-31`, `${year + 1}-01-31`,
+  ].find(date => date >= referenceDate) || `${year + 1}-04-30`;
+}
+
+async function ensureBuiltInComplianceDocs(
+  carrierDoc: admin.firestore.QueryDocumentSnapshot
+): Promise<void> {
+  const carrierId = carrierDoc.id;
+  const today = getTodayKey();
+  const year = Number(today.slice(0, 4));
+  const defaults: Record<string, string | null> = {
+    mcs150: calculatedMcs150DueDate(carrierDoc.data().usdotNumber),
+    tax2290: `${year}-08-31`,
+    "fmcsa-portal": null,
+    ucr: `${year}-12-31`,
+    ifta: `${year}-12-31`,
+    "ifta-quarterly": nextIftaDueDate(today),
+    irp: null,
+    insurance: null,
+    drug: null,
+    boc3: null,
+  };
+
+  await Promise.all(Object.entries(defaults).map(async ([id, dueDate]) => {
+    const ref = db.collection("carriers").doc(carrierId).collection("compliance").doc(id);
+    await db.runTransaction(async transaction => {
+      const existing = await transaction.get(ref);
+      if (existing.exists) return;
+      transaction.set(ref, {
+        enteredDate: null,
+        dueDate,
+        completed: false,
+        completedAt: null,
+        applicable: true,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    });
+  }));
+}
+
 type DriverRequirementDefinition = {
   field: "cdlExpiration" | "medicalExpiration" | "mvrDue" | "clearinghouseDue";
   itemType: "cdl" | "medical" | "mvr" | "clearinghouse";
   label: string;
   yearsToAdd: number;
+  daysToAdd?: number;
 };
 
 const DRIVER_REQUIREMENTS: DriverRequirementDefinition[] = [
@@ -205,7 +416,8 @@ const DRIVER_REQUIREMENTS: DriverRequirementDefinition[] = [
     field: "clearinghouseDue",
     itemType: "clearinghouse",
     label: "Clearinghouse annual query",
-    yearsToAdd: 1,
+    yearsToAdd: 0,
+    daysToAdd: 365,
   },
 ];
 
@@ -241,11 +453,37 @@ function addYearsToDate(
   );
 }
 
-// ── 1. Daily compliance check (runs every day at 8am Pacific) ─────────────────────
+function iftaQuarterEndFromDueDate(dueDate: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+
+  if (month === 4) return `${year}-03-31`;
+  if (month === 7) return `${year}-06-30`;
+  if (month === 10) return `${year}-09-30`;
+  if (month === 1) return `${year - 1}-12-31`;
+  return null;
+}
+
+function addDaysToDate(dateStr: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match || !Number.isInteger(days)) return "";
+
+  const date = new Date(Date.UTC(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3])
+  ));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+// ── 1. Daily compliance check (runs every day at 11am Pacific) ────────────────────
 
 export const dailyComplianceCheck = functions.scheduler.onSchedule(
   {
-    schedule: "0 8 * * *",
+    schedule: "0 11 * * *",
     timeZone: "America/Los_Angeles",
   },
   async () => {
@@ -256,24 +494,30 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
 
     for (const carrierDoc of carriersSnap.docs) {
       const carrierId = carrierDoc.id;
+      const carrierData = carrierDoc.data();
+      if (
+        carrierData.deletingAccount === true ||
+        (carrierData.billing?.status !== "active" &&
+          carrierData.billing?.status !== "trialing")
+      ) {
+        continue;
+      }
 
+      try {
       const usersSnap = await db
         .collection("users")
         .where("carrierId", "==", carrierId)
         .where("notificationsEnabled", "==", true)
         .get();
 
-      const users = usersSnap.docs
-        .map(userDoc => ({
-          userId: userDoc.id,
-          expoPushToken: userDoc.data().expoPushToken as string | undefined,
-        }))
-        .filter(user =>
-            isExpoPushToken(user.expoPushToken)
-          ) as Array<{
-          userId: string;
-          expoPushToken: string;
-        }>;
+      const users = usersSnap.docs.map(userDoc => {
+        const data = userDoc.data();
+        const tokens = [
+          ...(Array.isArray(data.expoPushTokens) ? data.expoPushTokens : []),
+          data.expoPushToken,
+        ].filter(isExpoPushToken);
+        return { userId: userDoc.id, expoPushTokens: [...new Set(tokens)] };
+      }).filter(user => user.expoPushTokens.length > 0);
     console.log("Eligible notification users", {
       carrierId,
       count: users.length,
@@ -284,20 +528,15 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
         continue;
       }
 
+      await ensureBuiltInComplianceDocs(carrierDoc);
+
       const compSnap = await db
         .collection("carriers")
         .doc(carrierId)
         .collection("compliance")
         .get();
 
-      const groupedItems: Record<
-        AlertType,
-        Array<{ itemId: string; label: string }>
-      > = {
-        "30_days": [],
-        "15_days": [],
-        "5_days": [],
-      };
+      const reminderCandidates: ReminderCandidate[] = [];
 
       for (const compDoc of compSnap.docs) {
         if (
@@ -318,7 +557,11 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
           continue;
         }
 
-        const days = daysUntil(String(data.dueDate));
+        const dueDate = String(data.dueDate);
+        const reminderDate = compDoc.id === "ifta-quarterly"
+          ? iftaQuarterEndFromDueDate(dueDate) || dueDate
+          : dueDate;
+        const days = daysUntil(reminderDate);
             console.log("Compliance item checked", {
       carrierId,
       itemId: compDoc.id,
@@ -326,15 +569,41 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
       completed: data.completed,
       daysUntilDue: days,
     });
-        const alertType = getAlertType(days, compDoc.id);
+        reminderCandidates.push({
+          itemId: compDoc.id,
+          label: compDoc.id === "ifta-quarterly"
+            ? "IFTA reporting quarter ends"
+            : REQUIREMENT_LABELS[compDoc.id] || compDoc.id,
+          days,
+          dueDate,
+          requirementId: compDoc.id,
+          legacyState: data.reminderState,
+        });
+      }
 
-        if (!alertType) {
+      const customRequirementsSnap = await db
+        .collection("carriers")
+        .doc(carrierId)
+        .collection("customRequirements")
+        .get();
+
+      for (const customDoc of customRequirementsSnap.docs) {
+        const data = customDoc.data();
+        if (data.active === false || data.completed === true || !data.dueDate) {
           continue;
         }
-
-        groupedItems[alertType].push({
-          itemId: compDoc.id,
-          label: REQUIREMENT_LABELS[compDoc.id] || compDoc.id,
+        const dueDate = String(data.dueDate);
+        const days = daysUntil(dueDate);
+        reminderCandidates.push({
+          itemId: `custom:${customDoc.id}`,
+          label:
+            typeof data.name === "string" && data.name.trim()
+              ? data.name.trim()
+              : "Custom company requirement",
+          days,
+          dueDate,
+          policy: customReminderPolicy(data),
+          legacyState: data.reminderState,
         });
       }
 const driversSnap = await db
@@ -365,14 +634,13 @@ for (const driverDoc of driversSnap.docs) {
       continue;
     }
 
-    const dueDate =
-      requirement.yearsToAdd > 0
+    const dueDate = requirement.daysToAdd
+      ? addDaysToDate(storedDate, requirement.daysToAdd)
+      : requirement.yearsToAdd > 0
         ? addYearsToDate(storedDate, requirement.yearsToAdd)
         : storedDate;
 
     const days = daysUntil(dueDate);
-    const alertType = getAlertType(days);
-
     console.log("Driver requirement checked", {
       carrierId,
       driverId: driverDoc.id,
@@ -383,31 +651,137 @@ for (const driverDoc of driversSnap.docs) {
       daysUntilDue: days,
     });
 
-    if (!alertType) {
-      continue;
-    }
-
-    groupedItems[alertType].push({
+    reminderCandidates.push({
       itemId: `driver:${driverDoc.id}:${requirement.itemType}`,
       label: `${driverName} — ${requirement.label}`,
+      days,
+      dueDate,
+      legacyState: driverData.reminderStates?.[requirement.itemType],
     });
   }
 }
-        const dueIn30DaysItems = groupedItems["30_days"];
-        const dueIn15DaysItems = groupedItems["15_days"];
-        const dueIn5DaysItems = groupedItems["5_days"];
 
-        const allItems = [
-          ...dueIn5DaysItems,
-          ...dueIn15DaysItems,
-          ...dueIn30DaysItems,
-        ];
+const vehiclesSnap = await db
+  .collection("carriers")
+  .doc(carrierId)
+  .collection("vehicles")
+  .get();
 
-        if (allItems.length === 0) {
-          continue;
-        }
+for (const vehicleDoc of vehiclesSnap.docs) {
+  const vehicleData = vehicleDoc.data();
 
+  if (vehicleData.status === "inactive") {
+    continue;
+  }
+
+  const unitNumber =
+    typeof vehicleData.unitNumber === "string" &&
+    vehicleData.unitNumber.trim()
+      ? vehicleData.unitNumber.trim()
+      : "Vehicle";
+
+  const vehicleType =
+    vehicleData.type === "trailer"
+      ? "Trailer"
+      : "Truck";
+
+  const deadlines = [
+    {
+      field: "registrationExpiration",
+      itemType: "registration",
+      label: "Registration",
+    },
+    {
+      field: "inspectionExpiration",
+      itemType: "inspection",
+      label: "Annual DOT inspection",
+    },
+  ];
+
+  for (const deadline of deadlines) {
+    if (
+      deadline.field === "registrationExpiration" &&
+      vehicleData.type === "trailer" &&
+      vehicleData.registrationPermanent === true
+    ) {
+      continue;
+    }
+
+    const dueDate = vehicleData[deadline.field];
+
+    if (typeof dueDate !== "string" || !dueDate.trim()) {
+      continue;
+    }
+
+    const days = daysUntil(dueDate);
+    reminderCandidates.push({
+      itemId: `vehicle:${vehicleDoc.id}:${deadline.itemType}`,
+      label: `${vehicleType} ${unitNumber} — ${deadline.label}`,
+      days,
+      dueDate,
+      legacyState: vehicleData.reminderStates?.[deadline.itemType],
+    });
+  }
+}
         for (const user of users) {
+          const groupedItems: Record<
+            AlertType,
+            Array<{ itemId: string; label: string }>
+          > = {
+            "30_days": [],
+            "15_days": [],
+            "5_days": [],
+            "1_day": [],
+          };
+          const stateRefs = reminderCandidates.map(candidate =>
+            reminderStateRef(carrierId, user.userId, candidate.itemId)
+          );
+          const stateSnapshots = stateRefs.length > 0
+            ? await db.getAll(...stateRefs)
+            : [];
+          const reminderUpdates: ReminderUpdate[] = [];
+
+          reminderCandidates.forEach((candidate, index) => {
+            const decision = getAlertDecision(
+              candidate.days,
+              candidate.dueDate,
+              stateSnapshots[index]?.exists
+                ? stateSnapshots[index].data()?.state
+                : candidate.legacyState,
+              candidate.requirementId,
+              candidate.policy
+            );
+            if (!decision) return;
+            groupedItems[decision.alertType].push({
+              itemId: candidate.itemId,
+              label: candidate.label,
+            });
+            reminderUpdates.push({
+              ref: stateRefs[index],
+              fieldPath: "state",
+              state: decision.state,
+              metadata: {
+                carrierId,
+                userId: user.userId,
+                itemId: candidate.itemId,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              },
+            });
+          });
+
+          const dueIn30DaysItems = groupedItems["30_days"];
+          const dueIn15DaysItems = groupedItems["15_days"];
+          const dueIn5DaysItems = groupedItems["5_days"];
+          const dueIn1DayItems = groupedItems["1_day"];
+          const allItems = [
+            ...dueIn5DaysItems,
+            ...dueIn1DayItems,
+            ...dueIn15DaysItems,
+            ...dueIn30DaysItems,
+          ];
+
+          if (allItems.length === 0) continue;
+
           const notificationId = buildNotificationId(
             user.userId,
             todayKey
@@ -420,6 +794,7 @@ for (const driverDoc of driversSnap.docs) {
             notificationDate: todayKey,
             totalItems: allItems.length,
             dueIn5DaysCount: dueIn5DaysItems.length,
+            dueIn1DayCount: dueIn1DayItems.length,
             dueIn15DaysCount: dueIn15DaysItems.length,
             dueIn30DaysCount: dueIn30DaysItems.length,
             itemIds: allItems.map(item => item.itemId),
@@ -434,18 +809,36 @@ for (const driverDoc of driversSnap.docs) {
             const ticket = await sendDailySummaryNotification({
               carrierId,
               userId: user.userId,
-              expoPushToken: user.expoPushToken,
+              expoPushTokens: user.expoPushTokens,
               dueIn30DaysIds: dueIn30DaysItems.map(item => item.itemId),
               dueIn15DaysIds: dueIn15DaysItems.map(item => item.itemId),
               dueIn5DaysIds: dueIn5DaysItems.map(item => item.itemId),
+              dueIn1DayIds: dueIn1DayItems.map(item => item.itemId),
             });
 
+            const acceptedTickets = ticket.filter(item => item.status === "ok" && item.id);
             await db.collection("notificationRuns").doc(notificationId).update({
-              status: ticket.status === "ok" ? "sent" : "failed",
-              expoTicketId: ticket.id || null,
-              errorMessage: ticket.message || null,
+              status: acceptedTickets.length > 0 ? "sent" : "failed",
+              expoTickets: ticket,
+              errorMessage: acceptedTickets.length > 0 ? null : "No device accepted the notification.",
               updatedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
+
+            if (acceptedTickets.length > 0) {
+              await saveReminderUpdates(reminderUpdates);
+              const receiptBatch = db.batch();
+              acceptedTickets.forEach(item => receiptBatch.set(
+                db.collection("notificationPushReceipts").doc(item.id!),
+                {
+                  token: item.token,
+                  userId: user.userId,
+                  carrierId,
+                  status: "pending",
+                  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                }
+              ));
+              await receiptBatch.commit();
+            }
           } catch (error) {
             await db.collection("notificationRuns").doc(notificationId).update({
               status: "failed",
@@ -457,6 +850,12 @@ for (const driverDoc of driversSnap.docs) {
             console.error("Daily summary notification failed:", error);
           }
         }
+      } catch (error) {
+        console.error("Carrier notification processing failed; continuing", {
+          carrierId,
+          error,
+        });
+      }
       }
        console.log("Daily compliance check complete");
     } 
@@ -466,17 +865,20 @@ for (const driverDoc of driversSnap.docs) {
 
 async function sendDailySummaryNotification(
   summary: DailyNotificationSummary
-): Promise<{
+): Promise<Array<{
   status: string;
   id?: string;
   message?: string;
-}> {
+  token: string;
+}>> {
   const dueIn5DaysCount = summary.dueIn5DaysIds.length;
+  const dueIn1DayCount = summary.dueIn1DayIds.length;
   const dueIn15DaysCount = summary.dueIn15DaysIds.length;
   const dueIn30DaysCount = summary.dueIn30DaysIds.length;
 
   const totalItems =
     dueIn5DaysCount +
+    dueIn1DayCount +
     dueIn15DaysCount +
     dueIn30DaysCount;
 
@@ -487,21 +889,26 @@ async function sendDailySummaryNotification(
 
   const bodyParts: string[] = [];
 
+  if (dueIn1DayCount > 0) {
+    bodyParts.push(`${dueIn1DayCount} need attention within 1 day`);
+  }
+
   if (dueIn5DaysCount > 0) {
-    bodyParts.push(`${dueIn5DaysCount} due in 5 days`);
+    bodyParts.push(`${dueIn5DaysCount} need attention within 5 days`);
   }
 
   if (dueIn15DaysCount  > 0) {
-    bodyParts.push(`${dueIn15DaysCount } due in 15 days`);
+    bodyParts.push(`${dueIn15DaysCount} need attention within 15 days`);
   }
 
   if (dueIn30DaysCount > 0) {
-    bodyParts.push(`${dueIn30DaysCount} due in 30 days`);
+    bodyParts.push(`${dueIn30DaysCount} need attention within 30 days`);
   }
 
   const body = `${bodyParts.join(" • ")}. Tap to review.`;
 
   const allItemIds = [
+    ...summary.dueIn1DayIds,
     ...summary.dueIn5DaysIds,
     ...summary.dueIn15DaysIds,
     ...summary.dueIn30DaysIds,
@@ -525,8 +932,8 @@ for (
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          to: summary.expoPushToken,
+        body: JSON.stringify(summary.expoPushTokens.map(token => ({
+          to: token,
           title,
           body,
           sound: "default",
@@ -538,12 +945,14 @@ for (
             itemIds: allItemIds,
             dueIn5DaysIds:
               summary.dueIn5DaysIds,
+            dueIn1DayIds:
+              summary.dueIn1DayIds,
             dueIn15DaysIds:
               summary.dueIn15DaysIds,
             dueIn30DaysIds:
               summary.dueIn30DaysIds,
           },
-        }),
+        }))),
       }
     );
   } catch (error) {
@@ -563,14 +972,17 @@ for (
 
   if (response.ok) {
     const result = (await response.json()) as {
-      data: {
+      data: Array<{
         status: string;
         id?: string;
         message?: string;
-      };
+      }>;
     };
 
-    return result.data;
+    return result.data.map((ticket, index) => ({
+      ...ticket,
+      token: summary.expoPushTokens[index],
+    }));
   }
 
   const errorText = await response.text();
@@ -597,6 +1009,63 @@ throw new Error(
   "Expo push request failed after retries."
 );
 }
+
+export const checkNotificationPushReceipts = functions.scheduler.onSchedule(
+  {
+    schedule: "every 15 minutes",
+    timeZone: "America/Los_Angeles",
+  },
+  async () => {
+    const pending = await db.collection("notificationPushReceipts")
+      .where("status", "==", "pending")
+      .limit(1000)
+      .get();
+    const eligible = pending.docs.filter(document => {
+      const createdAt = document.data().createdAt as admin.firestore.Timestamp | undefined;
+      return createdAt && Date.now() - createdAt.toMillis() >= 15 * 60 * 1000;
+    });
+    if (eligible.length === 0) return;
+
+    const response = await fetch("https://exp.host/--/api/v2/push/getReceipts", {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: eligible.map(document => document.id) }),
+    });
+    if (!response.ok) throw new Error(`Expo receipt request failed: ${response.status}`);
+    const result = await response.json() as {
+      data?: Record<string, { status: string; message?: string; details?: { error?: string } }>;
+    };
+
+    for (const document of eligible) {
+      const receipt = result.data?.[document.id];
+      if (!receipt) continue;
+      await document.ref.update({
+        status: receipt.status,
+        error: receipt.details?.error ?? null,
+        message: receipt.message ?? null,
+        checkedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      if (receipt.details?.error === "DeviceNotRegistered") {
+        const { userId, token } = document.data();
+        if (typeof userId === "string" && typeof token === "string") {
+          const userRef = db.collection("users").doc(userId);
+          await db.runTransaction(async transaction => {
+            const user = await transaction.get(userRef);
+            if (!user.exists) return;
+            const update: Record<string, unknown> = {
+              expoPushTokens: admin.firestore.FieldValue.arrayRemove(token),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            };
+            if (user.data()?.expoPushToken === token) {
+              update.expoPushToken = admin.firestore.FieldValue.delete();
+            }
+            transaction.update(userRef, update);
+          });
+        }
+      }
+    }
+  }
+);
 
 export const deleteAccount = onCall(
   {
@@ -797,9 +1266,25 @@ const carrierId = userId;
       await writer.close();
     }
 
-    // Remove referral-code ownership records belonging
-    // to this carrier. Historical referral attribution
-    // records are intentionally retained.
+    const [reminderStatesByUser, reminderStatesByCarrier] = await Promise.all([
+      db.collection("notificationReminderStates").where("userId", "==", userId).get(),
+      db.collection("notificationReminderStates").where("carrierId", "==", carrierId).get(),
+    ]);
+    const reminderStateRefs = new Map<string, FirebaseFirestore.DocumentReference>();
+    reminderStatesByUser.docs.forEach(document =>
+      reminderStateRefs.set(document.ref.path, document.ref)
+    );
+    reminderStatesByCarrier.docs.forEach(document =>
+      reminderStateRefs.set(document.ref.path, document.ref)
+    );
+    if (reminderStateRefs.size > 0) {
+      const writer = db.bulkWriter();
+      for (const ref of reminderStateRefs.values()) writer.delete(ref);
+      await writer.close();
+    }
+
+    // Referral codes and financial attribution are never recycled.
+    // Deactivate the code while preserving its ownership and audit history.
     const referralCodeOwnerRef =
       db
         .collection("carrierReferralCodes")
@@ -813,21 +1298,35 @@ const carrierId = userId;
 
     const referralWriter = db.bulkWriter();
 
-    referralWriter.delete(referralCodeOwnerRef);
+    referralWriter.set(
+      referralCodeOwnerRef,
+      {
+        active: false,
+        deactivatedReason: "account_deleted",
+        deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
 
     for (
       const referralCodeDocument of
       ownedReferralCodesSnapshot.docs
     ) {
-      referralWriter.delete(
-        referralCodeDocument.ref
+      referralWriter.set(
+        referralCodeDocument.ref,
+        {
+          active: false,
+          deactivatedReason: "account_deleted",
+          deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
       );
     }
 
     await referralWriter.close();
 
     console.log(
-      "Referral code records deleted during account deletion",
+      "Referral code records deactivated during account deletion",
       {
         carrierId,
         referralCodeCount:
@@ -858,6 +1357,158 @@ const carrierId = userId;
     return {
       success: true,
     };
+  }
+);
+
+export const deleteCarrierEntity = onCall(
+  { region: "us-central1", timeoutSeconds: 120 },
+  async request => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "You must be signed in to delete this record.");
+    }
+    const entityType = request.data?.entityType;
+    const entityId = request.data?.entityId;
+    if (
+      !["customRequirement", "driver", "vehicle"].includes(entityType) ||
+      typeof entityId !== "string" ||
+      !entityId ||
+      entityId.length > 200 ||
+      entityId.includes("/")
+    ) {
+      throw new HttpsError("invalid-argument", "The deletion target is invalid.");
+    }
+
+    const carrierId = request.auth.uid;
+    const [user, carrier] = await Promise.all([
+      db.collection("users").doc(carrierId).get(),
+      db.collection("carriers").doc(carrierId).get(),
+    ]);
+    if (!user.exists || user.data()?.carrierId !== carrierId || user.data()?.role !== "owner") {
+      throw new HttpsError("permission-denied", "Only the company owner can delete this record.");
+    }
+    if (!carrier.exists) {
+      throw new HttpsError("not-found", "Your company account could not be found.");
+    }
+    if (carrier.data()?.deletingAccount === true) {
+      throw new HttpsError("failed-precondition", "Account deletion is already in progress.");
+    }
+
+    const collectionName = entityType === "customRequirement"
+      ? "customRequirements"
+      : entityType === "driver"
+        ? "drivers"
+        : "vehicles";
+    const target = carrier.ref.collection(collectionName).doc(entityId);
+    if (!(await target.get()).exists) return { success: true, alreadyDeleted: true };
+    await db.recursiveDelete(target);
+    return { success: true, alreadyDeleted: false };
+  }
+);
+
+async function deleteDocumentsByUserOrCarrier(
+  collectionName: string,
+  userId: string,
+  carrierId: string
+): Promise<void> {
+  const [byUser, byCarrier] = await Promise.all([
+    db.collection(collectionName).where("userId", "==", userId).get(),
+    db.collection(collectionName).where("carrierId", "==", carrierId).get(),
+  ]);
+  const refs = new Map<string, FirebaseFirestore.DocumentReference>();
+  byUser.docs.forEach(document => refs.set(document.ref.path, document.ref));
+  byCarrier.docs.forEach(document => refs.set(document.ref.path, document.ref));
+  if (refs.size === 0) return;
+
+  const writer = db.bulkWriter();
+  refs.forEach(ref => writer.delete(ref));
+  await writer.close();
+}
+
+async function resumeStalledDeletion(
+  carrierSnapshot: FirebaseFirestore.DocumentSnapshot
+): Promise<void> {
+  const carrierId = carrierSnapshot.id;
+  const carrierRef = carrierSnapshot.ref;
+  const stripeCustomerId = carrierSnapshot.data()?.billing?.stripeCustomerId;
+
+  if (typeof stripeCustomerId === "string" && stripeCustomerId) {
+    const stripe = new Stripe(stripeSecretKey.value());
+    try {
+      await stripe.customers.del(stripeCustomerId);
+    } catch (error: any) {
+      const missing = error?.code === "resource_missing" || error?.statusCode === 404;
+      if (!missing) throw error;
+    }
+  }
+
+  await Promise.all([
+    deleteDocumentsByUserOrCarrier("notificationRuns", carrierId, carrierId),
+    deleteDocumentsByUserOrCarrier("notificationReminderStates", carrierId, carrierId),
+  ]);
+
+  const referralCodeOwnerRef = db.collection("carrierReferralCodes").doc(carrierId);
+  const ownedCodes = await db.collection("referralCodes")
+    .where("carrierId", "==", carrierId)
+    .get();
+  const referralWriter = db.bulkWriter();
+  referralWriter.set(referralCodeOwnerRef, {
+    active: false,
+    deactivatedReason: "account_deleted",
+    deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+  ownedCodes.docs.forEach(document => {
+    referralWriter.set(document.ref, {
+      active: false,
+      deactivatedReason: "account_deleted",
+      deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  });
+  await referralWriter.close();
+
+  await db.recursiveDelete(carrierRef);
+  await db.collection("users").doc(carrierId).delete();
+  try {
+    await admin.auth().deleteUser(carrierId);
+  } catch (error: any) {
+    if (error?.code !== "auth/user-not-found") throw error;
+  }
+}
+
+/**
+ * Safety net for a deletion interrupted by a timeout, deployment, or transient
+ * service failure. All operations are idempotent and retry on the next run.
+ */
+export const resumeStalledAccountDeletions = functions.scheduler.onSchedule(
+  {
+    schedule: "every 60 minutes",
+    timeZone: "America/Los_Angeles",
+    secrets: [stripeSecretKey],
+    timeoutSeconds: 540,
+  },
+  async () => {
+    const deletingCarriers = await db.collection("carriers")
+      .where("deletingAccount", "==", true)
+      .get();
+    const staleBefore = Date.now() - 15 * 60 * 1000;
+
+    for (const carrierSnapshot of deletingCarriers.docs) {
+      const startedAt = carrierSnapshot.data().deletingAccountStartedAt as
+        | admin.firestore.Timestamp
+        | undefined;
+      if (startedAt && startedAt.toMillis() > staleBefore) continue;
+
+      try {
+        await resumeStalledDeletion(carrierSnapshot);
+        console.log("Stalled account deletion completed", {
+          carrierId: carrierSnapshot.id,
+        });
+      } catch (error) {
+        console.error("Stalled account deletion will be retried", {
+          carrierId: carrierSnapshot.id,
+          error,
+        });
+      }
+    }
   }
 );
 
@@ -1005,8 +1656,7 @@ export const createBillingPortalSession = onCall(
       const portalSession =
         await stripe.billingPortal.sessions.create({
           customer: stripeCustomerId,
-          return_url:
-            "https://weheartpaperwork.com/settings",
+          return_url: `${publicAppBaseUrl()}/settings`,
         });
 
       console.log(
@@ -1048,6 +1698,140 @@ export const createBillingPortalSession = onCall(
     }
   }
 );
+/**
+ * Repairs a stale Firestore billing snapshot from Stripe.
+ *
+ * This is intentionally limited to the Stripe customer already linked to the
+ * authenticated carrier. An email match alone is not sufficient proof that a
+ * Stripe customer belongs to a Firebase account.
+ */
+export const refreshBillingStatus = onCall(
+  {
+    region: "us-central1",
+    secrets: [stripeSecretKey],
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError(
+        "unauthenticated",
+        "You must be signed in to refresh billing."
+      );
+    }
+
+    const userId = request.auth.uid;
+    const [userSnapshot, carrierSnapshot] = await Promise.all([
+      db.collection("users").doc(userId).get(),
+      db.collection("carriers").doc(userId).get(),
+    ]);
+
+    if (!carrierSnapshot.exists) {
+      throw new HttpsError(
+        "not-found",
+        "Your company account could not be found."
+      );
+    }
+
+    if (
+      userSnapshot.exists &&
+      userSnapshot.data()?.carrierId !== userId
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "Your company account link is invalid."
+      );
+    }
+
+    if (carrierSnapshot.data()?.deletingAccount === true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Account deletion is already in progress."
+      );
+    }
+
+    // Early accounts could have a carrier document without the matching user
+    // link. The authenticated UID is already the carrier owner in this app's
+    // one-owner data model, so restoring this missing index is safe.
+    if (!userSnapshot.exists) {
+      await db.collection("users").doc(userId).set({
+        email:
+          typeof request.auth.token.email === "string"
+            ? request.auth.token.email
+            : "",
+        carrierId: userId,
+        role: "owner",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    }
+
+    const billing = carrierSnapshot.data()?.billing ?? {};
+    const stripeCustomerId = billing.stripeCustomerId;
+    const savedSubscriptionId = billing.stripeSubscriptionId;
+
+    if (typeof stripeCustomerId !== "string" || !stripeCustomerId) {
+      return { repaired: false, reason: "no-linked-customer" };
+    }
+
+    const stripe = new Stripe(stripeSecretKey.value());
+    let subscription: Stripe.Subscription | null = null;
+
+    if (
+      typeof savedSubscriptionId === "string" &&
+      savedSubscriptionId
+    ) {
+      try {
+        subscription = await stripe.subscriptions.retrieve(
+          savedSubscriptionId
+        );
+      } catch (error: any) {
+        const missing =
+          error?.code === "resource_missing" ||
+          error?.statusCode === 404;
+
+        if (!missing) {
+          throw error;
+        }
+      }
+    }
+
+    if (!subscription) {
+      const subscriptions = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: "all",
+        limit: 100,
+      });
+
+      const accessSubscription = subscriptions.data.find(
+        (item) => item.status === "active" || item.status === "trialing"
+      );
+
+      subscription = accessSubscription ?? subscriptions.data[0] ?? null;
+    }
+
+    if (!subscription) {
+      return { repaired: false, reason: "no-subscription" };
+    }
+
+    const subscriptionCustomerId =
+      typeof subscription.customer === "string"
+        ? subscription.customer
+        : subscription.customer.id;
+
+    if (subscriptionCustomerId !== stripeCustomerId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The linked billing profile does not match this subscription."
+      );
+    }
+
+    await syncSubscriptionToCarrier(db, subscription, userId);
+
+    return {
+      repaired: true,
+      status: subscription.status,
+    };
+  }
+);
+
 export const createCheckoutSession = onCall(
   {
     region: "us-central1",
@@ -1331,6 +2115,58 @@ console.log(
         }
       );
 
+      const customerSubscriptions = await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: "all",
+        limit: 100,
+      });
+      const liveSubscription = customerSubscriptions.data.find(
+        subscription =>
+          subscription.status === "active" ||
+          subscription.status === "trialing" ||
+          subscription.status === "past_due" ||
+          subscription.status === "unpaid" ||
+          subscription.status === "incomplete" ||
+          subscription.status === "paused"
+      );
+
+      if (liveSubscription) {
+        await syncSubscriptionToCarrier(db, liveSubscription, carrierId);
+        const portalSession = await stripe.billingPortal.sessions.create({
+          customer: stripeCustomerId,
+          return_url: `${publicAppBaseUrl()}/settings`,
+        });
+        return {
+          url: portalSession.url,
+          activeDriverCount,
+          estimatedMonthlyAmountCents:
+            liveSubscription.items.data.reduce(
+              (total, item) => total + (item.price.unit_amount ?? 0) * (item.quantity ?? 1),
+              0
+            ),
+        };
+      }
+
+      const openCheckoutSessions = await stripe.checkout.sessions.list({
+        customer: stripeCustomerId,
+        status: "open",
+        limit: 100,
+      });
+      const reusableCheckoutSession = openCheckoutSessions.data.find(
+        session =>
+          session.mode === "subscription" &&
+          session.metadata?.carrierId === carrierId &&
+          typeof session.url === "string"
+      );
+
+      if (reusableCheckoutSession?.url) {
+        return {
+          url: reusableCheckoutSession.url,
+          activeDriverCount,
+          estimatedMonthlyAmountCents: 200 + activeDriverCount * 100,
+        };
+      }
+
       // Create the invoice line items.
       const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
         [
@@ -1382,24 +2218,13 @@ console.log(
         }
       );
 
-      const requestOrigin =
-  typeof request.rawRequest.headers.origin === "string"
-    ? request.rawRequest.headers.origin
-    : "";
-
-const allowedCheckoutOrigins = new Set([
-  "https://weheartpaperwork.com",
-  "http://localhost:8081",
-  "http://127.0.0.1:8081",
-]);
-
-const checkoutBaseUrl =
-  allowedCheckoutOrigins.has(requestOrigin)
-    ? requestOrigin
-    : "https://weheartpaperwork.com";
+const checkoutBaseUrl = publicAppBaseUrl();
 
 console.log("Checkout return origin resolved", {
-  requestOrigin: requestOrigin || null,
+  firebaseProjectId:
+    process.env.GCLOUD_PROJECT ??
+    process.env.GCP_PROJECT ??
+    admin.app().options.projectId ?? null,
   checkoutBaseUrl,
 });
 
@@ -1426,6 +2251,9 @@ console.log("Checkout return origin resolved", {
 
           cancel_url:
             `${checkoutBaseUrl}/subscription-required?checkout=cancelled`,
+          }, {
+            idempotencyKey:
+              `checkout_${carrierId}_${Math.floor(Date.now() / (30 * 60 * 1000))}`,
           });
 
       // STEP 11 belongs immediately after the Stripe
@@ -1529,6 +2357,40 @@ const isActive =
         }
       );
 
+      return;
+    }
+
+    const lockOwner = `driver_event_${event.id}`;
+    const reconciliation = await db.runTransaction(async transaction => {
+      const ref = db.collection("carriers").doc(carrierId);
+      const snapshot = await transaction.get(ref);
+      if (!snapshot.exists || snapshot.data()?.deletingAccount === true) {
+        return null;
+      }
+
+      const data = snapshot.data() ?? {};
+      const generation = Number(data.billingReconciliationGeneration ?? 0) + 1;
+      const lockUntil = data.billingReconciliationLockUntil as
+        | admin.firestore.Timestamp
+        | undefined;
+      const lockIsActive = lockUntil && lockUntil.toMillis() > Date.now();
+
+      transaction.update(ref, {
+        billingReconciliationGeneration: generation,
+        billingReconciliationPending: true,
+        ...(lockIsActive ? {} : {
+          billingReconciliationLockOwner: lockOwner,
+          billingReconciliationLockUntil:
+            admin.firestore.Timestamp.fromMillis(Date.now() + 5 * 60 * 1000),
+        }),
+      });
+
+      return { generation, ownsLock: !lockIsActive };
+    });
+
+    if (!reconciliation?.ownsLock) {
+      // The current lock holder or the scheduled safety net will reconcile the
+      // newest generation. This prevents out-of-order Stripe quantity writes.
       return;
     }
 
@@ -1676,8 +2538,164 @@ const billing =
             (item.price.unit_amount ?? 0) *
               (item.quantity ?? 1),
           0
-        ),
+      ),
     });
+
+    await db.runTransaction(async transaction => {
+      const latest = await transaction.get(carrierRef);
+      if (!latest.exists) return;
+      if (latest.data()?.billingReconciliationLockOwner !== lockOwner) return;
+      const hasNewerGeneration =
+        Number(latest.data()?.billingReconciliationGeneration ?? 0) !==
+        reconciliation.generation;
+      transaction.update(carrierRef, {
+        billingReconciliationPending: hasNewerGeneration,
+        billingReconciliationLockOwner: admin.firestore.FieldValue.delete(),
+        billingReconciliationLockUntil: admin.firestore.FieldValue.delete(),
+      });
+    });
+  }
+);
+
+export const reconcilePendingDriverBilling = functions.scheduler.onSchedule(
+  {
+    schedule: "every 5 minutes",
+    timeZone: "America/Los_Angeles",
+    secrets: [stripeSecretKey, stripeDriverPriceId],
+    timeoutSeconds: 540,
+    maxInstances: 1,
+  },
+  async () => {
+    const pendingCarriers = await db.collection("carriers")
+      .where("billingReconciliationPending", "==", true)
+      .get();
+    const stripe = new Stripe(stripeSecretKey.value());
+    const driverPriceId = stripeDriverPriceId.value();
+
+    for (const pendingCarrier of pendingCarriers.docs) {
+      const carrierRef = pendingCarrier.ref;
+      const carrierId = pendingCarrier.id;
+      const lockOwner = `scheduled_${Date.now()}_${carrierId}`;
+      const claim = await db.runTransaction(async transaction => {
+        const latest = await transaction.get(carrierRef);
+        if (!latest.exists || latest.data()?.deletingAccount === true) return null;
+        const lockUntil = latest.data()?.billingReconciliationLockUntil as
+          | admin.firestore.Timestamp
+          | undefined;
+        if (lockUntil && lockUntil.toMillis() > Date.now()) return null;
+        const generation = Number(latest.data()?.billingReconciliationGeneration ?? 0);
+        transaction.update(carrierRef, {
+          billingReconciliationLockOwner: lockOwner,
+          billingReconciliationLockUntil:
+            admin.firestore.Timestamp.fromMillis(Date.now() + 5 * 60 * 1000),
+        });
+        return {
+          generation,
+          subscriptionId: latest.data()?.billing?.stripeSubscriptionId,
+        };
+      });
+
+      if (!claim) continue;
+
+      try {
+        if (typeof claim.subscriptionId === "string" && claim.subscriptionId) {
+          const drivers = await carrierRef.collection("drivers").get();
+          const activeDriverCount = drivers.docs.filter(
+            document => document.data().status !== "inactive"
+          ).length;
+          let subscription = await stripe.subscriptions.retrieve(claim.subscriptionId);
+
+          if (subscription.status !== "canceled" && subscription.status !== "incomplete_expired") {
+            const driverItem = subscription.items.data.find(
+              item => item.price.id === driverPriceId
+            );
+            const currentQuantity = driverItem?.quantity ?? 0;
+
+            if (activeDriverCount > 0 && currentQuantity !== activeDriverCount) {
+              if (driverItem) {
+                await stripe.subscriptionItems.update(
+                  driverItem.id,
+                  { quantity: activeDriverCount, proration_behavior: "create_prorations" },
+                  { idempotencyKey: `driver_reconcile_${carrierId}_${claim.generation}` }
+                );
+              } else {
+                await stripe.subscriptionItems.create(
+                  {
+                    subscription: subscription.id,
+                    price: driverPriceId,
+                    quantity: activeDriverCount,
+                    proration_behavior: "create_prorations",
+                  },
+                  { idempotencyKey: `driver_reconcile_${carrierId}_${claim.generation}` }
+                );
+              }
+            } else if (activeDriverCount === 0 && driverItem) {
+              await stripe.subscriptionItems.del(
+                driverItem.id,
+                { proration_behavior: "create_prorations" }
+              );
+            }
+
+            subscription = await stripe.subscriptions.retrieve(subscription.id);
+            await syncSubscriptionToCarrier(db, subscription, carrierId, activeDriverCount);
+          }
+        }
+
+        await db.runTransaction(async transaction => {
+          const latest = await transaction.get(carrierRef);
+          if (!latest.exists || latest.data()?.billingReconciliationLockOwner !== lockOwner) return;
+          const hasNewerGeneration =
+            Number(latest.data()?.billingReconciliationGeneration ?? 0) !== claim.generation;
+          transaction.update(carrierRef, {
+            billingReconciliationPending: hasNewerGeneration,
+            billingReconciliationLockOwner: admin.firestore.FieldValue.delete(),
+            billingReconciliationLockUntil: admin.firestore.FieldValue.delete(),
+          });
+        });
+      } catch (error) {
+        console.error("Driver billing reconciliation will be retried", { carrierId, error });
+        await db.runTransaction(async transaction => {
+          const latest = await transaction.get(carrierRef);
+          if (!latest.exists || latest.data()?.billingReconciliationLockOwner !== lockOwner) return;
+          transaction.update(carrierRef, {
+            billingReconciliationPending: true,
+            billingReconciliationLockOwner: admin.firestore.FieldValue.delete(),
+            billingReconciliationLockUntil: admin.firestore.FieldValue.delete(),
+          });
+        });
+      }
+    }
+  }
+);
+
+export const queueDailyDriverBillingReconciliation = functions.scheduler.onSchedule(
+  {
+    schedule: "0 2 * * *",
+    timeZone: "America/Los_Angeles",
+    timeoutSeconds: 540,
+  },
+  async () => {
+    const carriers = await db.collection("carriers").get();
+    for (let index = 0; index < carriers.docs.length; index += 450) {
+      const batch = db.batch();
+      for (const carrier of carriers.docs.slice(index, index + 450)) {
+        const data = carrier.data();
+        const subscriptionId = data.billing?.stripeSubscriptionId;
+        if (
+          data.deletingAccount === true ||
+          typeof subscriptionId !== "string" ||
+          !subscriptionId
+        ) {
+          continue;
+        }
+        batch.update(carrier.ref, {
+          billingReconciliationPending: true,
+          billingReconciliationGeneration:
+            admin.firestore.FieldValue.increment(1),
+        });
+      }
+      await batch.commit();
+    }
   }
 );
 export const stripeWebhook = onRequest(
@@ -1686,6 +2704,7 @@ export const stripeWebhook = onRequest(
     secrets: [
       stripeSecretKey,
       stripeWebhookSecret,
+      stripeDriverPriceId,
     ],
   },
   async (request, response) => {
@@ -1748,7 +2767,19 @@ export const stripeWebhook = onRequest(
       await transaction.get(webhookEventRef);
 
     if (existingEvent.exists) {
-      return false;
+      const existing = existingEvent.data();
+      if (existing?.status === "processed") {
+        return "processed" as const;
+      }
+
+      const startedAt = existing?.processingStartedAt as
+        | admin.firestore.Timestamp
+        | undefined;
+      const leaseIsCurrent = startedAt &&
+        Date.now() - startedAt.toMillis() < 15 * 60 * 1000;
+      if (leaseIsCurrent) {
+        return "busy" as const;
+      }
     }
 
     transaction.set(webhookEventRef, {
@@ -1762,13 +2793,15 @@ export const stripeWebhook = onRequest(
       status: "processing",
       processingStartedAt:
         admin.firestore.FieldValue.serverTimestamp(),
-    });
+      processingAttempts:
+        admin.firestore.FieldValue.increment(1),
+    }, { merge: true });
 
-    return true;
+    return "claimed" as const;
   }
 );
 
-if (!eventClaimed) {
+if (eventClaimed === "processed") {
   console.log(
     "Duplicate Stripe webhook ignored",
     {
@@ -1785,6 +2818,13 @@ if (!eventClaimed) {
   return;
 }
 
+if (eventClaimed === "busy") {
+  // Do not acknowledge a concurrent delivery until the active worker has
+  // committed success. If that worker fails, Stripe will retry this event.
+  response.status(409).send("Webhook event is already being processed");
+  return;
+}
+
     try {
       switch (event.type) {
       case "checkout.session.completed": {
@@ -1794,7 +2834,8 @@ if (!eventClaimed) {
         await handleCheckoutCompleted(
           db,
           stripe,
-          session
+          session,
+          stripeDriverPriceId.value()
         );
 
         break;
@@ -1899,6 +2940,30 @@ if (!eventClaimed) {
         break;
       }
 
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await recordReferralRewardForPaidInvoice(db, stripe, event.id, event.created, invoice);
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        await recordRefundAdjustments(db, stripe, event.id, charge);
+        break;
+      }
+
+      case "charge.dispute.created": {
+        const dispute = event.data.object as Stripe.Dispute;
+        await holdRewardForDispute(db, event.id, dispute);
+        break;
+      }
+
+      case "charge.dispute.closed": {
+        const dispute = event.data.object as Stripe.Dispute;
+        await resolveRewardDispute(db, event.id, dispute);
+        break;
+      }
+
       default: {
         console.log(
           "Stripe webhook event ignored",
@@ -1960,4 +3025,8 @@ export {
   getReferralCode,
   claimReferral,
 } from "./referrals";
+export {
+  getReferralDashboard,
+  matureReferralRewards,
+} from "./referralRewards";
 

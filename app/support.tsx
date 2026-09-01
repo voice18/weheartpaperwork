@@ -1,6 +1,8 @@
-import { router } from "expo-router";
+import PublicHeader from "../components/public/PublicHeader";
+import PublicFooter from "../components/public/PublicFooter";
+import Head from "expo-router/head";
+import { Link } from "expo-router";
 import {
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,56 +13,34 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SupportPage() {
   return (
+  <>
+  <Head><title>Support | We Heart Paperwork</title><meta name="description" content="Get help with your We Heart Paperwork account, subscription, technical issue, or data request." /><link rel="canonical" href="https://weheartpaperwork.com/support" /><meta name="robots" content="index,follow" /></Head>
   <SafeAreaView
     edges={["top", "bottom"]}
     style={styles.page}
   >
+    <PublicHeader />
+
     <ScrollView
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
-       <Pressable
-        onPress={() => {
-          if (router.canGoBack()) {
-            router.back();
-          } else {
-            router.replace("/compliance-guide");
-          }
-        }}
-      >
-        <Text style={styles.backLink}>
-          ‹ Back
-        </Text>
-      </Pressable>
-      </View>
 
       <View style={styles.article}>
         <Text style={styles.eyebrow}>
           CUSTOMER SUPPORT
         </Text>
 
-        <Text style={styles.title}>
+        <Text accessibilityRole="header" style={styles.title}>
           How can we help?
         </Text>
 
         <Text style={styles.paragraph}>
           For account access, subscription questions,
           technical issues, or feedback, contact us at
-          voice18@gmail.com.
+          aaron@weheartpaperwork.com.
         </Text>
 
-        <Pressable
-          onPress={() =>
-            Linking.openURL(
-              "mailto:voice18@gmail.com?subject=We%20Heart%20Paperwork%20Support"
-            )
-          }
-          style={styles.button}
-        >
-          <Text style={styles.buttonText}>
-            Email support
-          </Text>
-        </Pressable>
+        <Link href={"mailto:aaron@weheartpaperwork.com?subject=We%20Heart%20Paperwork%20Support" as any} asChild><Pressable accessibilityRole="link" style={styles.button}><Text style={styles.buttonText}>Email support</Text></Pressable></Link>
 
         <Text style={styles.sectionTitle}>
           Include these details
@@ -87,7 +67,7 @@ export default function SupportPage() {
 
         <Text style={styles.paragraph}>
           To request account deletion, data access, or
-          correction, email voice18@gmail.com with
+          correction, email aaron@weheartpaperwork.com with
           the subject “Account or Data Request.”
         </Text>
 
@@ -100,9 +80,17 @@ export default function SupportPage() {
           information and deadlines. It does not provide
           legal advice or guarantee regulatory compliance.
         </Text>
+
+        <View style={styles.nextSteps}>
+          <Text style={styles.sectionTitle}>Looking for compliance instructions?</Text>
+          <Text style={styles.paragraph}>Support handles the product and your account. For filing steps, official destinations, and free document tools, start with the How-To library.</Text>
+          <Link href={"/how-to" as any} asChild><Pressable style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Open How-To walkthroughs</Text></Pressable></Link>
+        </View>
       </View>
+      <PublicFooter />
     </ScrollView>
     </SafeAreaView>
+    </>
   );
 }
 
@@ -186,6 +174,9 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
   },
+  nextSteps: { marginTop: 12, paddingBottom: 40 },
+  secondaryButton: { alignSelf:"flex-start",minHeight:48,marginTop:20,paddingHorizontal:20,borderWidth:1,borderColor:"#B6CBA4",borderRadius:11,alignItems:"center",justifyContent:"center",backgroundColor:"#FFFFFF" },
+  secondaryButtonText: { color:"#27500A",fontSize:14,fontWeight:"700" },
 
   list: {
     gap: 10,

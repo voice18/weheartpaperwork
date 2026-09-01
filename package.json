@@ -3,11 +3,21 @@
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
-    "start": "expo start",
+    "start": "node scripts/run-expo-production.mjs start",
+    "start:staging": "node scripts/run-expo-staging.mjs start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web",
-    "build:web": "expo export --platform web"
+    "web": "node scripts/run-expo-production.mjs start --web",
+    "web:staging": "node scripts/run-expo-staging.mjs start --web",
+    "build:web": "node scripts/run-expo-production.mjs export --platform web",
+    "build:web:staging": "node scripts/run-expo-staging.mjs export --platform web",
+    "validate:mobile": "node scripts/validate-mobile-config.mjs",
+    "deploy:production:web": "npm run build:web && firebase deploy --project dot-compliance-dashboard --only hosting",
+    "deploy:production:functions": "firebase deploy --project dot-compliance-dashboard --only functions",
+    "deploy:production:rules": "firebase deploy --project dot-compliance-dashboard --only firestore:rules",
+    "deploy:staging:web": "npm run build:web:staging && firebase deploy --project weheartpaperwork-staging --only hosting",
+    "deploy:staging:functions": "firebase deploy --project weheartpaperwork-staging --only functions",
+    "deploy:staging:rules": "firebase deploy --project weheartpaperwork-staging --only firestore:rules"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -25,6 +35,8 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.2",
+    "react-native-keyboard-controller": "1.21.9",
+    "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",

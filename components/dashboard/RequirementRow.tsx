@@ -16,6 +16,7 @@ import {
   calculateNextDue,
   daysFrom,
   fmtDate,
+  iftaQuarterEndFromDueDate,
   localDateString,
   urgency,
 } from "../../lib/requirements";
@@ -73,13 +74,16 @@ const {
   error: historyError,
   deleteRecord,
 } = useComplianceHistory(
-  String(r.id)
+  String(r.id),
+  undefined,
+  r.isCustom === true
 );
 
 const fixedCalendarIds = [
   "tax2290",
   "ucr",
   "ifta",
+  "ifta-quarterly",
 ];
 
 const latestHistoryRecord =
@@ -105,7 +109,7 @@ const canUndoFixedCalendarCompletion =
   !r.completed &&
   latestHistoryRecord?.nextDueDate ===
     r.due &&
-  previousDueYear === currentYear;
+  (r.id === "ifta-quarterly" || previousDueYear === currentYear);
 
   const [
     confirmingComplete,
@@ -157,6 +161,13 @@ const canUndoFixedCalendarCompletion =
   const rawDays =
     daysFrom(r.due);
 
+  const filingPeriodEnd =
+    r.filingPeriodEnd ||
+    (r.id === "ifta-quarterly"
+      ? iftaQuarterEndFromDueDate(r.due)
+      : null);
+  const periodDays = daysFrom(filingPeriodEnd);
+
   const days =
     rawDays === null
       ? null
@@ -164,8 +175,20 @@ const canUndoFixedCalendarCompletion =
         ? Math.abs(rawDays)
         : rawDays;
 
+  const isReadyToFile =
+    (r.periodBased === true && rawDays !== null && rawDays < 0) ||
+    (filingPeriodEnd &&
+      periodDays !== null &&
+      periodDays < 0 &&
+      rawDays !== null &&
+      rawDays > 0);
+
   const badgeText =
-    urg === "done"
+    filingPeriodEnd && periodDays === 0
+      ? "Quarter ends today"
+      : isReadyToFile
+      ? "Ready to file"
+      : urg === "done"
       ? "✓ Done"
       : !r.due || days === null
         ? "Needs Date"
@@ -182,6 +205,8 @@ const canUndoFixedCalendarCompletion =
   const finalBadgeColor =
     !isApplicable
       ? "#706E68"
+      : isReadyToFile
+        ? "#27500A"
       : isBoc3Unfiled
         ? "#A32D2D"
         : badgeColor;
@@ -189,6 +214,8 @@ const canUndoFixedCalendarCompletion =
   const finalBadgeBg =
     !isApplicable
       ? "#E8E8E5"
+      : isReadyToFile
+        ? "#EAF3DE"
       : isBoc3Unfiled
         ? "#FCEBEB"
         : badgeBg;
@@ -242,11 +269,9 @@ const canUndoFixedCalendarCompletion =
     return;
   }
 
-  const nextDue =
-    calculateNextDue(
-      r.id,
-      isoDate
-    );
+  const nextDue = r.isCustom
+    ? isoDate
+    : calculateNextDue(r.id, isoDate);
 
   if (!nextDue) {
     return;
@@ -374,6 +399,16 @@ async function handleUndoFixedCalendarCompletion() {
   const isoDate = inputToIso(completionDate);
 
   if (!isoDate) {
+    return;
+  }
+
+  if (filingPeriodEnd && isoDate <= filingPeriodEnd) {
+    const message = "The IFTA return can be marked filed after the reporting quarter ends.";
+    if (Platform.OS === "web") {
+      window.alert(`Reporting quarter is still open\n\n${message}`);
+    } else {
+      Alert.alert("Reporting quarter is still open", message);
+    }
     return;
   }
 
@@ -549,7 +584,7 @@ async function handleHistoryRecordMenu(
                   marginTop: 2,
                 }}
               >
-                Next due:{" "}
+                {r.periodBased ? "Period ends" : "Next due"}:{" "}
                 {fmtDate(
                   r.due
                 )}
@@ -714,7 +749,7 @@ async function handleHistoryRecordMenu(
                     color: "#706E68",
                   }}
                 >
-                  Next due
+                  {r.periodBased ? "Reporting period ends" : "Next due"}
                 </Text>
 
                 <Text
@@ -727,6 +762,15 @@ async function handleHistoryRecordMenu(
                   {fmtDate(r.due)}
                 </Text>
               </View>
+
+              {filingPeriodEnd ? (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: 5 }}>
+                  <Text style={{ fontSize: 12, color: "#706E68" }}>Reporting quarter ends</Text>
+                  <Text style={{ fontSize: 12, fontWeight: "500", color: "#1A1915" }}>
+                    {fmtDate(filingPeriodEnd)}
+                  </Text>
+                </View>
+              ) : null}
 
               {r.id ===
                 "mcs150" && (

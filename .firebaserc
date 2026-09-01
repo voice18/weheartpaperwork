@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "dot-compliance-dashboard"
+    "default": "dot-compliance-dashboard",
+    "production": "dot-compliance-dashboard",
+    "staging": "weheartpaperwork-staging"
   }
 }

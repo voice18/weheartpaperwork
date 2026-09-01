@@ -4,6 +4,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  runTransaction,
   onSnapshot,
   serverTimestamp,
   Timestamp,
@@ -41,7 +42,8 @@ export type ComplianceHistoryRecord = {
 
 export function useComplianceHistory(
   requirementId: string,
-  driverId?: string
+  driverId?: string,
+  isCustom = false
 ) {
   const [records, setRecords] = useState<
     ComplianceHistoryRecord[]
@@ -67,7 +69,16 @@ export function useComplianceHistory(
     setLoading(true);
     setError(null);
 
-    const historyRef = driverId
+    const historyRef = isCustom
+  ? collection(
+      db,
+      "carriers",
+      carrierId,
+      "customRequirements",
+      requirementId,
+      "history"
+    )
+  : driverId
   ? collection(
       db,
       "carriers",
@@ -200,7 +211,7 @@ export function useComplianceHistory(
     );
 
     return unsubscribe;
-  }, [requirementId, driverId]);
+  }, [requirementId, driverId, isCustom]);
 
 async function deleteRecord(
   recordId: string
@@ -214,7 +225,17 @@ async function deleteRecord(
     );
   }
 
-  const recordRef = driverId
+  const recordRef = isCustom
+    ? doc(
+        db,
+        "carriers",
+        carrierId,
+        "customRequirements",
+        requirementId,
+        "history",
+        recordId
+      )
+    : driverId
     ? doc(
         db,
         "carriers",
@@ -253,6 +274,44 @@ async function deleteRecord(
     records[0]?.id !== recordId
   ) {
     await deleteDoc(recordRef);
+    return;
+  }
+
+  if (isCustom) {
+    const requirementRef = doc(
+      db, "carriers", carrierId, "customRequirements", requirementId
+    );
+    const requirementSnapshot = await getDoc(requirementRef);
+    if (!requirementSnapshot.exists()) {
+      await deleteDoc(recordRef);
+      return;
+    }
+    const liveData = requirementSnapshot.data();
+    const expectedDue = targetRecord.nextDueDate;
+    const liveCompletionDate =
+      typeof liveData.completedDate === "string" ? liveData.completedDate : null;
+    if (
+      liveData.dueDate !== expectedDue ||
+      (targetRecord.completionDate && liveCompletionDate !== targetRecord.completionDate)
+    ) {
+      await deleteDoc(recordRef);
+      return;
+    }
+    await runTransaction(db, async transaction => {
+      const latest = await transaction.get(requirementRef);
+      if (!latest.exists()) { transaction.delete(recordRef); return; }
+      const data = latest.data();
+      if (data.dueDate !== expectedDue ||
+          (targetRecord.completionDate && data.completedDate !== targetRecord.completionDate)) {
+        transaction.delete(recordRef); return;
+      }
+      transaction.set(requirementRef, {
+        dueDate: targetRecord.previousDueDate, completed: false,
+        completedDate: null, completedAt: null, notified30: false,
+        notified90: false, updatedAt: serverTimestamp(),
+      }, { merge: true });
+      transaction.delete(recordRef);
+    });
     return;
   }
 
@@ -324,9 +383,12 @@ async function deleteRecord(
       targetRecord.previousCompletionDate ??
       "";
 
-    const batch = writeBatch(db);
-
-    batch.set(
+    await runTransaction(db, async transaction => {
+    const latest = await transaction.get(driverRef);
+    if (!latest.exists() || latest.data()?.[driverField] !== expectedCurrentValue) {
+      transaction.delete(recordRef); return;
+    }
+    transaction.set(
       driverRef,
       {
         [driverField]:
@@ -340,9 +402,8 @@ async function deleteRecord(
       }
     );
 
-    batch.delete(recordRef);
-
-    await batch.commit();
+    transaction.delete(recordRef);
+    });
     return;
   }
 
@@ -384,9 +445,12 @@ async function deleteRecord(
       return;
     }
 
-    const batch = writeBatch(db);
-
-    batch.set(
+    await runTransaction(db, async transaction => {
+    const latest = await transaction.get(complianceRef);
+    if (!latest.exists() || latest.data()?.dueDate !== targetRecord.nextDueDate) {
+      transaction.delete(recordRef); return;
+    }
+    transaction.set(
       complianceRef,
       {
         dueDate:
@@ -412,9 +476,8 @@ async function deleteRecord(
       }
     );
 
-    batch.delete(recordRef);
-
-    await batch.commit();
+    transaction.delete(recordRef);
+    });
     return;
   }
 
@@ -442,9 +505,17 @@ async function deleteRecord(
     return;
   }
 
-  const batch = writeBatch(db);
-
-  batch.set(
+  await runTransaction(db, async transaction => {
+  const latest = await transaction.get(complianceRef);
+  if (!latest.exists() || latest.data()?.completed !== true) {
+    transaction.delete(recordRef); return;
+  }
+  const latestCompletion = typeof latest.data()?.completedDate === "string"
+    ? latest.data()?.completedDate : null;
+  if (targetRecord.completionDate && latestCompletion && latestCompletion !== targetRecord.completionDate) {
+    transaction.delete(recordRef); return;
+  }
+  transaction.set(
     complianceRef,
     {
       completed: false,
@@ -462,9 +533,8 @@ async function deleteRecord(
     }
   );
 
-  batch.delete(recordRef);
-
-  await batch.commit();
+  transaction.delete(recordRef);
+  });
 }
 
   return {

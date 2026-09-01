@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+Disallow: /login
+Disallow: /logout
+Disallow: /account
+Disallow: /dashboard
+Disallow: /drivers
+Disallow: /settings
+Disallow: /subscription-required
+Disallow: /company
+Disallow: /notifications
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://weheartpaperwork.com/sitemap.xml

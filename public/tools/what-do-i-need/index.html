@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Paperwork Do I Actually Need?</title>
+<meta name="description" content="Answer a few questions and get the federal compliance checklist that applies to your carrier — with the regulation behind every item. Free, no signup, nothing leaves your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#FBFBF9;
+  --surface:#F1F2EE;
+  --surface-2:#E7E9E3;
+  --line:#DBDDD5;
+  --line-soft:#EAEBE5;
+  --ink:#1A1D1C;
+  --ink-2:#545A57;
+  --ink-3:#82887F;
+  --accent:#1F5E56;
+  --accent-2:#2C7A70;
+  --accent-bg:#DDEAE7;
+  --accent-ink:#FFFFFF;
+  --cost:#8A5A12;
+  --cost-bg:#F4E9D3;
+  --crit:#8E3130;
+  --crit-bg:#F5DFDE;
+  --focus:#8A5A12;
+  --radius:3px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131615;
+    --surface:#1B1F1E;
+    --surface-2:#242927;
+    --line:#333937;
+    --line-soft:#232827;
+    --ink:#E8EAE6;
+    --ink-2:#A4ABA6;
+    --ink-3:#7B827C;
+    --accent:#5FB3A5;
+    --accent-2:#7FC7BA;
+    --accent-bg:#1A302C;
+    --accent-ink:#0E1817;
+    --cost:#D8A94E;
+    --cost-bg:#332A16;
+    --crit:#E08C8B;
+    --crit-bg:#2E1D1D;
+    --focus:#D8A94E;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131615;
+  --surface:#1B1F1E;
+  --surface-2:#242927;
+  --line:#333937;
+  --line-soft:#232827;
+  --ink:#E8EAE6;
+  --ink-2:#A4ABA6;
+  --ink-3:#7B827C;
+  --accent:#5FB3A5;
+  --accent-2:#7FC7BA;
+  --accent-bg:#1A302C;
+  --accent-ink:#0E1817;
+  --cost:#D8A94E;
+  --cost-bg:#332A16;
+  --crit:#E08C8B;
+  --crit-bg:#2E1D1D;
+  --focus:#D8A94E;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:Barlow,"Helvetica Neue",Arial,sans-serif;
+  font-size:17px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4,.eyebrow,.btn,.chip,.tag,.qnum,.gnum,.count{
+  font-family:"Barlow Semi Condensed",Barlow,"Helvetica Neue",Arial,sans-serif;
+}
+h1{font-size:clamp(1.9rem,5vw,2.7rem);line-height:1.05;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:balance}
+h2{font-size:1.5rem;font-weight:700;line-height:1.15;margin:0;letter-spacing:-.008em;text-wrap:balance}
+h3{font-size:1.06rem;font-weight:600;line-height:1.25;margin:0}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:2px}
+.eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin:0}
+.small{font-size:.92rem;line-height:1.5;color:var(--ink-2)}
+.tiny{font-size:.8rem;line-height:1.5;color:var(--ink-3)}
+.mono,.cite{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.8rem}
+.cite{color:var(--ink-3)}
+strong{font-weight:600}
+
+.shell{max-width:720px;margin:0 auto;padding:0 20px 80px}
+.col{max-width:36rem}
+
+/* ---------- masthead ---------- */
+.mast{display:flex;flex-direction:column;gap:16px;padding:48px 0 28px}
+.mast .sub{font-size:1.08rem;color:var(--ink-2);line-height:1.5;max-width:34rem}
+
+/* ---------- buttons ---------- */
+.btn{
+  font-size:.95rem;font-weight:600;letter-spacing:.01em;
+  padding:11px 20px;border-radius:var(--radius);border:1px solid var(--accent);
+  background:var(--accent);color:var(--accent-ink);cursor:pointer;
+  transition:filter .12s ease;line-height:1.2;
+}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--accent);border-color:var(--line)}
+.btn.ghost:hover{background:var(--surface);filter:none}
+.btn:focus-visible,.opt:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ---------- intro ---------- */
+.facts{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);padding:18px 20px;max-width:34rem}
+.fact{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:baseline;font-size:.93rem;line-height:1.45}
+.fact .m{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--accent);font-weight:500}
+
+/* ---------- progress ---------- */
+.prog{display:flex;gap:4px;padding:0 0 22px}
+.seg{height:3px;flex:1;background:var(--line);border-radius:2px;transition:background .2s ease}
+.seg.done{background:var(--accent)}
+.seg.now{background:var(--accent-2)}
+
+/* ---------- question ---------- */
+.qwrap{display:flex;flex-direction:column;gap:22px;padding:28px 0 0}
+.qhead{display:flex;flex-direction:column;gap:8px}
+.qnum{font-size:.72rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3)}
+.qtitle{font-size:1.5rem;font-weight:700;line-height:1.18;letter-spacing:-.008em;text-wrap:balance}
+.qhelp{font-size:.94rem;color:var(--ink-2);line-height:1.5;max-width:34rem}
+.opts{display:flex;flex-direction:column;gap:9px}
+.opt{
+  display:grid;grid-template-columns:20px 1fr;gap:13px;align-items:start;
+  text-align:left;width:100%;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  padding:15px 17px;cursor:pointer;font-family:inherit;font-size:1rem;color:var(--ink);
+  transition:border-color .12s ease, background .12s ease;
+}
+.opt:hover{border-color:var(--accent);background:var(--accent-bg)}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent)}
+.dotmark{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ink-3);margin-top:3px;position:relative;flex:none}
+.opt[aria-pressed="true"] .dotmark{border-color:var(--accent)}
+.opt[aria-pressed="true"] .dotmark::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+.opt .ot{display:flex;flex-direction:column;gap:3px}
+.opt .oh{font-weight:600;line-height:1.3}
+.opt .od{font-size:.86rem;color:var(--ink-2);line-height:1.45}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:6px}
+
+/* ---------- results ---------- */
+.res{display:flex;flex-direction:column;gap:0}
+.verdict{
+  border:1px solid var(--line);border-top:3px solid var(--accent);border-radius:var(--radius);
+  background:var(--surface);padding:24px 24px 22px;display:flex;flex-direction:column;gap:16px;
+}
+.vlabel{font-size:.7rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);
+  font-family:"Barlow Semi Condensed",sans-serif}
+.vname{font-family:"Barlow Semi Condensed",sans-serif;font-size:1.7rem;font-weight:700;line-height:1.12;letter-spacing:-.01em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  padding:3px 9px;border-radius:2px;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.stats{display:flex;gap:26px;flex-wrap:wrap;padding-top:2px;border-top:1px solid var(--line-soft);margin-top:2px;padding-top:16px}
+.stat{display:flex;flex-direction:column;gap:1px}
+.count{font-size:1.9rem;font-weight:700;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat .sl{font-size:.75rem;color:var(--ink-3);letter-spacing:.02em}
+.count.money{color:var(--cost)}
+
+.group{padding:34px 0 0;display:flex;flex-direction:column;gap:14px}
+.ghead{display:flex;flex-direction:column;gap:5px;padding-bottom:2px;border-bottom:1px solid var(--line)}
+.gnum{font-size:.7rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--accent)}
+.gtitle{font-family:"Barlow Semi Condensed",sans-serif;font-size:1.28rem;font-weight:700;line-height:1.2}
+.gsub{font-size:.88rem;color:var(--ink-2);line-height:1.45;padding-bottom:10px}
+
+.items{display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+.item{display:grid;grid-template-columns:22px 1fr;gap:12px;padding:15px 17px;background:var(--surface);
+  border-bottom:1px solid var(--line-soft);break-inside:avoid}
+.item:last-child{border-bottom:0}
+.box{width:15px;height:15px;border:1.5px solid var(--ink-3);border-radius:2px;margin-top:4px}
+.ib{display:flex;flex-direction:column;gap:6px;min-width:0}
+.ititle{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.ititle h3{font-size:1rem}
+.tag{font-size:.65rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:2px;white-space:nowrap}
+.t-once{background:var(--surface-2);color:var(--ink-3)}
+.t-rep{background:var(--accent-bg);color:var(--accent)}
+.t-cost{background:var(--cost-bg);color:var(--cost)}
+.t-free{background:var(--accent-bg);color:var(--accent)}
+.t-crit{background:var(--crit-bg);color:var(--crit)}
+.iwhat{font-size:.92rem;color:var(--ink-2);line-height:1.5}
+.imeta{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;padding-top:1px}
+
+.note{border:1px solid var(--line);border-left:3px solid var(--cost);border-radius:var(--radius);
+  background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:7px}
+.note.crit{border-left-color:var(--crit)}
+.note.acc{border-left-color:var(--accent)}
+.note h3{font-size:.98rem}
+
+.offer{margin-top:38px;border:1px solid var(--line);border-radius:var(--radius);background:var(--accent-bg);
+  padding:22px 24px;display:flex;flex-direction:column;gap:12px}
+.offer h3{font-size:1.15rem;font-family:"Barlow Semi Condensed",sans-serif;font-weight:700}
+.efield{display:flex;gap:8px;flex-wrap:wrap;max-width:30rem}
+.efield input{flex:1 1 15rem;font-family:inherit;font-size:.96rem;padding:10px 13px;border-radius:var(--radius);
+  border:1px solid var(--line);background:var(--ground);color:var(--ink)}
+.efield input:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+
+.disclaimer{margin-top:40px;padding-top:22px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+
+.toolbar{position:sticky;top:0;z-index:5;background:var(--ground);border-bottom:1px solid var(--line);
+  padding:11px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:4px}
+.toolbar .tl{font-family:"Barlow Semi Condensed",sans-serif;font-weight:600;font-size:.9rem;color:var(--ink-2)}
+
+.hide{display:none !important}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important;animation:none !important}
+}
+
+/* ---------- print ---------- */
+@media print{
+  @page{margin:14mm 13mm}
+  html,body{background:#fff;color:#000;font-size:10.5pt;line-height:1.4}
+  .shell{max-width:none;padding:0}
+  .noprint,.toolbar,.offer,.prog,.nav,.btn,.mast{display:none !important}
+  .printonly{display:block !important}
+  .verdict{border:1.5pt solid #000;border-top-width:3pt;background:#fff;padding:12pt;break-inside:avoid}
+  .vname{font-size:16pt}
+  .chip{background:#fff;border:.5pt solid #666;color:#000}
+  .group{padding-top:16pt;break-inside:auto}
+  .ghead{border-bottom:1pt solid #000}
+  .gtitle{font-size:12pt}
+  .gnum,.vlabel{color:#000}
+  .items{border:.75pt solid #999}
+  .item{background:#fff;border-bottom:.5pt solid #ccc;padding:7pt 8pt;break-inside:avoid}
+  .box{border:1pt solid #000}
+  .iwhat,.small,.gsub{color:#222}
+  .tiny,.cite{color:#444}
+  .tag{border:.5pt solid #888;background:#fff !important;color:#000 !important}
+  .note{background:#fff;border:.75pt solid #000;break-inside:avoid}
+  .stats{border-top:.5pt solid #999}
+  .count{color:#000 !important}
+  a{color:#000;text-decoration:none}
+}
+.printonly{display:none}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+<!-- ================= INTRO ================= -->
+<section id="intro">
+  <div class="mast">
+    <p class="eyebrow">Free tool &middot; We Heart Paperwork</p>
+    <h1>What paperwork do I actually need?</h1>
+    <p class="sub">A few questions. You get the federal checklist that applies to <em>your</em> operation &mdash; not the generic one &mdash; with the regulation behind every line so you can check our work.</p>
+  </div>
+
+  <div class="facts">
+    <div class="fact"><span class="m">01</span><span>Nothing you type leaves your device. There is no account, no database, no email required.</span></div>
+    <div class="fact"><span class="m">02</span><span>Every item cites the actual CFR section. If we say you need something, you can go read why.</span></div>
+    <div class="fact"><span class="m">03</span><span>We flag what is <strong>free</strong>. Several things carriers get charged hundreds for cost nothing.</span></div>
+    <div class="fact"><span class="m">04</span><span>We are a private company. We are not FMCSA, not DOT, and not affiliated with any government agency.</span></div>
+  </div>
+
+  <div class="btnrow" style="padding-top:22px">
+    <button class="btn" id="start">Start &mdash; about 2 minutes</button>
+  </div>
+</section>
+
+<!-- ================= QUIZ ================= -->
+<section id="quiz" class="hide">
+  <div class="prog" id="prog" aria-hidden="true"></div>
+  <div class="qwrap">
+    <div class="qhead">
+      <p class="qnum" id="qnum"></p>
+      <h2 class="qtitle" id="qtitle"></h2>
+      <p class="qhelp" id="qhelp"></p>
+    </div>
+    <div class="opts" id="opts" role="group" aria-labelledby="qtitle"></div>
+    <div class="nav">
+      <button class="btn ghost" id="back">Back</button>
+      <p class="tiny" id="hint">Pick one to continue</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RESULTS ================= -->
+<section id="results" class="hide">
+  <div class="toolbar noprint">
+    <span class="tl">Your checklist</span>
+    <div class="btnrow">
+      <button class="btn ghost" id="restart">Start over</button>
+      <button class="btn" id="print">Print / Save as PDF</button>
+    </div>
+  </div>
+
+  <div class="printonly" style="padding:0 0 10pt">
+    <p style="font-family:'Barlow Semi Condensed',sans-serif;font-weight:700;font-size:13pt">Federal compliance checklist</p>
+    <p style="font-size:9pt;color:#444" id="printmeta"></p>
+  </div>
+
+  <div class="res" id="res"></div>
+
+  <div class="offer noprint">
+    <h3>Want the dates tracked for you?</h3>
+    <p class="small">Most of the list above repeats &mdash; annually, quarterly, every 24 months, every 12 months per driver. Missing one is how small carriers get fined for things they thought they had handled. We track them for <strong>$2 a month plus $1 per driver</strong>.</p>
+    <div class="efield">
+      <input type="email" id="email" placeholder="you@yourcompany.com" aria-label="Email address">
+      <button class="btn" id="send">Email me this checklist</button>
+    </div>
+    <p class="tiny" id="emailnote">Optional. We will send this checklist and nothing else unless you ask.</p>
+  </div>
+
+  <div class="disclaimer">
+    <p class="tiny"><strong>We are not FMCSA.</strong> We Heart Paperwork is a private company. We are not affiliated with, endorsed by, or acting on behalf of the Federal Motor Carrier Safety Administration, the U.S. Department of Transportation, or any government agency. Many filings can be completed directly with the government, and several are free; certain insurance and process-agent filings must be submitted by an authorized filer.</p>
+    <p class="tiny">This checklist covers <strong>federal</strong> requirements and flags where state obligations begin. It is a starting point built from the regulations cited, not legal advice, and it cannot see everything about your operation. Verify anything that carries real consequence against the current eCFR or ask FMCSA directly at 1-800-832-5660.</p>
+    <p class="tiny" id="asof"></p>
+  </div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+
+/* =====================================================================
+   QUESTIONS
+   Each question either narrows the requirement set or is skipped.
+   ===================================================================== */
+const Q = [
+  {
+    id:"scope",
+    title:"Do you cross state lines?",
+    help:"Interstate also means hauling freight that is moving across state lines, even if your truck never leaves the state.",
+    opts:[
+      {v:"interstate", h:"Yes — interstate", d:"You cross state lines, or your freight does."},
+      {v:"intrastate", h:"No — only inside my state", d:"Everything starts and ends in one state and never becomes part of an interstate move."}
+    ]
+  },
+  {
+    id:"haul",
+    title:"What are you hauling, and for whom?",
+    help:"This single answer decides whether you need operating authority at all.",
+    opts:[
+      {v:"forhire", h:"Other people's freight, for money", d:"Someone pays you to move their property. This is for-hire."},
+      {v:"private", h:"My own company's goods", d:"You haul materials or products your business owns — a roofer with a dump truck, a farm, a shop making deliveries."},
+      {v:"passenger", h:"Passengers", d:"Motorcoach, shuttle, van service, limo."}
+    ]
+  },
+  {
+    id:"commodity",
+    title:"What kind of freight?",
+    help:"Some agricultural and unprocessed commodities are exempt from economic regulation, which changes whether you need an MC number.",
+    when: a => a.haul === "forhire",
+    opts:[
+      {v:"general", h:"General freight or regulated commodities", d:"Almost everything. Manufactured goods, building materials, packaged food, machinery."},
+      {v:"exempt", h:"Only exempt commodities", d:"Unprocessed agricultural products, ordinary livestock, raw fish. Check FMCSA Administrative Ruling 119 before relying on this."},
+      {v:"hhg", h:"Household goods", d:"Moving people's belongings. This is its own authority type with extra consumer-protection rules."}
+    ]
+  },
+  {
+    id:"paid",
+    title:"Do your passengers pay to ride?",
+    help:"This matters more than it sounds. The seat count that makes a vehicle regulated is different depending on whether money changes hands.",
+    when: a => a.haul === "passenger",
+    opts:[
+      {v:"yes", h:"Yes — it's a paid service", d:"Fares, charter fees, or transportation included in something the rider bought."},
+      {v:"no", h:"No — nobody pays", d:"Church van, company shuttle for your own employees, volunteer transport."}
+    ]
+  },
+  {
+    id:"seats",
+    title:"How many people does your largest vehicle seat, including the driver?",
+    help:"Count every seat, including the driver's.",
+    when: a => a.haul === "passenger",
+    opts:[
+      {v:"under9", h:"8 or fewer", d:"Including the driver."},
+      {v:"9to15", h:"9 to 15", d:"Including the driver."},
+      {v:"16plus", h:"16 or more", d:"Including the driver."}
+    ]
+  },
+  {
+    id:"weight",
+    title:"What does your heaviest vehicle or combination weigh?",
+    help:"Use the greater of the manufacturer's rating (GVWR or GCWR) or what it actually grosses loaded. If a truck is rated at 9,900 lbs but runs at 11,000, use the higher number.",
+    opts:[
+      {v:"under10", h:"Under 10,001 lbs", d:"Sprinter van, pickup, box truck under the line — rated and loaded."},
+      {v:"mid", h:"10,001 to 26,000 lbs", d:"Most box trucks, larger hotshots, small dumps. No CDL needed on weight alone."},
+      {v:"cdl", h:"26,001 to 54,999 lbs", d:"A CDL-level vehicle or combination below the Form 2290 threshold."},
+      {v:"heavy55", h:"55,000 lbs or more", d:"Heavy highway vehicle territory. Form 2290 may apply."}
+    ]
+  },
+  {
+    id:"axles",
+    title:"Does any power unit have three or more axles?",
+    help:"This matters for IFTA and IRP even when the vehicle or combination is 26,000 lbs or less.",
+    when: a => a.scope === "interstate" && (a.weight === "under10" || a.weight === "mid"),
+    opts:[
+      {v:"yes", h:"Yes — three or more axles", d:"Count axles on the power unit itself for IFTA."},
+      {v:"no", h:"No — one or two axles", d:"The weight test will decide IFTA and IRP eligibility."}
+    ]
+  },
+  {
+    id:"hazmat",
+    title:"Do you haul hazardous materials?",
+    help:"Placardable quantities change your insurance minimum, your registration, and your training obligations more than anything else on this form.",
+    opts:[
+      {v:"none", h:"No", d:"Nothing regulated as hazmat."},
+      {v:"small", h:"Yes, but never enough to placard", d:"Small quantities below the placarding threshold, and nothing from Table 1."},
+      {v:"placard", h:"Yes, in placardable quantities", d:"1,001 lbs or more aggregate of Table 2 materials, or any amount of a Table 1 material."}
+    ]
+  },
+  {
+    id:"tank",
+    title:"Do you pull tanks, doubles, or triples?",
+    help:"There is a road-test rule here that catches almost everybody, and it is one of the most common audit findings.",
+    when: a => a.weight === "cdl" || a.weight === "heavy55" || a.hazmat === "placard",
+    opts:[
+      {v:"yes", h:"Yes", d:"Tank vehicles, or double or triple trailers."},
+      {v:"no", h:"No", d:"Standard trailers only."}
+    ]
+  },
+  {
+    id:"drivers",
+    title:"How many drivers, including yourself?",
+    help:"A one-person operation cannot run its own random testing pool, which changes what you have to buy.",
+    opts:[
+      {v:"solo", h:"Just me", d:"You are the owner and the only driver."},
+      {v:"multi", h:"Two or more", d:"You have employee drivers, or plan to hire."}
+    ]
+  },
+  {
+    id:"shorthaul",
+    title:"Do your drivers start and finish at the same place within 14 hours, most days?",
+    help:"If you stay inside 150 air miles of your reporting location and get released within 14 hours, you may not need an ELD at all.",
+    opts:[
+      {v:"yes", h:"Yes, almost always", d:"Local or regional work. Home base every night, within 150 air miles."},
+      {v:"no", h:"No — we run longer or farther", d:"Over-the-road, or days that run past 14 hours."},
+      {v:"mixed", h:"Some of both", d:"Sometimes local, sometimes long."}
+    ]
+  }
+];
+
+/* =====================================================================
+   DERIVED FACTS
+   ===================================================================== */
+function derive(a){
+  const d = {};
+  d.interstate = a.scope === "interstate";
+  d.passenger  = a.haul === "passenger";
+  d.forhire    = a.haul === "forhire";
+  d.private    = a.haul === "private";
+  d.hhg        = a.commodity === "hhg";
+  d.exempt     = a.commodity === "exempt";
+  d.placard    = a.hazmat === "placard";
+  d.anyHazmat  = a.hazmat === "placard" || a.hazmat === "small";
+  d.solo       = a.drivers === "solo";
+  d.tank       = a.tank === "yes";
+  d.paidRiders = d.passenger && a.paid === "yes";
+
+  // Passenger prongs of 49 CFR 390.5T: more than 8 FOR compensation,
+  // or more than 15 NOT for compensation. The seat count alone is not the test.
+  d.paxIsCMV = d.passenger && (
+      d.paidRiders ? (a.seats === "9to15" || a.seats === "16plus")
+                   : (a.seats === "16plus")
+  );
+
+  // Is it a CMV under 49 CFR 390.5T?
+  d.isCMV = d.interstate && (
+      a.weight !== "under10" ||
+      d.placard ||
+      d.paxIsCMV
+  );
+
+  // Does operating the vehicle require a CDL under 49 CFR 383.91?
+  d.needsCDL = a.weight === "cdl" || a.weight === "heavy55" || d.placard || (d.passenger && a.seats === "16plus");
+
+  // Part 382 drug & alcohol keys to CDL-level vehicles, not the 10,001 lb line.
+  d.needsDA = d.needsCDL && d.interstate;
+
+  // Operating authority: for-hire interstate, non-exempt.
+  d.needsAuthority = d.interstate && d.forhire && !d.exempt;
+  if (d.passenger) d.needsAuthority = d.interstate && d.paidRiders;
+  if (d.private)   d.needsAuthority = false;
+  if (d.exempt)    d.needsAuthority = false;
+
+  d.authorityType = d.hhg ? "Household Goods" : d.passenger ? "Passenger" : "Property";
+
+  // IFTA / IRP qualified vehicle: over 26,000 lbs, or 3+ axles.
+  d.qualified = d.interstate && (a.weight === "cdl" || a.weight === "heavy55" || a.axles === "yes");
+
+  // Form 2290 applies at 55,000 lbs taxable gross weight.
+  d.hvut = a.weight === "heavy55";
+
+  // Insurance
+  d.ins = insuranceFor(a, d);
+
+  // ELD
+  d.shortHaulOnly = a.shorthaul === "yes";
+  d.needsELD = d.isCMV && a.shorthaul !== "yes";
+
+  return d;
+}
+
+function insuranceFor(a, d){
+  if (!d.interstate) return {amt:null, label:"Set by your state", note:"Federal minimums under Part 387 reach interstate operations. Your state sets its own."};
+  if (d.passenger){
+    if (!d.paidRiders) return {amt:null, label:"No federal filing required", cite:"49 CFR 387.31",
+      note:"The Part 387 passenger minimums apply to for-hire passenger transportation. Nobody pays to ride with you, so there is no federal financial responsibility filing. You still need real commercial auto liability coverage, and your state and your insurer will have their own requirements."};
+    if (a.seats === "16plus") return {amt:"$5,000,000", label:"16 or more seats including the driver", cite:"49 CFR 387.33"};
+    if (a.seats === "9to15")  return {amt:"$1,500,000", label:"15 or fewer seats including the driver", cite:"49 CFR 387.33"};
+    return {amt:"$1,500,000", label:"Passenger service", cite:"49 CFR 387.33"};
+  }
+  if (d.placard){
+    return {
+      amt:"$1,000,000 — or $5,000,000",
+      label:"Depends on the exact material",
+      cite:"49 CFR 387.9",
+      note:"$5,000,000 applies to bulk Division 1.1/1.2/1.3, bulk Division 2.3 Hazard Zone A, bulk Division 6.1 Packing Group I Hazard Zone A, bulk Division 2.1 or 2.2, and highway route controlled quantities of Class 7. Everything else on the 172.101 table is $1,000,000. This applies even to vehicles under 10,001 lbs — there is no small-vehicle relief for hazmat."
+    };
+  }
+  if (d.forhire && a.weight === "under10"){
+    return {amt:"$300,000", label:"Fleet of only vehicles under 10,001 lbs GVWR, non-hazardous", cite:"49 CFR 387.303T(b)(1)",
+      note:"This is the figure people miss. If every vehicle you run is rated under 10,001 lbs and you haul no hazmat, your filing requirement is $300,000, not $750,000."};
+  }
+  if (d.forhire){
+    return {amt:"$750,000", label:"For-hire property, 10,001 lbs or more, non-hazardous", cite:"49 CFR 387.9"};
+  }
+  if (d.private && !d.anyHazmat){
+    return {amt:null, label:"No federal filing required", cite:"49 CFR 387.9",
+      note:"Private carriers hauling non-hazardous property have no federal financial responsibility filing. You still need real commercial insurance, and your state and your customers will require it."};
+  }
+  return {amt:"$1,000,000", label:"Private carrier hauling hazardous materials", cite:"49 CFR 387.9",
+    note:"Private carriers are not exempt from the hazmat financial responsibility minimums. Rows 2, 3 and 4 of the Part 387 table reach for-hire and private carriers alike."};
+}
+
+/* =====================================================================
+   REQUIREMENTS
+   group: 1 = before you haul, 2 = before a driver moves,
+          3 = every day you run, 4 = comes back around
+   ===================================================================== */
+const REQS = [
+
+/* ---------- 1. BEFORE YOU HAUL ---------- */
+{
+  g:1, id:"usdot", t:"USDOT number", cad:"One-time", cost:"free",
+  when:(a,d)=>d.interstate && (d.isCMV || d.needsAuthority),
+  what:"Your carrier identity number. Everything else attaches to it. You apply in Motus at motus.dot.gov, which now requires a Login.gov account and identity verification with a photo ID and a selfie — you have to do that part yourself, nobody can do it for you.",
+  cite:"49 CFR 390.19T"
+},
+{
+  g:1, id:"authority", t:a=>"Operating authority — " + a._d.authorityType, cad:"One-time", cost:"$300",
+  when:(a,d)=>d.needsAuthority,
+  what:"The MC number. $300 per authority type, non-refundable, paid to FMCSA through Pay.gov. You cannot haul regulated freight for hire until FMCSA issues the authority. Filing the application is not enough; the required insurance filing and BOC-3 must also be accepted.",
+  cite:"49 CFR 365.101T · 49 CFR 360.3T"
+},
+{
+  g:1, id:"noauth", t:"You do NOT need an MC number", cad:"Good news", cost:"free",
+  when:(a,d)=>d.interstate && !d.needsAuthority && !d.passenger,
+  what:a=> a._d.private
+    ? "You haul your own company's goods, so you are a private carrier. Operating authority is for people who transport property for compensation. If your interstate vehicle meets the federal CMV definition, you still need a USDOT number and the applicable safety rules below apply — but do not let anyone sell you an MC number."
+    : "Exempt commodities are outside FMCSA's economic regulation, so no operating authority is required. Verify your specific commodity against FMCSA Administrative Ruling 119 first — 'agricultural' is narrower than people assume. Bananas are not exempt. Cheese is not exempt.",
+  cite:"49 U.S.C. 13506 · FMCSA Administrative Ruling 119"
+},
+{
+  g:1, id:"insurance",
+  t:a=> a._d.ins.amt ? "Public liability insurance on file with FMCSA" : "Commercial insurance — no federal filing",
+  cad:"Continuous", cost:"varies",
+  when:(a,d)=>d.interstate,
+  what:a=>{
+    const i = a._d.ins;
+    let s;
+    if (i.amt){
+      s = "Your minimum is <strong>" + i.amt + "</strong> — " + i.label + ". "
+        + "Your insurer files it for you on Form BMC-91 or BMC-91X; you cannot file it yourself. The MCS-90 endorsement is attached to the policy, and required proof is maintained at the carrier's principal place of business. Cancellation of the federal filing generally requires advance notice, but you should never treat that notice period as permission to operate without effective coverage.";
+    } else {
+      s = i.label + ".";
+    }
+    if (i.note) s += (i.amt ? "<br><br>" : " ") + i.note;
+    return s;
+  },
+  cite:a=>a._d.ins.cite || "49 CFR 387"
+},
+{
+  g:1, id:"cargo", t:"Cargo insurance — BMC-34", cad:"Continuous", cost:"varies",
+  when:(a,d)=>d.hhg,
+  what:"$5,000 per vehicle and $10,000 per occurrence. This applies to household goods carriers only — there is no federal cargo insurance filing for general freight, whatever a broker tells you.",
+  cite:"49 CFR 387.303T(c)"
+},
+{
+  g:1, id:"boc3", t:"BOC-3 process agent designation", cad:"One-time", cost:"$20–$50",
+  when:(a,d)=>d.needsAuthority,
+  what:"Names someone in each state who can accept legal papers for you. FMCSA charges nothing for the form itself — the entire cost is the process agent's fee, and blanket agents covering every state run about $20 to $50. It does not expire, so if someone is billing you annually for a BOC-3, ask them why.",
+  cite:"49 CFR 366.4T"
+},
+{
+  g:1, id:"ucr", t:"Unified Carrier Registration (UCR)", cad:"Annual", cost:"$55",
+  when:(a,d)=>d.interstate && (d.isCMV || d.needsAuthority),
+  what:"Required of interstate carriers including private carriers and exempt-commodity haulers. The 2027 fee for 0–2 vehicles is <strong>$55</strong>, up from $46, effective October 1, 2026. Register at plan.ucr.gov — the official site. Third-party sites charge $80 to $219 for the same filing.",
+  cite:"49 U.S.C. 14504a · 49 CFR 367"
+},
+{
+  g:1, id:"hmreg", t:"PHMSA hazmat registration", cad:"Annual", cost:"$275+",
+  when:(a,d)=>d.placard,
+  what:"Form DOT F 5800.2. Small business $275 all in, larger operations $2,600. The registration year runs July 1 to June 30. As of 2026–2027 PHMSA no longer accepts paper forms or checks.",
+  cite:"49 CFR 107.601 · 107.612"
+},
+{
+  g:1, id:"hmpermit", t:"Hazardous Materials Safety Permit", cad:"Check if it applies", cost:"varies",
+  when:(a,d)=>d.placard,
+  what:"A separate FMCSA permit, required only for specific high-consequence materials: highway route controlled quantity Class 7, more than 55 lbs net of Division 1.1/1.2/1.3, more than one liter per package of a Hazard Zone A poison-inhalation material, and certain bulk methane or liquefied gas loads. Most hazmat carriers do not need one. Check whether you do.",
+  cite:"49 CFR 385.403"
+},
+{
+  g:1, id:"secplan", t:"Hazmat security plan", cad:"Written, kept current", cost:"free",
+  when:(a,d)=>d.placard,
+  what:"A written security plan is required for specified materials and quantities — any amount of a poison-inhalation material, any quantity of temperature-controlled organic peroxide Type B, large bulk quantities of several classes, and others. If a plan is required, your hazmat employees also need in-depth security training.",
+  cite:"49 CFR 172.800"
+},
+{
+  g:1, id:"hvut", t:"Form 2290 — Heavy Vehicle Use Tax", cad:"Annual", cost:"varies",
+  when:(a,d)=>d.hvut,
+  what:"Due on vehicles with a taxable gross weight of 55,000 lbs or more. The tax year runs July 1 to June 30; for a truck first used in July the return and payment are due by August 31. Under 5,000 miles a year (7,500 agricultural) files as suspended and owes no tax but still files. <strong>The stamped Schedule 1 is what your DMV wants before it will plate the truck</strong> — and it is issued when the IRS accepts the return, not when the money clears.",
+  cite:"IRS Form 2290"
+},
+{
+  g:1, id:"ifta", t:"IFTA license and decals", cad:"Annual", cost:"$0–$10",
+  when:(a,d)=>d.qualified,
+  what:"Required for a qualified motor vehicle — over 26,000 lbs, or a power unit with three or more axles regardless of weight — operating in two or more member jurisdictions. Note the threshold is <em>in excess of</em> 26,000 lbs, so 26,000 exactly does not qualify by weight alone. Your base state issues the license and two decals per truck. Many states charge nothing.",
+  cite:"IFTA Articles of Agreement R245"
+},
+{
+  g:1, id:"irp", t:"IRP apportioned plates", cad:"Annual", cost:"$500–$3,000/truck",
+  when:(a,d)=>d.qualified,
+  what:"Same weight and axle test as IFTA, plus actual travel in two or more member jurisdictions. The cost is computed from your mileage distribution across states and your declared weight, so nobody can quote it in advance. First-year applicants use estimated distance; renewals use last year's actuals, so year one and year two are calculated differently.",
+  cite:"IRP Plan, Apportionable Vehicle"
+},
+
+/* ---------- 2. BEFORE A DRIVER MOVES ---------- */
+{
+  g:2, id:"dqfile", t:"Driver qualification file — one per driver", cad:"Per driver", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:"There is no official government form for this, which is why so many carriers fail on it. It must hold: the employment application, the pre-hire MVR, the road test certificate or its equivalent, the annual MVR, the signed annual review note, and the medical certification proof. Keep it for as long as the driver works for you plus three years.",
+  cite:"49 CFR 391.51"
+},
+{
+  g:2, id:"mvrhire", t:"MVR at hire — every state, past 3 years", cad:"Per driver", cost:"$2–$27",
+  when:(a,d)=>d.isCMV,
+  what:"You must request a driving record from every licensing authority where the driver held a license in the previous three years, within 30 days of their start date. Not just their current state. Washington charges $15; California charges $2; Oklahoma charges $27.50.",
+  cite:"49 CFR 391.23(a)(1)"
+},
+{
+  g:2, id:"psp", t:"Previous-employer safety performance history inquiry", cad:"Per driver", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:a=> a._d.solo
+    ? "This one surprises owner-operators. The rule attaches to the driver, and you are a driver — so if you worked for any DOT-regulated carrier in the past three years, you have to investigate your own history and put the documentation in your own file. Write to those former employers, ask for your accident and drug-and-alcohol record, and keep proof you asked even if nobody replies. If you have never driven for a DOT-regulated employer, write a dated note in the file saying exactly that. Due within 30 days of your start date."
+    : "Write to every DOT-regulated employer the driver worked for in the past three years and ask for their accident and drug-and-alcohol history. Document the request even if nobody answers — the requirement is that you asked, and the record of asking is what an auditor looks for. Due within 30 days of the start date.",
+  cite:"49 CFR 391.23(a)(2)"
+},
+{
+  g:2, id:"roadtest", t:"Road test — or a CDL in place of one", cad:"Per driver", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:a=> a._d.tank
+    ? "<strong>Your CDL will not substitute here.</strong> The CDL-in-lieu-of-road-test rule does not extend to vehicles requiring a doubles/triples or tank endorsement. Because you pull tanks or multiple trailers, every driver needs an actual road test on file — and if you are the carrier and the driver both, somebody other than you has to administer it. This is one of the most commonly cited findings in the whole audit."
+    : "A valid CDL can stand in for the road test, and a copy of it goes in the file. If a driver has no CDL, you administer an actual road test covering pre-trip inspection, coupling, controls, traffic, turning, braking and backing, and put the signed certificate in the file. If you are both the carrier and the driver, someone other than you must administer it.",
+  cite:"49 CFR 391.31 · 391.33"
+},
+{
+  g:2, id:"medcert", t:"Medical certification", cad:"Every 24 months", cost:"$50–$150",
+  when:(a,d)=>d.isCMV,
+  what:a=> a._d.needsCDL
+    ? "The exam has to be done by a medical examiner on the National Registry. For a CDL or CLP holder, your proof for the file is the <strong>CDLIS motor vehicle record</strong> showing certified status — the paper certificate stopped being the file copy on June 23, 2025. A temporary exemption lets carriers rely on a paper certificate for up to 60 days after issuance, but <strong>it expires October 11, 2026</strong>. It has been extended three times; do not assume a fourth. Maximum interval is 24 months, shorter if the examiner says so."
+    : "Your drivers do not hold CDLs, so the paper route still applies and is unaffected by the CDL changes. Two things go in the file: a legible copy of the medical examiner's certificate (MCSA-5876), and your written note verifying the examiner was listed on the National Registry as of the date of issue. Maximum interval is 24 months.",
+  cite:"49 CFR 391.43 · 391.45 · 391.51(b)(6)"
+},
+{
+  g:2, id:"cdl", t:a=>"CDL" + (a._d.tank ? " with tank and/or doubles-triples endorsement" : "") + (a._d.placard ? " with hazmat (H) endorsement" : ""), cad:"Per driver", cost:"varies",
+  when:(a,d)=>d.needsCDL,
+  what:a=> a._d.placard
+    ? "A hazmat endorsement requires a TSA security threat assessment, and states must renew it every five years or less so holders get re-screened. Budget real time for this — it is not same-day."
+    : "Group A for combinations over 26,001 lbs with a towed unit over 10,000 lbs; Group B for heavy straight trucks; Group C for 16-plus passengers or placarded hazmat below the other thresholds.",
+  cite:"49 CFR 383.91 · 383.93 · 383.141"
+},
+{
+  g:2, id:"dapolicy", t:"Written drug and alcohol policy", cad:"One-time, then per driver", cost:"free",
+  when:(a,d)=>d.needsDA,
+  what:"You must give every driver a written policy covering twelve required subject areas, and <strong>collect a signed receipt from each one</strong>. The signed receipt is the part carriers forget, and it is the part the auditor asks for.",
+  cite:"49 CFR 382.601"
+},
+{
+  g:2, id:"preemp", t:"Pre-employment drug test", cad:"Per driver", cost:"$40–$80",
+  when:(a,d)=>d.needsDA,
+  what:"A controlled substances test before the driver performs any safety-sensitive function. Pre-employment alcohol testing is permitted but not required. This applies to you too if you drive.",
+  cite:"49 CFR 382.301"
+},
+{
+  g:2, id:"consortium", t:a=>a._d.solo ? "Join a random testing consortium — required" : "Random testing pool", cad:"Annual", cost:"$65–$185/yr",
+  when:(a,d)=>d.needsDA,
+  what:a=> a._d.solo
+    ? "You are a one-person operation, so you cannot run your own pool — the rule requires a random program of two or more covered employees, and FMCSA states directly that owner-operators must join a consortium. Rates for 2026 are <strong>50% of driver positions for controlled substances and 10% for alcohol</strong>, annually. Membership runs about $65 to $185 a year. Ask any consortium in writing whether the advertised 'included' random tests are per driver or per membership — that answer varies a lot more than the marketing suggests."
+    : "You must test at <strong>50% of your average driver positions for controlled substances and 10% for alcohol</strong> each year, selected by a scientifically valid random method and spread reasonably across the year. Most small carriers buy into a consortium rather than run their own pool.",
+  cite:"49 CFR 382.103(b) · 382.305"
+},
+{
+  g:2, id:"supertrain", t:"Supervisor reasonable-suspicion training", cad:"One-time", cost:"$30–$50/seat",
+  when:(a,d)=>d.needsDA && !(a.drivers==="solo"),
+  what:"Anyone who supervises drivers needs <strong>60 minutes on alcohol misuse plus another 60 minutes on controlled substances</strong> — two hours total. There is no recurrent training requirement, so this is genuinely one and done.",
+  cite:"49 CFR 382.603"
+},
+{
+  g:2, id:"chreg", t:"Clearinghouse registration", cad:"One-time", cost:"free",
+  when:(a,d)=>d.needsDA,
+  what:"Registering your company in the FMCSA Drug and Alcohol Clearinghouse is <strong>free</strong>. Queries cost $1.25 each and never expire. Some services charge $249 for the registration alone — do not pay it. If you use a third-party administrator, note that FMCSA does not let them buy your query plan; you buy the queries in your own account and designate them to run the queries.",
+  cite:"clearinghouse.fmcsa.dot.gov"
+},
+{
+  g:2, id:"chfull", t:"Full Clearinghouse query at hire", cad:"Per driver", cost:"$1.25",
+  when:(a,d)=>d.needsDA,
+  what:"Required before the driver performs any safety-sensitive function, and it needs the driver's specific electronic consent inside the Clearinghouse — which means the driver has to have their own account and click through. Plan for that; it is the step that stalls hires.",
+  cite:"49 CFR 382.701(a)"
+},
+
+/* ---------- 3. EVERY DAY YOU RUN ---------- */
+{
+  g:3, id:"hos", t:"Hours of service limits", cad:"Every day", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:a=> a._d.passenger
+    ? "Passenger-carrying limits are different from property, and the difference trips people up: <strong>10 hours driving after 8 consecutive hours off, and a 15-hour on-duty limit</strong>. That 15 hours is accumulated on-duty time, not an elapsed window — off-duty periods do not burn it. Passenger drivers have neither the 30-minute break requirement nor the 34-hour restart. 60 hours in 7 days or 70 in 8."
+    : "<strong>11 hours driving inside a 14-hour window, after 10 consecutive hours off.</strong> The 14-hour window is elapsed clock time and off-duty breaks do not pause it. A 30-minute break is required after 8 hours of driving without an interruption, and it can be off-duty, sleeper, or on-duty-not-driving. 60 hours in 7 days or 70 in 8, with a 34-hour restart available.",
+  cite:a=>a._d.passenger ? "49 CFR 395.5" : "49 CFR 395.3"
+},
+{
+  g:3, id:"eld", t:"Electronic logging device", cad:"Continuous", cost:"$15–$40/mo/truck",
+  when:(a,d)=>d.needsELD,
+  what:"Your drivers keep records of duty status, so an ELD is the default. Three exceptions let you use paper instead: you only need logs on <strong>8 or fewer days in any 30-day period</strong>; driveaway-towaway operations; or the vehicle was manufactured before model year 2000 per the VIN on the registration. FMCSA also accepts a pre-2000 engine even where the VIN shows a later year, but keep your engine-change documentation. Records and supporting documents are kept 6 months.",
+  cite:"49 CFR 395.8(a)(1)(iii)"
+},
+{
+  g:3, id:"shorthaul", t:"Short-haul time records instead of logs", cad:"Every day", cost:"free",
+  when:(a,d)=>d.isCMV && a.shorthaul === "yes",
+  what:"You said your drivers stay local and finish inside 14 hours. If they operate within <strong>150 air miles</strong> of the reporting location and are released within <strong>14 consecutive hours</strong>, they are exempt from RODS and from the ELD — but you must keep accurate time records showing report time, total hours on duty, release time, and the running total for the preceding 7 days. Keep them 6 months. The 150-mile radius applies to CDL and non-CDL drivers alike since 2020. <strong>Blow the 14 hours and that day needs a full log</strong>, which is why the 8-days-in-30 provision matters.",
+  cite:"49 CFR 395.1(e)(1)"
+},
+{
+  g:3, id:"dvir", t:"Driver vehicle inspection reports", cad:"Every day", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:a=> a._d.passenger
+    ? "Passenger-carrying vehicles get a written report at the end of each day's work regardless of whether a defect was found. Any defect affecting safe operation must be repaired and the repair certified before the vehicle runs again. Keep reports 3 months."
+    : "A written report at the end of each day's work covering brakes, steering, lights, tires, horn, wipers, mirrors, coupling devices, wheels and emergency equipment. <strong>For property carriers, a no-defect report is not required</strong> — you only file one when something is found. Defects affecting safety must be repaired and the repair certified before the truck moves again. Keep reports 3 months.",
+  cite:"49 CFR 396.11"
+},
+{
+  g:3, id:"annualinsp", t:"Annual vehicle inspection", cad:"Every 12 months", cost:"$85–$135",
+  when:(a,d)=>d.isCMV,
+  what:"Every vehicle needs a periodic inspection at least once in the preceding 12 months, and <strong>each unit in a combination counts separately</strong> — tractor and trailer are two inspections. Proof must be on the vehicle. The inspection report is retained 14 months, not 12.",
+  cite:"49 CFR 396.17 · 396.21(b)"
+},
+{
+  g:3, id:"maint", t:"Maintenance records", cad:"Ongoing", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:"For every vehicle you control 30 days or more: identifying information including tire size, your inspection and maintenance schedule, and a dated record of what was actually done. Kept where the vehicle is housed for 1 year, and 6 months after it leaves your control.",
+  cite:"49 CFR 396.3"
+},
+{
+  g:3, id:"accreg", t:"Accident register", cad:"Ongoing", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:"Keep one even if it is empty — an auditor will ask. A recordable accident means a fatality, an injury where someone <strong>immediately</strong> gets treatment <strong>away from the scene</strong>, or a vehicle actually towed away because of disabling damage. A tire blowout with no other damage is not recordable even with no spare. Record date, city and state, driver, injuries, fatalities, and whether hazmat other than fuel was released. Keep 3 years.",
+  cite:"49 CFR 390.15(b)"
+},
+{
+  g:3, id:"roadside", t:"Roadside inspection reports", cad:"As they happen", cost:"free",
+  when:(a,d)=>d.isCMV,
+  what:"When you get inspected, violations have to be corrected and you must sign and certify the correction on the form and return it. Keep a copy 12 months. Ignoring this is free points against you.",
+  cite:"49 CFR 396.9(d)"
+},
+{
+  g:3, id:"hmtrain", t:"Hazmat employee training", cad:"Every 3 years", cost:"$50–$200",
+  when:(a,d)=>d.anyHazmat,
+  what:"Five components: general awareness, function-specific, safety, security awareness, and — if you need a security plan — in-depth security. Initial training within 90 days of hire or a change of function. Records must name the employee, the completion date, the materials, who trained them, and certify they were tested. Kept while employed plus 90 days.",
+  cite:"49 CFR 172.704"
+},
+
+/* ---------- 4. COMES BACK AROUND ---------- */
+{
+  g:4, id:"audit", t:"New entrant safety audit", cad:"First 12 months", cost:"free",
+  when:(a,d)=>d.interstate && d.isCMV,
+  what:a=>"You are in an <strong>18-month new entrant monitoring period</strong>. The audit itself happens once you have been running long enough to have records to look at — the regulation says generally at least 3 months, and FMCSA's practice is within the first 12. There are 16 regulations that fail you automatically, including no drug and alcohol testing program, using an unqualified or disqualified driver, operating without required insurance, and running a vehicle that was never inspected. If you fail, you get "
+    + (a._d.passenger || a._d.placard ? "<strong>45 days</strong> to fix it — the shorter window applies to passenger and hazmat carriers." : "<strong>60 days</strong> to fix it.")
+    + " Roadside performance is watched the whole time.",
+  cite:"49 CFR 385.307 · 385.319 · 385.321"
+},
+{
+  g:4, id:"mcs150", t:"MCS-150 biennial update", cad:"Every 24 months", cost:"free",
+  when:(a,d)=>d.interstate && (d.isCMV || d.needsAuthority),
+  what:"<strong>This is free.</strong> Your due month comes from your USDOT number: the next-to-last digit tells you whether it falls in odd or even years, and the last digit is the month, with 1 for January through 9 for September and 0 for October. You must file even if nothing changed. FMCSA has suspended deactivations for missed updates since June 1, 2026 while Motus problems get sorted out, but do not rely on that lasting.",
+  cite:"49 CFR 390.19T"
+},
+{
+  g:4, id:"mvrannual", t:"Annual MVR and review note", cad:"Every 12 months, per driver", cost:"$2–$27",
+  when:(a,d)=>d.isCMV,
+  what:"Pull each driver's record once every 12 months, review it, and put <strong>a note in the file naming who reviewed it and on what date</strong>. Some states offer continuous monitoring instead, which FMCSA has confirmed can satisfy the annual requirement when the program meets the rule.",
+  cite:"49 CFR 391.25"
+},
+{
+  g:4, id:"chquery", t:"Annual Clearinghouse query", cad:"Every 12 months, per driver", cost:"$1.25",
+  when:(a,d)=>d.needsDA,
+  what:"One limited query per driver per year, on a rolling 365-day clock. <strong>If it comes back showing information exists, you have 24 hours to run a full query</strong> — and if you miss that window you must pull the driver off safety-sensitive work until it is done.",
+  cite:"49 CFR 382.701(b)"
+},
+{
+  g:4, id:"ucrren", t:"UCR renewal", cad:"Annual, Oct–Dec", cost:"$55",
+  when:(a,d)=>d.interstate && (d.isCMV || d.needsAuthority),
+  what:"The registration period opens October 1 and closes December 31 for the following year. Renew at plan.ucr.gov.",
+  cite:"49 CFR 367"
+},
+{
+  g:4, id:"hvutren", t:"Form 2290 renewal", cad:"Annual, July–Aug", cost:"varies",
+  when:(a,d)=>d.hvut,
+  what:"Filed every year for the July-to-June tax period, due August 31 for vehicles in service in July. You will need the new stamped Schedule 1 to renew your plates.",
+  cite:"IRS Form 2290"
+},
+{
+  g:4, id:"iftaq", t:"IFTA quarterly returns", cad:"4× per year", cost:"varies",
+  when:(a,d)=>d.qualified,
+  what:"Due April 30, July 31, October 31 and January 31. <strong>You must file even for a quarter with zero miles.</strong> The amount owed depends on where you drove and where you bought fuel, so it can be a payment or a refund.",
+  cite:"IFTA Articles of Agreement R960"
+},
+{
+  g:4, id:"irpren", t:"IRP renewal", cad:"Annual", cost:"varies",
+  when:(a,d)=>d.qualified,
+  what:"The mileage reporting period is always July 1 to June 30, but each jurisdiction sets its own renewal window — there is no single national date. Ask your base state when yours falls.",
+  cite:"IRP Plan"
+},
+{
+  g:4, id:"hmregren", t:"Hazmat registration renewal", cad:"Annual, by June 30", cost:"$275+",
+  when:(a,d)=>d.placard,
+  what:"The registration year runs July 1 to June 30. File by June 30 for the coming year. You can file up to three years at once.",
+  cite:"49 CFR 107.608"
+}
+];
+
+/* =====================================================================
+   ENGINE
+   ===================================================================== */
+const GROUPS = [
+  {n:1, label:"Step one", title:"Before you can legally haul", sub:"Registration, authority and money. Most of this is one-time, and two items on it are free."},
+  {n:2, label:"Step two", title:"Before a driver turns a wheel", sub:"Everything that has to be in a file before someone drives for you — including you, if you drive."},
+  {n:3, label:"Step three", title:"Every day you operate", sub:"The records that get asked for at an audit and at the roadside. These are the ones people are surprised by."},
+  {n:4, label:"Step four", title:"What comes back around", sub:"The recurring dates. This is where small carriers get fined for things they genuinely thought were handled."}
+];
+
+let answers = {};
+let order = [];
+let idx = 0;
+
+const el = id => document.getElementById(id);
+
+function visibleQuestions(){
+  return Q.filter(q => !q.when || q.when(answers));
+}
+
+function renderProgress(){
+  const vis = visibleQuestions();
+  el("prog").innerHTML = vis.map((q,i)=>{
+    const cls = i < idx ? "done" : (i === idx ? "now" : "");
+    return '<span class="seg '+cls+'"></span>';
+  }).join("");
+}
+
+function showQuestion(){
+  const vis = visibleQuestions();
+  if (idx >= vis.length){ showResults(); return; }
+  const q = vis[idx];
+
+  renderProgress();
+  el("qnum").textContent = "Question " + (idx+1) + " of " + vis.length;
+  el("qtitle").textContent = q.title;
+  el("qhelp").textContent = q.help || "";
+  el("qhelp").style.display = q.help ? "" : "none";
+  el("back").style.visibility = idx === 0 ? "hidden" : "visible";
+
+  el("opts").innerHTML = q.opts.map(o =>
+    '<button class="opt" type="button" data-v="'+o.v+'" aria-pressed="'+(answers[q.id]===o.v)+'">'
+    + '<span class="dotmark" aria-hidden="true"></span>'
+    + '<span class="ot"><span class="oh">'+o.h+'</span>'
+    + (o.d ? '<span class="od">'+o.d+'</span>' : '')
+    + '</span></button>'
+  ).join("");
+
+  Array.prototype.forEach.call(el("opts").querySelectorAll(".opt"), btn => {
+    btn.addEventListener("click", () => {
+      answers[q.id] = btn.dataset.v;
+      // Clear answers to questions that are no longer reachable.
+      const stillVisible = new Set(visibleQuestions().map(x=>x.id));
+      Object.keys(answers).forEach(k => { if(!stillVisible.has(k)) delete answers[k]; });
+      idx++;
+      showQuestion();
+      window.scrollTo({top:0, behavior:"instant"});
+    });
+  });
+
+  const first = el("opts").querySelector(".opt");
+  if (first) first.focus();
+}
+
+function resolve(v, a){ return typeof v === "function" ? v(a) : v; }
+
+function showResults(){
+  const a = Object.assign({}, answers);
+  const d = derive(a);
+  a._d = d;
+
+  el("quiz").classList.add("hide");
+  el("results").classList.remove("hide");
+  window.scrollTo({top:0, behavior:"instant"});
+
+  /* ---- intrastate short path ---- */
+  if (!d.interstate){
+    el("res").innerHTML =
+      '<div class="verdict">'
+      + '<p class="vlabel">Your classification</p>'
+      + '<p class="vname">Intrastate carrier</p>'
+      + '<p class="small">You operate entirely inside one state, so the federal safety regulations reach you only where your state has adopted them — and most states have adopted them nearly word for word, often with a lower weight threshold than the federal 10,001 lbs.</p>'
+      + '</div>'
+      + '<div class="group"><div class="ghead"><p class="gnum">What to do</p><p class="gtitle">Ask your state, not us</p></div>'
+      + '<p class="gsub">We can tell you what the federal rules say. We cannot tell you which ones your state adopted, and guessing would be worse than useless.</p>'
+      + '<div class="items">'
+      + '<div class="item"><span class="box"></span><div class="ib"><div class="ititle"><h3>Check whether your state requires a USDOT number</h3><span class="tag t-once">One-time</span></div>'
+      + '<p class="iwhat">Many states and Puerto Rico require certain intrastate carriers to have a USDOT number even when federal interstate registration does not apply. It is free either way.</p></div></div>'
+      + '<div class="item"><span class="box"></span><div class="ib"><div class="ititle"><h3>Find your state’s adopted weight threshold</h3><span class="tag t-once">One-time</span></div>'
+      + '<p class="iwhat">Several states apply driver qualification, hours of service and inspection rules below 10,001 lbs. That threshold decides almost everything else.</p></div></div>'
+      + '<div class="item"><span class="box"></span><div class="ib"><div class="ititle"><h3>Ask about intrastate operating authority</h3><span class="tag t-once">One-time</span></div>'
+      + '<p class="iwhat">Federal MC numbers cover interstate commerce. Many states run their own intrastate authority, and some require it for household goods or passengers specifically.</p></div></div>'
+      + (d.hvut
+        ? '<div class="item"><span class="box"></span><div class="ib"><div class="ititle"><h3>Form 2290 — this one is federal and it does apply to you</h3><span class="tag t-rep">Annual</span><span class="tag t-cost">varies</span></div>'
+        + '<p class="iwhat">The Heavy Vehicle Use Tax is an IRS tax on vehicles with a taxable gross weight of 55,000 lbs or more. It does not care whether you cross state lines. Tax year runs July 1 to June 30, due August 31 for a truck in service in July. Under 5,000 miles a year files as suspended and owes nothing, but still files. <strong>Your DMV will want the stamped Schedule 1 before it plates the truck.</strong></p>'
+        + '<div class="imeta"><span class="cite">IRS Form 2290</span></div></div></div>'
+        : '')
+      + '</div></div>'
+      + '<div class="note acc" style="margin-top:26px"><h3>If you ever cross a state line, come back</h3>'
+      + '<p class="small">Interstate is not only about your truck leaving the state. If you haul freight that is part of a shipment moving across state lines, that is interstate commerce even if you never leave home. Run this again as an interstate carrier and you will get a very different list.</p></div>';
+    el("printmeta").textContent = "Intrastate carrier · generated " + new Date().toLocaleDateString();
+    stampAsOf();
+    return;
+  }
+
+  /* ---- build the list ---- */
+  const active = REQS.filter(r => r.when(a, d));
+  const paid = active.filter(r => r.cost !== "free" && r.cost !== "Good news").length;
+  const free = active.filter(r => r.cost === "free").length;
+  const recurring = active.filter(r => r.g === 4 || /Every|Annual|day|×/.test(r.cad)).length;
+
+  /* ---- classification chips ---- */
+  const chips = [];
+  chips.push(d.passenger ? "Passenger" : d.hhg ? "Household goods" : d.exempt ? "Exempt commodities" : "Property");
+  chips.push(d.forhire || d.passenger ? "For-hire" : "Private");
+  chips.push(d.needsCDL ? "CDL required" : "Non-CDL");
+  chips.push(a.weight === "heavy55" ? "55,000 lbs +" : a.weight === "cdl" ? "26,001–54,999 lbs" : a.weight === "mid" ? "10,001–26,000 lbs" : "Under 10,001 lbs");
+  if (d.placard) chips.push("Placarded hazmat");
+  else if (d.anyHazmat) chips.push("Hazmat, non-placarded");
+  chips.push(d.solo ? "Single driver" : "Multiple drivers");
+  if (d.shortHaulOnly) chips.push("Short-haul");
+
+  const name = d.passenger ? "Interstate passenger carrier"
+    : d.hhg ? "Interstate household goods carrier"
+    : d.private ? "Interstate private property carrier"
+    : d.exempt ? "Interstate exempt-commodity carrier"
+    : "Interstate for-hire property carrier";
+
+  let html = ''
+    + '<div class="verdict">'
+    + '<p class="vlabel">Your classification</p>'
+    + '<p class="vname">' + name + '</p>'
+    + '<div class="chips">' + chips.map(c=>'<span class="chip">'+c+'</span>').join("") + '</div>'
+    + '<div class="stats">'
+    + '<div class="stat"><span class="count">'+active.length+'</span><span class="sl">requirements apply</span></div>'
+    + '<div class="stat"><span class="count money">'+paid+'</span><span class="sl">cost money</span></div>'
+    + '<div class="stat"><span class="count">'+free+'</span><span class="sl">are free</span></div>'
+    + '</div>'
+    + '</div>';
+
+  GROUPS.forEach(g => {
+    const items = active.filter(r => r.g === g.n);
+    if (!items.length) return;
+    html += '<div class="group"><div class="ghead"><p class="gnum">'+g.label+'</p><p class="gtitle">'+g.title+'</p></div>'
+         + '<p class="gsub">'+g.sub+'</p><div class="items">';
+    items.forEach(r => {
+      const title = resolve(r.t, a);
+      const what  = resolve(r.what, a);
+      const cite  = resolve(r.cite, a);
+      const costTag = r.cost === "free"
+        ? '<span class="tag t-free">Free</span>'
+        : (r.cost === "Good news" ? "" : '<span class="tag t-cost">'+r.cost+'</span>');
+      const cadTag = '<span class="tag '+(r.g===4?'t-rep':'t-once')+'">'+r.cad+'</span>';
+      html += '<div class="item"><span class="box" aria-hidden="true"></span><div class="ib">'
+           +  '<div class="ititle"><h3>'+title+'</h3>'+cadTag+costTag+'</div>'
+           +  '<p class="iwhat">'+what+'</p>'
+           +  '<div class="imeta"><span class="cite">'+cite+'</span></div>'
+           +  '</div></div>';
+    });
+    html += '</div></div>';
+  });
+
+  /* ---- closing notes ---- */
+  html += '<div class="group"><div class="ghead"><p class="gnum">Also</p><p class="gtitle">Worth knowing</p></div><div style="display:flex;flex-direction:column;gap:12px">';
+
+  if (!d.isCMV){
+    html += '<div class="note acc"><h3>Why your list is short — this is not a mistake</h3>'
+      + '<p class="small">Nothing you run meets the definition of a commercial motor vehicle in <span class="cite">49 CFR 390.5T</span>'
+      + (d.passenger
+          ? ' — no compensation and fewer than 16 seats.'
+          : ' — everything is under 10,001 lbs rated and loaded, with no placarded hazmat.')
+      + ' That means the federal safety regulations in Parts 390 through 399 do not reach you: <strong>no driver qualification file, no medical card requirement, no hours-of-service limits, no ELD, no DVIRs, no annual inspection, and no new entrant safety audit.</strong> Any commercial-registration or insurance items shown above come from different parts of the law.</p>'
+      + '<p class="small">Two ways this changes overnight. <strong>Weight is measured by the greater of the rating or what you actually gross</strong> — load a van rated at 9,900 lbs up to 10,200 and it became a commercial motor vehicle for that trip, and everything above lands on you at once. And your state very likely applies its own rules at a lower threshold than the federal one. Do not read this as "no rules apply."</p></div>';
+  }
+
+
+  html += '<div class="note"><h3>Your state will want its own things</h3>'
+       +  '<p class="small">Beyond the federal list: intrastate authority if you also run inside your state, state weight-distance taxes in <strong>Kentucky, New Mexico, New York and Oregon</strong> — Kentucky requires a filing even in a zero-mile quarter — plus state fuel permits, oversize permits and, in some states, an intrastate USDOT number. Oregon also requires a highway use tax bond set by the state after your account opens, so it cannot be quoted in advance.</p></div>';
+
+  html += '<div class="note crit"><h3>Nobody can do the Motus identity check for you</h3>'
+       +  '<p class="small">FMCSA’s registration system requires a Login.gov account and identity verification through IDEMIA — you photograph a government ID and take a selfie on your phone. A filing service can prepare your application and be designated to enter your data, but <strong>you must verify your own identity, start the application yourself, and personally sign the final certification.</strong> Any company telling you it will handle all of it, or asking for your Login.gov credentials, is telling you something that is not true. Never hand those over.</p></div>';
+
+  html += '</div></div>';
+
+  el("res").innerHTML = html;
+  el("printmeta").textContent = name + " · " + chips.join(" · ") + " · generated " + new Date().toLocaleDateString();
+  stampAsOf();
+}
+
+function stampAsOf(){
+  el("asof").textContent = "Regulations reviewed September 2026. UCR fee shown is the 2027 rate effective October 1, 2026. "
+    + "The medical-certificate paper exemption referenced above expires October 11, 2026 unless FMCSA extends it again.";
+}
+
+/* ---------- wiring ---------- */
+el("start").addEventListener("click", () => {
+  el("intro").classList.add("hide");
+  el("quiz").classList.remove("hide");
+  idx = 0; answers = {};
+  showQuestion();
+});
+el("back").addEventListener("click", () => {
+  if (idx > 0){ idx--; showQuestion(); }
+});
+el("restart").addEventListener("click", () => {
+  el("results").classList.add("hide");
+  el("intro").classList.remove("hide");
+  idx = 0; answers = {};
+  window.scrollTo({top:0, behavior:"instant"});
+});
+el("print").addEventListener("click", () => window.print());
+el("send").addEventListener("click", () => {
+  const v = el("email").value.trim();
+  const note = el("emailnote");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v)){
+    note.textContent = "That address does not look right — check it and try again.";
+    note.style.color = "var(--crit)";
+    el("email").focus();
+    return;
+  }
+  /* Wire this to your own endpoint. Until then, tell the truth: nothing was sent. */
+  note.innerHTML = "Not connected yet. For now, use <strong>Print / Save as PDF</strong> above — it produces the whole checklist as a file you can keep or send to your insurance agent.";
+  note.style.color = "var(--ink-2)";
+});
+</script>
+</body>
+</html>

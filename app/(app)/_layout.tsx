@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Platform,
   StyleSheet,
   Text,
   View,
@@ -131,15 +130,9 @@ const isSubscriptionPage =
   );
 
 if (!hasAccess) {
-  if (Platform.OS === "web") {
-    if (!isSubscriptionPage) {
-      router.replace(
-        "/(app)/subscription-required"
-      );
-    }
-  } else {
+  if (!isSubscriptionPage) {
     router.replace(
-      "/compliance-guide"
+      "/(app)/subscription-required"
     );
   }
 

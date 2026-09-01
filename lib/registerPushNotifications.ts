@@ -78,7 +78,10 @@ export async function registerForPushNotifications(): Promise<PushRegistrationRe
 
   if (
     typeof expoPushToken !== "string" ||
-    !expoPushToken.startsWith("ExponentPushToken[")
+    !(
+      expoPushToken.startsWith("ExponentPushToken[") ||
+      expoPushToken.startsWith("ExpoPushToken[")
+    )
   ) {
     return {
       success: false,

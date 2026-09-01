@@ -13,6 +13,7 @@ import {
   doc,
   getDocs,
   onSnapshot,
+  runTransaction,
   serverTimestamp,
   setDoc,
   writeBatch,
@@ -36,6 +37,8 @@ type Driver = {
   roadTestOnFile: boolean;
   employmentApplicationOnFile?: boolean;
   initialMvrOnFile?: boolean;
+  preEmploymentClearinghouseQueryComplete?: boolean;
+  preEmploymentDrugTestComplete?: boolean;
 
   speStatus?:
     | "missing"
@@ -170,6 +173,9 @@ export default function DriversPanel() {
   driver.employmentApplicationOnFile === true,
   driver.initialMvrOnFile === true,
   driver.roadTestOnFile === true,
+  driver.preEmploymentClearinghouseQueryComplete === true,
+  driver.preEmploymentDrugTestComplete === true,
+  driver.previousEmployerInvestigationComplete === true,
 
   driver.speStatus === "on_file" ||
     driver.speStatus === "not_applicable",
@@ -218,9 +224,14 @@ export default function DriversPanel() {
   const previousCompletionDate =
     driver[fieldName] || null;
 
-  const batch = writeBatch(db);
+  await runTransaction(db, async transaction => {
+  const live = await transaction.get(driverRef);
+  if (!live.exists()) throw new Error("This driver no longer exists.");
+  if ((live.data()?.[fieldName] || null) !== previousCompletionDate) {
+    throw new Error("This driver deadline changed on another device. Review it and try again.");
+  }
 
-  batch.set(
+  transaction.set(
     driverRef,
     {
       [fieldName]:
@@ -234,7 +245,7 @@ export default function DriversPanel() {
     }
   );
 
-  batch.set(historyRef, {
+  transaction.set(historyRef, {
     recordType: "completion",
     source: "driver",
 
@@ -261,7 +272,7 @@ export default function DriversPanel() {
     createdAt: serverTimestamp(),
   });
 
-  await batch.commit();
+  });
 };
 
   const archiveDriver = async (driver: Driver) => {
@@ -494,6 +505,8 @@ export default function DriversPanel() {
         roadTestOnFile: false,
         employmentApplicationOnFile: false,
         initialMvrOnFile: false,
+        preEmploymentClearinghouseQueryComplete: false,
+        preEmploymentDrugTestComplete: false,
         speStatus: "missing",
         lcvStatus: "missing",
         previousEmployerInvestigationComplete: false,
@@ -668,7 +681,7 @@ export default function DriversPanel() {
                   value={driver.clearinghouseDue}
                   driverId={driver.id}
                   requirementId="clearinghouse"
-                  years={1}
+                  days={365}
                   onChange={(value: string) =>
                     updateDriver(driver.id, { clearinghouseDue: value })
                   }
@@ -732,7 +745,7 @@ export default function DriversPanel() {
                           color: "#706E68",
                         }}
                       >
-                        {getDqConfirmedCount(driver)} of 5 DQ checks resolved
+                        {getDqConfirmedCount(driver)} of 8 DQ checks resolved
                       </Text>
                     </View>
 
@@ -769,7 +782,7 @@ export default function DriversPanel() {
                           letterSpacing: 0.6,
                         }}
                       >
-                        Initial setup
+                        Core file
                       </Text>
 
                       <DriverStatusToggle
@@ -815,6 +828,68 @@ export default function DriversPanel() {
                           })
                         }
                       />
+
+                      <View
+                        style={{
+                          marginTop: 8,
+                          paddingTop: 10,
+                          borderTopWidth: 1,
+                          borderTopColor: "#E8E6E0",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            marginBottom: 8,
+                            fontSize: 11,
+                            fontWeight: "700",
+                            color: "#706E68",
+                            textTransform: "uppercase",
+                            letterSpacing: 0.6,
+                          }}
+                        >
+                          Before driving
+                        </Text>
+
+                        <DriverStatusToggle
+                          label="Clearinghouse pre-employment query"
+                          value={driver.preEmploymentClearinghouseQueryComplete === true}
+                          trueText="Complete"
+                          falseText="Incomplete"
+                          onPress={() =>
+                            updateDriver(driver.id, {
+                              preEmploymentClearinghouseQueryComplete:
+                                !driver.preEmploymentClearinghouseQueryComplete,
+                            })
+                          }
+                        />
+
+                        <DriverStatusToggle
+                          label="Pre-employment drug test / exception"
+                          value={driver.preEmploymentDrugTestComplete === true}
+                          trueText="Confirmed"
+                          falseText="Unconfirmed"
+                          onPress={() =>
+                            updateDriver(driver.id, {
+                              preEmploymentDrugTestComplete:
+                                !driver.preEmploymentDrugTestComplete,
+                            })
+                          }
+                        />
+                      </View>
+
+                      <Text
+                        style={{
+                          marginTop: 12,
+                          marginBottom: 8,
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: "#706E68",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.6,
+                        }}
+                      >
+                        Only when applicable
+                      </Text>
 
                       <TouchableOpacity
                         onPress={() => {
@@ -1023,6 +1098,21 @@ export default function DriversPanel() {
     <DqGuidanceItem
       title="Road test certificate / equivalent"
       text="Keep the road test certificate or an FMCSA-permitted equivalent qualification document."
+    />
+
+    <DqGuidanceItem
+      title="Clearinghouse pre-employment query"
+      text="Complete the required full Clearinghouse query before permitting the driver to perform safety-sensitive work."
+    />
+
+    <DqGuidanceItem
+      title="Pre-employment drug test / exception"
+      text="Confirm a verified negative controlled-substances test before driving, or document the specific exception that applies."
+    />
+
+    <DqGuidanceItem
+      title="Previous-employer safety investigation"
+      text="Request the required three-year safety-performance history and document the response or your good-faith efforts within 30 days of hire."
     />
 
     <DqGuidanceItem

@@ -4,6 +4,10 @@ import {
   HttpsError,
 } from "firebase-functions/v2/https";
 import { randomBytes } from "node:crypto";
+import {
+  REFERRAL_RATE_BPS,
+  REFERRAL_TERMS_VERSION,
+} from "./referralPolicy";
 
 const REFERRAL_CODE_ALPHABET =
   "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -13,6 +17,10 @@ const REFERRAL_CODE_ATTEMPTS = 12;
 
 const REFERRAL_CODE_PATTERN =
   /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
+
+function normalizedUsdot(value: unknown): string {
+  return typeof value === "string" ? value.replace(/\D/g, "") : "";
+}
 
 function generateReferralCode(): string {
   const bytes = randomBytes(REFERRAL_CODE_LENGTH);
@@ -64,6 +72,22 @@ export const getReferralCode = onCall(
               throw new HttpsError(
                 "failed-precondition",
                 "Your company account could not be found."
+              );
+            }
+
+            if (carrierSnapshot.data()?.deletingAccount === true) {
+              throw new HttpsError(
+                "failed-precondition",
+                "Account deletion is already in progress."
+              );
+            }
+
+
+            const billingStatus = carrierSnapshot.data()?.billing?.status;
+            if (billingStatus !== "active" && billingStatus !== "trialing") {
+              throw new HttpsError(
+                "failed-precondition",
+                "Referral rewards require an active account in good standing."
               );
             }
 
@@ -136,6 +160,10 @@ export const getReferralCode = onCall(
 
             transaction.set(ownerRef, {
               code: candidate,
+              active: true,
+              termsVersion: REFERRAL_TERMS_VERSION,
+              termsAcceptedAt:
+                admin.firestore.FieldValue.serverTimestamp(),
               createdAt:
                 admin.firestore.FieldValue
                   .serverTimestamp(),
@@ -144,6 +172,7 @@ export const getReferralCode = onCall(
             transaction.set(codeRef, {
               carrierId,
               active: true,
+              termsVersion: REFERRAL_TERMS_VERSION,
               createdAt:
                 admin.firestore.FieldValue
                   .serverTimestamp(),
@@ -184,8 +213,6 @@ export const getReferralCode = onCall(
     );
   }
 );
-const REFERRAL_COMMISSION_RATE_BPS = 1000;
-
 export const claimReferral = onCall(
   {
     region: "us-central1",
@@ -218,6 +245,23 @@ export const claimReferral = onCall(
 
     const referredCarrierId = request.auth.uid;
     const db = admin.firestore();
+
+    const attemptRef = db.collection("referralClaimAttempts").doc(referredCarrierId);
+    await db.runTransaction(async transaction => {
+      const snapshot = await transaction.get(attemptRef);
+      const data = snapshot.data();
+      const windowStartedAt = data?.windowStartedAt as admin.firestore.Timestamp | undefined;
+      const withinWindow = windowStartedAt && Date.now() - windowStartedAt.toMillis() < 60 * 60 * 1000;
+      const attempts = withinWindow ? Number(data?.attempts ?? 0) : 0;
+      if (attempts >= 5) {
+        throw new HttpsError("resource-exhausted", "Too many referral-code attempts. Try again later.");
+      }
+      transaction.set(attemptRef, {
+        attempts: attempts + 1,
+        windowStartedAt: withinWindow ? windowStartedAt : admin.firestore.FieldValue.serverTimestamp(),
+        lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
 
     const referralRef =
       db
@@ -387,17 +431,73 @@ export const claimReferral = onCall(
           );
         }
 
+        if (referrerCarrierSnapshot.data()?.deletingAccount === true) {
+          throw new HttpsError(
+            "failed-precondition",
+            "The referring company is no longer eligible for referral rewards."
+          );
+        }
+
+        const referredCarrierSnapshot = await transaction.get(
+          db.collection("carriers").doc(referredCarrierId)
+        );
+
+        if (!referredCarrierSnapshot.exists) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Finish creating the company account before claiming a referral."
+          );
+        }
+
+        if (referredCarrierSnapshot.data()?.deletingAccount === true) {
+          throw new HttpsError(
+            "failed-precondition",
+            "Account deletion is already in progress."
+          );
+        }
+
+        const referrerData = referrerCarrierSnapshot.data();
+        const referredData = referredCarrierSnapshot.data();
+        const referrerUsdot = normalizedUsdot(referrerData?.usdotNumber);
+        const referredUsdot = normalizedUsdot(referredData?.usdotNumber);
+
+        if (referrerUsdot && referredUsdot && referrerUsdot === referredUsdot) {
+          throw new HttpsError(
+            "failed-precondition",
+            "A company cannot refer another account using the same USDOT number."
+          );
+        }
+
+        const referrerBillingStatus = referrerData?.billing?.status;
+        if (referrerBillingStatus !== "active" && referrerBillingStatus !== "trialing") {
+          throw new HttpsError(
+            "failed-precondition",
+            "The referring company is not currently eligible for referral rewards."
+          );
+        }
+
         transaction.create(referralRef, {
           referrerCarrierId,
           referredCarrierId,
           referralCode: code,
           commissionRateBps:
-            REFERRAL_COMMISSION_RATE_BPS,
+            REFERRAL_RATE_BPS,
+          termsVersion: REFERRAL_TERMS_VERSION,
           status: "active",
           claimedAt:
             admin.firestore.FieldValue
               .serverTimestamp(),
         });
+
+        transaction.set(
+          db.collection("referralSummaries").doc(referrerCarrierId),
+          {
+            referrerCarrierId,
+            directReferralCount: admin.firestore.FieldValue.increment(1),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
 
         return {
           status: "claimed",

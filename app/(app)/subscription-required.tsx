@@ -25,6 +25,7 @@ import {
   auth,
   db,
   functions,
+  isStaging,
 } from "../../lib/firebase";
 
 export default function SubscriptionRequiredScreen() {
@@ -38,12 +39,31 @@ export default function SubscriptionRequiredScreen() {
 
   const [isBillingLoading, setIsBillingLoading] =
   useState(true);
+  const [hasRequestedBillingRefresh, setHasRequestedBillingRefresh] =
+    useState(false);
+
 useEffect(() => {
-  if (Platform.OS !== "web") {
-    router.replace("/compliance-guide");
+  const user = auth.currentUser;
+
+  if (!user || hasRequestedBillingRefresh) {
     return;
   }
 
+  setHasRequestedBillingRefresh(true);
+
+  const refreshBillingStatus = httpsCallable<
+    Record<string, never>,
+    { repaired: boolean; status?: string; reason?: string }
+  >(functions, "refreshBillingStatus");
+
+  void refreshBillingStatus({}).catch((error) => {
+    // The Firestore listener below remains the source of truth for routing.
+    // A refresh failure must not prevent a customer from restarting checkout.
+    console.error("Unable to refresh billing status:", error);
+  });
+}, [hasRequestedBillingRefresh]);
+
+useEffect(() => {
   const user = auth.currentUser;
 
   if (!user) {
@@ -139,9 +159,6 @@ useEffect(() => {
     unsubscribeCarrier?.();
   };
 }, []);
-if (Platform.OS !== "web") {
-  return null;
-}
 
     const isPastDue =
   billingStatus === "past_due" ||
@@ -276,10 +293,10 @@ const billingNote = hasUsedTrial
               Running a trucking company is hard
               enough without worrying about missed
               DOT paperwork. We Heart Paperwork
-              helps organize company and driver
-              compliance so you know what is due,
-              what is coming next, and what needs
-              attention.
+              helps organize company, driver,
+              truck, and trailer requirements so
+              you know what is due, what is coming
+              next, and what needs attention.
             </Text>
           </View>
 
@@ -305,14 +322,22 @@ const billingNote = hasUsedTrial
               />
 
               <BenefitRow
-                title="Audit readiness"
-                description="Keep important compliance information organized and accessible."
+                title="Organized records"
+                description="Keep compliance dates, status, reminders, and completion history together in one place."
                 showDivider={false}
               />
             </View>
           </View>
 
           <View style={styles.planCard}>
+            {isStaging ? (
+              <View style={styles.stagingBadge}>
+                <Text style={styles.stagingBadgeText}>
+                  CLOSED TESTING · STAGING
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={styles.planLabel}>
               COMPLIANCE DASHBOARD
             </Text>
@@ -328,6 +353,8 @@ const billingNote = hasUsedTrial
           </Text>
 
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={checkoutButtonLabel}
               style={[
                 styles.primaryButton,
                 (isStartingTrial ||
@@ -353,6 +380,18 @@ const billingNote = hasUsedTrial
             <Text style={styles.billingNote}>
               {billingNote}
             </Text>
+
+            {Platform.OS !== "web" ? (
+              <Text style={styles.browserNote}>
+                Secure checkout opens in your browser. Return to the app after checkout and your dashboard will unlock automatically.
+              </Text>
+            ) : null}
+
+            {isStaging ? (
+              <Text style={styles.stagingNote}>
+                This test build uses the staging account and staging checkout. It does not subscribe you to the live service. Use card 4242 4242 4242 4242, any future expiration date, and any CVC.
+              </Text>
+            ) : null}
           </View>
 
           <TouchableOpacity
@@ -540,6 +579,22 @@ const styles = StyleSheet.create({
     borderColor: "#D9DDE3",
   },
 
+  stagingBadge: {
+    alignSelf: "flex-start",
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#FFF1C7",
+  },
+
+  stagingBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    color: "#74520A",
+  },
+
   planLabel: {
     fontSize: 12,
     fontWeight: "800",
@@ -588,6 +643,25 @@ const styles = StyleSheet.create({
     color: "#7A828D",
     textAlign: "center",
     marginTop: 12,
+  },
+
+  browserNote: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#5E6672",
+    textAlign: "center",
+  },
+
+  stagingNote: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#FFF8E5",
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#74520A",
+    textAlign: "center",
   },
 
 

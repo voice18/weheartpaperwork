@@ -1,6 +1,5 @@
-import { router } from "expo-router";
+import PublicHeader from "../components/public/PublicHeader";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,25 +13,12 @@ export default function PrivacyPage() {
   edges={["top", "bottom"]}
   style={styles.page}
 >
+  <PublicHeader />
+
     <ScrollView
       style={styles.page}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace("/compliance-guide");
-            }
-          }}
-        >
-          <Text style={styles.backLink}>
-            ‹ Back
-          </Text>
-        </Pressable>
-      </View>
 
       <View style={styles.article}>
         <Text style={styles.eyebrow}>
@@ -92,7 +78,7 @@ export default function PrivacyPage() {
 
         <Text style={styles.paragraph}>
           Questions or privacy requests may be sent to
-          voice18@gmail.com.
+          aaron@weheartpaperwork.com.
         </Text>
       </View>
     </ScrollView>
