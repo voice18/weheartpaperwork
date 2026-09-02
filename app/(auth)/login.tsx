@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -23,9 +23,10 @@ function friendlyAuthError(error: unknown, mode: AuthMode): string {
 }
 
 export default function Login() {
+  const isWeb = Platform.OS === "web";
   const params = useLocalSearchParams<{ ref?: string | string[]; mode?: string | string[] }>();
   const referralCode = firstParam(params.ref);
-  const requestedMode: AuthMode = firstParam(params.mode) === "create" ? "create" : "login";
+  const requestedMode: AuthMode = isWeb && firstParam(params.mode) === "create" ? "create" : "login";
   const [mode, setMode] = useState<AuthMode>(requestedMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -58,7 +59,7 @@ export default function Login() {
     try {
       setWorking(true);
       setMessage(mode === "create" ? "Creating your account…" : "Signing you in…");
-      if (mode === "create") await createUserWithEmailAndPassword(auth, cleanedEmail, password);
+      if (isWeb && mode === "create") await createUserWithEmailAndPassword(auth, cleanedEmail, password);
       else await signInWithEmailAndPassword(auth, cleanedEmail, password);
     } catch (error) {
       setMessage(friendlyAuthError(error, mode));
@@ -81,7 +82,7 @@ export default function Login() {
     }
   };
 
-  const creating = mode === "create";
+  const creating = isWeb && mode === "create";
 
   return (
     <ScrollView
@@ -139,12 +140,18 @@ export default function Login() {
 
         {message ? <Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text> : null}
 
-        <View style={styles.switchPanel}>
-          <Text style={styles.switchPrompt}>{creating ? "Already have an account?" : "New to We Heart Paperwork?"}</Text>
-          <TouchableOpacity accessibilityRole="button" onPress={() => chooseMode(creating ? "login" : "create")} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>{creating ? "Sign in" : "Create account"}</Text>
-          </TouchableOpacity>
-        </View>
+        {isWeb ? (
+          <View style={styles.switchPanel}>
+            <Text style={styles.switchPrompt}>{creating ? "Already have an account?" : "New to We Heart Paperwork?"}</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => chooseMode(creating ? "login" : "create")} style={styles.secondaryButton}>
+              <Text style={styles.secondaryButtonText}>{creating ? "Sign in" : "Create account"}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.companionNote}>
+            Sign in with the account your company already uses for We Heart Paperwork.
+          </Text>
+        )}
         <Text style={styles.version}>v0.1.0 Beta</Text>
       </View>
     </ScrollView>
@@ -168,6 +175,7 @@ const styles = StyleSheet.create({
   message: { marginTop: 14, color: "#6B4F16", fontSize: 13, lineHeight: 19, textAlign: "center" },
   switchPanel: { marginTop: 24, paddingTop: 22, borderTopWidth: 1, borderTopColor: "#E5E3DA" },
   switchPrompt: { marginBottom: 10, color: "#45433F", fontSize: 14, fontWeight: "600", textAlign: "center" },
+  companionNote: { marginTop: 22, color: "#706E68", fontSize: 14, lineHeight: 20, textAlign: "center" },
   secondaryButton: { minHeight: 46, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#27500A", borderRadius: 10, backgroundColor: "#FFFFFF" },
   secondaryButtonText: { color: "#27500A", fontSize: 15, fontWeight: "800" },
   version: { marginTop: 24, color: "#8A8880", fontSize: 11, textAlign: "center" },

@@ -1224,6 +1224,8 @@ const trialEndLabel = (() => {
             />
           )}
 
+      {Platform.OS === "web" && (
+        <>
         <SettingsRow
           label="Active drivers"
           value={String(activeDriverCount)}
@@ -1237,10 +1239,8 @@ const trialEndLabel = (() => {
         <SettingsRow
           label="Pricing"
           value={`$2 company + $1 x ${activeDriverCount}`}
-          showDivider={Platform.OS === "web"}
         />
 
-      {Platform.OS === "web" && (
         <SettingsRow
         label="Manage billing"
         value={
@@ -1255,9 +1255,12 @@ const trialEndLabel = (() => {
             : handleManageBilling
         }
       />
+        </>
       )}
       </View>
 
+      {Platform.OS === "web" && (
+        <>
         <Text style={styles.sectionLabel}>
           Referral Rewards
         </Text>
@@ -1304,6 +1307,8 @@ const trialEndLabel = (() => {
           }
         />
       </View>
+        </>
+      )}
         <Text style={styles.sectionLabel}>
           Support
         </Text>

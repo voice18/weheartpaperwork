@@ -201,6 +201,10 @@ const billingNote = hasUsedTrial
   }
 
   async function handleCheckout() {
+    if (Platform.OS !== "web") {
+      return;
+    }
+
     if (isStartingTrial) {
       return;
     }
@@ -329,6 +333,7 @@ const billingNote = hasUsedTrial
             </View>
           </View>
 
+          {Platform.OS === "web" ? (
           <View style={styles.planCard}>
             {isStaging ? (
               <View style={styles.stagingBadge}>
@@ -381,18 +386,30 @@ const billingNote = hasUsedTrial
               {billingNote}
             </Text>
 
-            {Platform.OS !== "web" ? (
-              <Text style={styles.browserNote}>
-                Secure checkout opens in your browser. Return to the app after checkout and your dashboard will unlock automatically.
-              </Text>
-            ) : null}
-
             {isStaging ? (
               <Text style={styles.stagingNote}>
                 This test build uses the staging account and staging checkout. It does not subscribe you to the live service. Use card 4242 4242 4242 4242, any future expiration date, and any CVC.
               </Text>
             ) : null}
           </View>
+          ) : (
+            <View style={styles.planCard}>
+              <Text style={styles.planLabel}>ACCOUNT ACCESS</Text>
+              <Text style={styles.planTitle}>This account does not currently have access.</Text>
+              <Text style={styles.planDescription}>
+                If your company already uses We Heart Paperwork, confirm that you signed in with the correct email address. For help accessing an existing company account, contact support.
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="link"
+                accessibilityLabel="Email We Heart Paperwork support"
+                style={styles.primaryButton}
+                onPress={() => void Linking.openURL("mailto:aaron@weheartpaperwork.com?subject=We%20Heart%20Paperwork%20Account%20Access")}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.primaryButtonText}>Email support</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.logoutButton}

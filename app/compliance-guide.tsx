@@ -172,7 +172,7 @@ function handleCreateAccount() {
                   {isSignedIn ? "Account" : "Sign in"}
                 </Text>
               </TouchableOpacity>
-              {!isSignedIn ? (
+              {!isSignedIn && Platform.OS === "web" ? (
                 <TouchableOpacity
                   onPress={handleCreateAccount}
                   activeOpacity={0.75}
