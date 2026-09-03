@@ -57,6 +57,14 @@ export default function PublicHeader() {
             </Pressable>
           </Link>
 
+          <Link href={"/fmcsa-updates" as any} asChild>
+            <Pressable>
+              <Text style={linkStyle("/fmcsa-updates")}>
+                FMCSA Updates
+              </Text>
+            </Pressable>
+          </Link>
+
           <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/")}><Text style={[styles.headerLink, pathname.startsWith("/tools") && styles.headerLinkActive]}>Free Tools</Text></Pressable>
 
           <Link href="/pricing" asChild><Pressable><Text style={linkStyle("/pricing")}>Pricing</Text></Pressable></Link>
