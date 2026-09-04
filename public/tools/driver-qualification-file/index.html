@@ -19,6 +19,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<link rel="stylesheet" href="/tools/tool-header.css">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@graph":[
  {"@type":"WebApplication","name":"Driver Qualification File Builder",
@@ -544,14 +545,16 @@ legend{
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-in">
-    <a class="brand" href="/">We <span class="heart">&hearts;</span> Paperwork</a>
-    <nav class="topnav">
-      <a href="/features">Features</a>
+<header class="whp-sitebar">
+  <div class="whp-sitebar-inner">
+    <a class="whp-brand" href="/"><span class="whp-brand-mark">WHP</span><span>We Heart Paperwork</span></a>
+    <nav class="whp-site-links" aria-label="Main navigation">
+      <a href="/features">What We Track</a>
+      <a href="/how-to">How to Stay Compliant</a>
+      <a href="/tools/" aria-current="page">Free Tools</a>
       <a href="/pricing">Pricing</a>
-      <a href="/compliance">Guides</a>
-      <a class="pill" href="/pricing">Get started &mdash; $3/mo</a>
+      <a href="/login">Sign in</a>
+      <a class="whp-create-account" href="/login?mode=create">Create account</a>
     </nav>
   </div>
 </header><div class="wrap">
@@ -599,7 +602,7 @@ legend{
               </div>
               <div class="f">
                 <label for="safetyContact">Who signs off on safety</label>
-                <input id="safetyContact" type="text" placeholder="Edward Daniel">
+                <input id="safetyContact" type="text" placeholder="John Doe">
               </div>
               <div class="f">
                 <label for="safetyTitle">Title</label>

@@ -11,6 +11,11 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == carrierId;
     }
 
+    function carrierAcceptsWrites(carrierId) {
+      return ownsCarrier(carrierId)
+        && get(/databases/$(database)/documents/carriers/$(carrierId)).data.get("deletingAccount", false) != true;
+    }
+
     function allowedCarrierCreate() {
       return request.resource.data.keys().hasOnly([
         "companyName",
@@ -19,6 +24,7 @@ service cloud.firestore {
         "onboardingComplete",
         "notificationsEnabled",
         "expoPushToken",
+        "expoPushTokens",
         "notificationTokenUpdatedAt",
         "nextStepDismissed",
         "nextStepDismissedAt",
@@ -39,6 +45,7 @@ service cloud.firestore {
           "onboardingComplete",
           "notificationsEnabled",
           "expoPushToken",
+          "expoPushTokens",
           "notificationTokenUpdatedAt",
           "nextStepDismissed",
           "nextStepDismissedAt",
@@ -49,48 +56,61 @@ service cloud.firestore {
     match /carriers/{carrierId} {
       allow read: if ownsCarrier(carrierId);
       allow create: if ownsCarrier(carrierId) && allowedCarrierCreate();
-      allow update: if ownsCarrier(carrierId) && allowedCarrierUpdate();
+      allow update: if ownsCarrier(carrierId)
+        && resource.data.get("deletingAccount", false) != true
+        && allowedCarrierUpdate();
 
       match /compliance/{documentId} {
-        allow read, write: if ownsCarrier(carrierId);
+        allow read: if ownsCarrier(carrierId);
+        allow write: if carrierAcceptsWrites(carrierId);
       }
 
       match /complianceRecords/{requirementId} {
-        allow read, write: if ownsCarrier(carrierId);
+        allow read: if ownsCarrier(carrierId);
+        allow write: if carrierAcceptsWrites(carrierId);
 
         match /history/{recordId} {
-          allow read, write: if ownsCarrier(carrierId);
+          allow read: if ownsCarrier(carrierId);
+          allow write: if carrierAcceptsWrites(carrierId);
         }
       }
 
       match /drivers/{driverId} {
-        allow read, write: if ownsCarrier(carrierId);
+        allow read: if ownsCarrier(carrierId);
+        allow write: if carrierAcceptsWrites(carrierId);
 
         match /complianceRecords/{requirementId} {
-          allow read, write: if ownsCarrier(carrierId);
+          allow read: if ownsCarrier(carrierId);
+          allow write: if carrierAcceptsWrites(carrierId);
 
           match /history/{recordId} {
-            allow read, write: if ownsCarrier(carrierId);
+            allow read: if ownsCarrier(carrierId);
+            allow write: if carrierAcceptsWrites(carrierId);
           }
         }
       }
 
       match /customRequirements/{requirementId} {
-        allow read, write: if ownsCarrier(carrierId);
+        allow read: if ownsCarrier(carrierId);
+        allow write: if carrierAcceptsWrites(carrierId);
 
         match /history/{recordId} {
-          allow read, write: if ownsCarrier(carrierId);
+          allow read: if ownsCarrier(carrierId);
+          allow write: if carrierAcceptsWrites(carrierId);
         }
       }
 
       match /vehicles/{vehicleId} {
-        allow read, write: if ownsCarrier(carrierId);
+        allow read: if ownsCarrier(carrierId);
+        allow write: if carrierAcceptsWrites(carrierId);
 
         match /complianceRecords/{requirementId} {
-          allow read, write: if ownsCarrier(carrierId);
+          allow read: if ownsCarrier(carrierId);
+          allow write: if carrierAcceptsWrites(carrierId);
 
           match /history/{recordId} {
-            allow read, write: if ownsCarrier(carrierId);
+            allow read: if ownsCarrier(carrierId);
+            allow write: if carrierAcceptsWrites(carrierId);
           }
         }
       }
@@ -102,12 +122,14 @@ service cloud.firestore {
 
   allow create: if signedIn()
     && request.auth.uid == userId
+    && carrierAcceptsWrites(userId)
     && request.resource.data.keys().hasOnly([
       "email",
       "carrierId",
       "role",
       "notificationsEnabled",
       "expoPushToken",
+      "expoPushTokens",
       "notificationTokenUpdatedAt",
       "updatedAt"
     ])
@@ -116,6 +138,7 @@ service cloud.firestore {
 
   allow update: if signedIn()
     && request.auth.uid == userId
+    && carrierAcceptsWrites(userId)
     && request.resource.data.carrierId == userId
     && request.resource.data.role == "owner"
     && request.resource.data
@@ -127,6 +150,7 @@ service cloud.firestore {
         "role",
         "notificationsEnabled",
         "expoPushToken",
+        "expoPushTokens",
         "notificationTokenUpdatedAt",
         "updatedAt"
       ]);
@@ -179,6 +203,10 @@ service cloud.firestore {
     }
 
     match /stripeWebhookEvents/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /notificationPushReceipts/{documentId} {
       allow read, write: if false;
     }
 

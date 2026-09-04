@@ -15,12 +15,14 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
+  runTransaction,
   serverTimestamp,
   setDoc,
   writeBatch,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
-import { auth, db } from "../../lib/firebase";
+import { auth, db, functions } from "../../lib/firebase";
 import { addYears, daysFrom, fmtDate, localDateString } from "../../lib/requirements";
 import { formatDateInput, inputToIso, isoToInput } from "../../lib/dateUtils";
 import PersistedDateInput from "./PersistedDateInput";
@@ -197,13 +199,17 @@ export default function FleetPanel() {
 
     const vehicleRef = doc(db, "carriers", user.uid, "vehicles", vehicle.id);
     const historyRef = doc(collection(vehicleRef, "complianceRecords", field, "history"));
-    const batch = writeBatch(db);
-
-    batch.set(vehicleRef, {
+    await runTransaction(db, async transaction => {
+    const live = await transaction.get(vehicleRef);
+    if (!live.exists()) throw new Error("This vehicle no longer exists.");
+    if (live.data()?.[field] !== currentDate) {
+      throw new Error("This vehicle deadline changed on another device. Review it and try again.");
+    }
+    transaction.set(vehicleRef, {
       [field]: nextDate,
       lastUpdated: serverTimestamp(),
     }, { merge: true });
-    batch.set(historyRef, {
+    transaction.set(historyRef, {
       requirementId: field,
       completionDate: completionDate || null,
       previousDueDate: currentDate,
@@ -211,7 +217,7 @@ export default function FleetPanel() {
       completedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     });
-    await batch.commit();
+    });
   };
 
   const archiveVehicle = (vehicle: FleetVehicle) => {
@@ -237,15 +243,8 @@ export default function FleetPanel() {
       async () => {
         const user = auth.currentUser;
         if (!user) return;
-        const vehicleRef = doc(db, "carriers", user.uid, "vehicles", vehicle.id);
-        const batch = writeBatch(db);
-
-        for (const requirementId of ["registrationExpiration", "inspectionExpiration"]) {
-          const history = await getDocs(collection(vehicleRef, "complianceRecords", requirementId, "history"));
-          history.docs.forEach(record => batch.delete(record.ref));
-        }
-        batch.delete(vehicleRef);
-        await batch.commit();
+        const removeEntity = httpsCallable(functions, "deleteCarrierEntity");
+        await removeEntity({ entityType: "vehicle", entityId: vehicle.id });
         setOpenVehicleId(null);
       }
     );

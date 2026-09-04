@@ -293,7 +293,7 @@ export const howToGuides: HowToGuide[] = [
     relatedComplianceSlug: "annual-mvr",
     sources: [
       { label: "FMCSA — Driver Qualification File Checklist", url: "https://csa.fmcsa.dot.gov/SafetyPlanner/GetFile.aspx?d=44" },
-      { label: "eCFR — 49 CFR 391.25", url: "https://www.ecfr.gov/current/title-49/subtitle-B/chapter-III/subchapter-B/part-391/subpart-F/section-391.25" }
+      { label: "eCFR — 49 CFR 391.25", url: "https://www.ecfr.gov/current/title-49/subtitle-B/chapter-III/subchapter-B/part-391/subpart-C/section-391.25" }
     ]
   },
   {

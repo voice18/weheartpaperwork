@@ -511,11 +511,18 @@ async markComplete(reqId, completionDate = null) {
     }
   }
 
-  const batch = writeBatch(db);
+  await runTransaction(db, async transaction => {
+    const live = await transaction.get(complianceRef);
+    const liveData = live.data();
+    if (!live.exists()) throw new Error("This requirement no longer exists.");
+    if (previousDueDate && liveData?.dueDate !== previousDueDate) {
+      throw new Error("This deadline changed on another device. Review it and try again.");
+    }
+    if (!nextDueDate && liveData?.completed === true) {
+      throw new Error("This requirement was already completed on another device.");
+    }
 
-  batch.set(
-    recordRef,
-    {
+    transaction.set(recordRef, {
       recordType: "completion",
       requirementId: reqId,
       carrierId,
@@ -543,18 +550,9 @@ async markComplete(reqId, completionDate = null) {
       source: "company",
       createdAt:
         serverTimestamp(),
-    }
-  );
-
-  batch.set(
-    complianceRef,
-    complianceUpdate,
-    {
-      merge: true,
-    }
-  );
-
-  await batch.commit();
+    });
+    transaction.set(complianceRef, complianceUpdate, { merge: true });
+  });
 },
   // ── markIncomplete (undo) ──────────────────────────────────────────────────
  async markIncomplete(reqId) {

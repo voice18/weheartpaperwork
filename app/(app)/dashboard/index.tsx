@@ -6,9 +6,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  View, Text, ScrollView, TouchableOpacity,
+  View, Text, TouchableOpacity,
 StyleSheet, Platform, ActivityIndicator, Button,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useComplianceStore }            from "../../../store/useComplianceStore";
 import {
@@ -200,8 +201,10 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
   const active = filter === "od" ? od : filter === "sn" ? sn : filter === "up" ? up : exc;
 
       return (
-      <ScrollView
+      <KeyboardAwareScrollView
         style={styles.container}
+        bottomOffset={24}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.content,
           {
@@ -499,7 +502,7 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
 ) : (
   <FleetPanel />
 )}
- </ScrollView>
+ </KeyboardAwareScrollView>
 
   );
 }

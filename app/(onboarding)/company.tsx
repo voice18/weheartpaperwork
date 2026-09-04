@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
@@ -59,9 +60,12 @@ export default function CompanyOnboarding() {
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
+    <ScrollView
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={{
+        flexGrow: 1,
         backgroundColor: "#FAFAF8",
         alignItems: "center",
         justifyContent: "center",
@@ -166,6 +170,6 @@ export default function CompanyOnboarding() {
           </Text>
         ) : null}
       </View>
-    </View>
+    </ScrollView>
   );
 }

@@ -13,6 +13,7 @@ import {
   doc,
   getDocs,
   onSnapshot,
+  runTransaction,
   serverTimestamp,
   setDoc,
   writeBatch,
@@ -223,9 +224,14 @@ export default function DriversPanel() {
   const previousCompletionDate =
     driver[fieldName] || null;
 
-  const batch = writeBatch(db);
+  await runTransaction(db, async transaction => {
+  const live = await transaction.get(driverRef);
+  if (!live.exists()) throw new Error("This driver no longer exists.");
+  if ((live.data()?.[fieldName] || null) !== previousCompletionDate) {
+    throw new Error("This driver deadline changed on another device. Review it and try again.");
+  }
 
-  batch.set(
+  transaction.set(
     driverRef,
     {
       [fieldName]:
@@ -239,7 +245,7 @@ export default function DriversPanel() {
     }
   );
 
-  batch.set(historyRef, {
+  transaction.set(historyRef, {
     recordType: "completion",
     source: "driver",
 
@@ -266,7 +272,7 @@ export default function DriversPanel() {
     createdAt: serverTimestamp(),
   });
 
-  await batch.commit();
+  });
 };
 
   const archiveDriver = async (driver: Driver) => {

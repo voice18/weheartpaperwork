@@ -25,6 +25,7 @@ import {
   auth,
   db,
   functions,
+  isStaging,
 } from "../../lib/firebase";
 
 export default function SubscriptionRequiredScreen() {
@@ -38,12 +39,31 @@ export default function SubscriptionRequiredScreen() {
 
   const [isBillingLoading, setIsBillingLoading] =
   useState(true);
+  const [hasRequestedBillingRefresh, setHasRequestedBillingRefresh] =
+    useState(false);
+
 useEffect(() => {
-  if (Platform.OS !== "web") {
-    router.replace("/compliance-guide");
+  const user = auth.currentUser;
+
+  if (!user || hasRequestedBillingRefresh) {
     return;
   }
 
+  setHasRequestedBillingRefresh(true);
+
+  const refreshBillingStatus = httpsCallable<
+    Record<string, never>,
+    { repaired: boolean; status?: string; reason?: string }
+  >(functions, "refreshBillingStatus");
+
+  void refreshBillingStatus({}).catch((error) => {
+    // The Firestore listener below remains the source of truth for routing.
+    // A refresh failure must not prevent a customer from restarting checkout.
+    console.error("Unable to refresh billing status:", error);
+  });
+}, [hasRequestedBillingRefresh]);
+
+useEffect(() => {
   const user = auth.currentUser;
 
   if (!user) {
@@ -139,9 +159,6 @@ useEffect(() => {
     unsubscribeCarrier?.();
   };
 }, []);
-if (Platform.OS !== "web") {
-  return null;
-}
 
     const isPastDue =
   billingStatus === "past_due" ||
@@ -184,6 +201,10 @@ const billingNote = hasUsedTrial
   }
 
   async function handleCheckout() {
+    if (Platform.OS !== "web") {
+      return;
+    }
+
     if (isStartingTrial) {
       return;
     }
@@ -312,7 +333,16 @@ const billingNote = hasUsedTrial
             </View>
           </View>
 
+          {Platform.OS === "web" ? (
           <View style={styles.planCard}>
+            {isStaging ? (
+              <View style={styles.stagingBadge}>
+                <Text style={styles.stagingBadgeText}>
+                  CLOSED TESTING · STAGING
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={styles.planLabel}>
               COMPLIANCE DASHBOARD
             </Text>
@@ -328,6 +358,8 @@ const billingNote = hasUsedTrial
           </Text>
 
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={checkoutButtonLabel}
               style={[
                 styles.primaryButton,
                 (isStartingTrial ||
@@ -353,7 +385,31 @@ const billingNote = hasUsedTrial
             <Text style={styles.billingNote}>
               {billingNote}
             </Text>
+
+            {isStaging ? (
+              <Text style={styles.stagingNote}>
+                This test build uses the staging account and staging checkout. It does not subscribe you to the live service. Use card 4242 4242 4242 4242, any future expiration date, and any CVC.
+              </Text>
+            ) : null}
           </View>
+          ) : (
+            <View style={styles.planCard}>
+              <Text style={styles.planLabel}>ACCOUNT ACCESS</Text>
+              <Text style={styles.planTitle}>This account does not currently have access.</Text>
+              <Text style={styles.planDescription}>
+                If your company already uses We Heart Paperwork, confirm that you signed in with the correct email address. For help accessing an existing company account, contact support.
+              </Text>
+              <TouchableOpacity
+                accessibilityRole="link"
+                accessibilityLabel="Email We Heart Paperwork support"
+                style={styles.primaryButton}
+                onPress={() => void Linking.openURL("mailto:aaron@weheartpaperwork.com?subject=We%20Heart%20Paperwork%20Account%20Access")}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.primaryButtonText}>Email support</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.logoutButton}
@@ -540,6 +596,22 @@ const styles = StyleSheet.create({
     borderColor: "#D9DDE3",
   },
 
+  stagingBadge: {
+    alignSelf: "flex-start",
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: "#FFF1C7",
+  },
+
+  stagingBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    color: "#74520A",
+  },
+
   planLabel: {
     fontSize: 12,
     fontWeight: "800",
@@ -588,6 +660,25 @@ const styles = StyleSheet.create({
     color: "#7A828D",
     textAlign: "center",
     marginTop: 12,
+  },
+
+  browserNote: {
+    marginTop: 10,
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#5E6672",
+    textAlign: "center",
+  },
+
+  stagingNote: {
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: "#FFF8E5",
+    fontSize: 12,
+    lineHeight: 18,
+    color: "#74520A",
+    textAlign: "center",
   },
 
 

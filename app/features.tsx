@@ -19,7 +19,7 @@ export default function FeaturesPage() {
         <title>FMCSA Compliance Tracking Features | We Heart Paperwork</title>
         <meta
           name="description"
-          content="Track quarterly IFTA returns, company deadlines, driver qualification setup, vehicle registration, DOT inspections, reminders, and history."
+          content="Track quarterly IFTA returns, built-in and custom company deadlines, driver qualification setup, vehicle registration, DOT inspections, reminders, and history."
         />
         <link rel="canonical" href="https://weheartpaperwork.com/features" />
       </Head>
@@ -100,6 +100,10 @@ export default function FeaturesPage() {
           [
             "FMCSA Portal and Motus access",
             "Keep Portal access active for systems that still use it while using Motus for current FMCSA registration work.",
+          ],
+          [
+            "Custom company requirements",
+            "Add as many company- or state-specific requirements as needed, with fixed dates, calendar-monthly or quarterly periods, other recurring intervals, reminders, and completion history.",
           ],
         ]}
         />
@@ -288,6 +292,7 @@ function Footer({ compact }: { compact: boolean }) {
         </View>
         <View style={styles.footerLinks}>
           <Link href="/features" asChild><Pressable><Text style={styles.footerLink}>Features</Text></Pressable></Link>
+          <Link href="/compliance-guide" asChild><Pressable><Text style={styles.footerLink}>Compliance Guide</Text></Pressable></Link>
           <Link href="/pricing" asChild><Pressable><Text style={styles.footerLink}>Pricing</Text></Pressable></Link>
           <Link href="/about" asChild><Pressable><Text style={styles.footerLink}>About</Text></Pressable></Link>
           <Link href="/tools/mcs-150-due-date-calculator" asChild><Pressable><Text style={styles.footerLink}>Free MCS-150 Tool</Text></Pressable></Link>

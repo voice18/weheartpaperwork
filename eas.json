@@ -11,7 +11,7 @@
         "EXPO_PUBLIC_APP_ENV": "staging"
       }
     },
-        "preview": {
+    "preview": {
       "developmentClient": false,
       "distribution": "internal",
       "env": {
@@ -19,6 +19,16 @@
       },
       "android": {
         "buildType": "apk"
+      }
+    },
+    "closed-test": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging"
+      },
+      "android": {
+        "buildType": "app-bundle"
       }
     },
     "production": {
@@ -32,6 +42,12 @@
     "internal": {
       "android": {
         "track": "internal",
+        "releaseStatus": "completed"
+      }
+    },
+    "closed-test": {
+      "android": {
+        "track": "alpha",
         "releaseStatus": "completed"
       }
     },

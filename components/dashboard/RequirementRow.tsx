@@ -129,6 +129,7 @@ const canUndoFixedCalendarCompletion =
 ] = useState(
   isoToInput(r.enteredDate || "")
 );
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const [
     usdotInput,
@@ -266,6 +267,7 @@ const canUndoFixedCalendarCompletion =
   const isoDate = inputToIso(enteredDate);
 
   if (!isoDate) {
+    setDateError("Enter a real date in MM-DD-YYYY format.");
     return;
   }
 
@@ -274,9 +276,11 @@ const canUndoFixedCalendarCompletion =
     : calculateNextDue(r.id, isoDate);
 
   if (!nextDue) {
+    setDateError("Enter a real date in MM-DD-YYYY format.");
     return;
   }
 
+  setDateError(null);
   onSave(
     r.id,
     isoDate,
@@ -905,28 +909,47 @@ async function handleHistoryRecordMenu(
 
                     <TextInput
                       placeholder="MM-DD-YYYY"
+                      placeholderTextColor="#706E68"
+                      accessibilityLabel={r.dl || "Due date"}
                       value={
                         enteredDate
                       }
-                      onChangeText={text =>
+                      onChangeText={text => {
                         setEnteredDate(
                           formatDateInput(
                             text
                           )
-                        )
-                      }
+                        );
+                        setDateError(null);
+                      }}
+                      onBlur={() => {
+                        if (enteredDate && !inputToIso(enteredDate)) {
+                          setDateError("Enter a real date in MM-DD-YYYY format.");
+                        }
+                      }}
+                      keyboardType="number-pad"
+                      maxLength={10}
+                      selectionColor="#27500A"
+                      cursorColor="#27500A"
                       style={{
                         width: 160,
                         backgroundColor:
                           "#FFFFFF",
                         borderWidth: 1,
-                        borderColor:
-                          "#D3D1C7",
+                        borderColor: dateError
+                          ? "#A32D2D"
+                          : "#D3D1C7",
                         borderRadius: 8,
                         paddingHorizontal: 10,
                         paddingVertical: 8,
                       }}
                     />
+
+                    {dateError ? (
+                      <Text style={{ fontSize: 11, color: "#A32D2D", marginTop: 4 }}>
+                        {dateError}
+                      </Text>
+                    ) : null}
 
                     <Text
                       style={{

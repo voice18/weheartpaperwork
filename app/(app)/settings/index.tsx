@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
   Platform,
   Share,
   SafeAreaView,
@@ -22,6 +23,7 @@ import {
   verifyBeforeUpdateEmail,
 } from "firebase/auth";
 import {
+  arrayUnion,
   doc,
   getDoc,
   setDoc,
@@ -568,6 +570,7 @@ const updateNotificationStatus = async (
       {
         notificationsEnabled: true,
         expoPushToken: registration.expoPushToken,
+        expoPushTokens: arrayUnion(registration.expoPushToken),
         notificationTokenUpdatedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       },
@@ -1069,6 +1072,9 @@ const trialEndLabel = (() => {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.content}
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
       >
         {Platform.OS === "web" && (
         <TouchableOpacity
@@ -1191,6 +1197,17 @@ const trialEndLabel = (() => {
             />
           )}
         </View>
+        <View style={styles.notificationSchedule}>
+          <Text style={styles.notificationScheduleTitle}>
+            When reminders are sent
+          </Text>
+          <Text style={styles.notificationScheduleText}>
+            We check deadlines daily at 11:00 AM Pacific Time. Most requirements notify you 15 days before, 5 days before, and on the due date.
+          </Text>
+          <Text style={styles.notificationScheduleText}>
+            FMCSA Portal maintenance and quarterly IFTA notify you 5 days before and on the due date. Short custom cycles also use fewer reminders to avoid repeated alerts.
+          </Text>
+        </View>
       </View>
 
 
@@ -1226,6 +1243,8 @@ const trialEndLabel = (() => {
             />
           )}
 
+      {Platform.OS === "web" && (
+        <>
         <SettingsRow
           label="Active drivers"
           value={String(activeDriverCount)}
@@ -1239,10 +1258,8 @@ const trialEndLabel = (() => {
         <SettingsRow
           label="Pricing"
           value={`$2 company + $1 x ${activeDriverCount}`}
-          showDivider={Platform.OS === "web"}
         />
 
-      {Platform.OS === "web" && (
         <SettingsRow
         label="Manage billing"
         value={
@@ -1257,9 +1274,12 @@ const trialEndLabel = (() => {
             : handleManageBilling
         }
       />
+        </>
       )}
       </View>
 
+      {Platform.OS === "web" && (
+        <>
         <Text style={styles.sectionLabel}>
           Referral Rewards
         </Text>
@@ -1312,6 +1332,8 @@ const trialEndLabel = (() => {
           }
         />
       </View>
+        </>
+      )}
         <Text style={styles.sectionLabel}>
           Support
         </Text>
@@ -1371,7 +1393,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         Company name
@@ -1414,7 +1440,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
 <Modal
@@ -1428,7 +1454,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         USDOT Number
@@ -1468,7 +1498,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
 <Modal
@@ -1482,7 +1512,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         Phone number
@@ -1523,7 +1557,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
 <Modal
@@ -1537,7 +1571,11 @@ const trialEndLabel = (() => {
     }
   }}
 >
-  <View style={styles.modalBackdrop}>
+  <KeyboardAvoidingView
+    behavior="padding"
+    enabled={Platform.OS === "ios"}
+    style={styles.modalBackdrop}
+  >
     <View style={styles.modalCard}>
       <Text style={styles.modalTitle}>
         Change login email
@@ -1584,7 +1622,7 @@ const trialEndLabel = (() => {
         </TouchableOpacity>
       </View>
     </View>
-  </View>
+  </KeyboardAvoidingView>
 </Modal>
 
     </SafeAreaView>
@@ -1657,6 +1695,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     color: "#706E68",
+  },
+  notificationSchedule: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 15,
+    borderTopWidth: 1,
+    borderTopColor: "#ECEAE4",
+    backgroundColor: "#F8FAF5",
+  },
+  notificationScheduleTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#27500A",
+  },
+  notificationScheduleText: {
+    marginTop: 5,
+    fontSize: 12,
+    lineHeight: 17,
+    color: "#5E5C55",
   },
   modalBackdrop: {
     flex: 1,

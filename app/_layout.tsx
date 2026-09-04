@@ -7,6 +7,7 @@ import {
   useRef,
 } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { Platform } from "react-native";
 import {
   doc,
@@ -23,6 +24,7 @@ import { onAuthStateChanged } from "firebase/auth";
 
 import { auth, db } from "../lib/firebase";
 import { useComplianceStore } from "../store/useComplianceStore";
+import { syncCurrentDevicePushToken } from "../lib/syncPushToken";
 import {
   hasBillingAccess,
   type CarrierBilling,
@@ -158,6 +160,10 @@ if (isPublicRoute) {
         return;
       }
 
+      void syncCurrentDevicePushToken(user).catch(error => {
+        console.log("Unable to refresh this device notification token:", error);
+      });
+
         if (isAccountRoute) {
         appReady.current = false;
         return;
@@ -229,19 +235,9 @@ const carrierRef = doc(
             if (!hasAccess) {
               appReady.current = false;
 
-              if (Platform.OS === "web") {
-
-
-                router.replace(
-                  "/(app)/subscription-required"
-                );
-              } else {
-
-
-                router.replace(
-                  "/compliance-guide"
-                );
-              }
+              router.replace(
+                "/(app)/subscription-required"
+              );
 
               return;
             }
@@ -371,11 +367,13 @@ const carrierRef = doc(
   }, [navigationReady, openDashboard]);
 
   return (
-  <SafeAreaProvider>
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(app)" />
-    </Stack>
-  </SafeAreaProvider>
+  <KeyboardProvider>
+    <SafeAreaProvider>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(app)" />
+      </Stack>
+    </SafeAreaProvider>
+  </KeyboardProvider>
 );
 }

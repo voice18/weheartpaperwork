@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drug and Alcohol Policy Builder</title>
+<meta name="description" content="Build the written drug and alcohol policy 49 CFR 382.601 requires — all twelve content items — plus the signed receipt form for each driver. Free, nothing leaves your browser.">
+<link rel="canonical" href="https://weheartpaperwork.com/tools/drug-alcohol-policy/">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/tools/tool-header.css">
+<style>
+:root{
+  --ground:#FBFBF9;--surface:#F1F2EE;--surface-2:#E7E9E3;
+  --line:#DBDDD5;--line-soft:#EAEBE5;
+  --ink:#1A1D1C;--ink-2:#545A57;--ink-3:#82887F;
+  --accent:#1F5E56;--accent-2:#2C7A70;--accent-bg:#DDEAE7;--accent-ink:#FFFFFF;
+  --cost:#8A5A12;--cost-bg:#F4E9D3;
+  --crit:#8E3130;--crit-bg:#F5DFDE;
+  --focus:#8A5A12;--radius:3px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131615;--surface:#1B1F1E;--surface-2:#242927;
+    --line:#333937;--line-soft:#232827;
+    --ink:#E8EAE6;--ink-2:#A4ABA6;--ink-3:#7B827C;
+    --accent:#5FB3A5;--accent-2:#7FC7BA;--accent-bg:#1A302C;--accent-ink:#0E1817;
+    --cost:#D8A94E;--cost-bg:#332A16;
+    --crit:#E08C8B;--crit-bg:#2E1D1D;
+    --focus:#D8A94E;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131615;--surface:#1B1F1E;--surface-2:#242927;
+  --line:#333937;--line-soft:#232827;
+  --ink:#E8EAE6;--ink-2:#A4ABA6;--ink-3:#7B827C;
+  --accent:#5FB3A5;--accent-2:#7FC7BA;--accent-bg:#1A302C;--accent-ink:#0E1817;
+  --cost:#D8A94E;--cost-bg:#332A16;
+  --crit:#E08C8B;--crit-bg:#2E1D1D;
+  --focus:#D8A94E;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:Barlow,"Helvetica Neue",Arial,sans-serif;font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4,.eyebrow,.btn,.tag,.snum,.dnum,label,.leg{font-family:"Barlow Semi Condensed",Barlow,"Helvetica Neue",Arial,sans-serif}
+h1{font-size:clamp(1.9rem,5vw,2.7rem);line-height:1.05;font-weight:700;letter-spacing:-.015em;margin:0;text-wrap:balance}
+h2{font-size:1.45rem;font-weight:700;line-height:1.15;margin:0;letter-spacing:-.008em;text-wrap:balance}
+h3{font-size:1.05rem;font-weight:600;line-height:1.25;margin:0}
+p{margin:0}
+a{color:var(--accent);text-underline-offset:2px}
+.eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-3);margin:0}
+.small{font-size:.92rem;line-height:1.5;color:var(--ink-2)}
+.tiny{font-size:.8rem;line-height:1.5;color:var(--ink-3)}
+.mono,.cite{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;font-size:.8rem}
+.cite{color:var(--ink-3)}
+strong{font-weight:600}
+.shell{max-width:760px;margin:0 auto;padding:0 20px 80px}
+
+.mast{display:flex;flex-direction:column;gap:16px;padding:48px 0 26px}
+.mast .sub{font-size:1.08rem;color:var(--ink-2);line-height:1.5;max-width:34rem}
+
+.btn{font-size:.95rem;font-weight:600;padding:11px 20px;border-radius:var(--radius);
+  border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer;
+  transition:filter .12s ease;line-height:1.2}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;color:var(--accent);border-color:var(--line)}
+.btn.ghost:hover{background:var(--surface);filter:none}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,.opt:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+.facts{display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--radius);
+  background:var(--surface);padding:18px 20px;max-width:34rem}
+.fact{display:grid;grid-template-columns:auto 1fr;gap:11px;align-items:baseline;font-size:.93rem;line-height:1.45}
+.fact .m{font-family:"IBM Plex Mono",monospace;font-size:.75rem;color:var(--accent);font-weight:500}
+
+/* form */
+fieldset{border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);
+  padding:20px 22px;margin:0;display:flex;flex-direction:column;gap:15px}
+.leg{font-size:.72rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);
+  padding:0 7px;margin-left:-7px}
+.form{display:flex;flex-direction:column;gap:16px;padding:26px 0 0}
+.f{display:flex;flex-direction:column;gap:5px}
+.f2{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:15px}
+label{font-size:.85rem;font-weight:600;letter-spacing:.01em}
+label .req{color:var(--crit);font-weight:600}
+label .opt{color:var(--ink-3);font-weight:500;font-size:.78rem;letter-spacing:.03em;text-transform:uppercase}
+input[type=text],input[type=email],input[type=tel],input[type=date],textarea,select{
+  font-family:inherit;font-size:.97rem;padding:10px 12px;border-radius:var(--radius);
+  border:1px solid var(--line);background:var(--ground);color:var(--ink);width:100%}
+textarea{min-height:82px;resize:vertical;line-height:1.5}
+.hint{font-size:.82rem;color:var(--ink-3);line-height:1.45}
+.err{border-color:var(--crit) !important}
+.errmsg{font-size:.82rem;color:var(--crit);font-weight:500}
+.choice{display:flex;flex-direction:column;gap:8px}
+.opt{display:grid;grid-template-columns:19px 1fr;gap:12px;align-items:start;text-align:left;width:100%;
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--ground);padding:13px 15px;
+  cursor:pointer;font-family:inherit;font-size:.96rem;color:var(--ink);transition:border-color .12s,background .12s}
+.opt:hover{border-color:var(--accent)}
+.opt[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-bg);box-shadow:inset 0 0 0 1px var(--accent)}
+.dotmark{width:17px;height:17px;border-radius:50%;border:1.5px solid var(--ink-3);margin-top:3px;position:relative;flex:none}
+.opt[aria-pressed="true"] .dotmark{border-color:var(--accent)}
+.opt[aria-pressed="true"] .dotmark::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+.opt .oh{font-weight:600;line-height:1.3;display:block}
+.opt .od{font-size:.85rem;color:var(--ink-2);line-height:1.45;display:block;margin-top:2px}
+
+.note{border:1px solid var(--line);border-left:3px solid var(--cost);border-radius:var(--radius);
+  background:var(--surface);padding:16px 18px;display:flex;flex-direction:column;gap:7px}
+.note.crit{border-left-color:var(--crit)}
+.note.acc{border-left-color:var(--accent)}
+.note h3{font-size:.98rem}
+
+/* doc output */
+.toolbar{position:sticky;top:0;z-index:5;background:var(--ground);border-bottom:1px solid var(--line);
+  padding:11px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.toolbar .tl{font-family:"Barlow Semi Condensed",sans-serif;font-weight:600;font-size:.9rem;color:var(--ink-2)}
+
+.doc{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:34px 36px;margin-top:22px;display:flex;flex-direction:column;gap:22px}
+.dochead{display:flex;flex-direction:column;gap:9px;padding-bottom:18px;border-bottom:2px solid var(--ink)}
+.doctitle{font-family:"Barlow Semi Condensed",sans-serif;font-size:1.6rem;font-weight:700;line-height:1.1}
+.docmeta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 22px;padding-top:6px}
+.dm{display:flex;flex-direction:column;gap:1px}
+.dm .k{font-size:.68rem;font-weight:600;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  font-family:"Barlow Semi Condensed",sans-serif}
+.dm .v{font-size:.95rem;font-weight:500}
+.sec{display:flex;flex-direction:column;gap:9px;break-inside:auto}
+.sechead{display:flex;flex-wrap:wrap;gap:9px;align-items:baseline;padding-bottom:2px}
+.snum{font-size:.75rem;font-weight:700;color:var(--accent);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.sec h3{font-size:1.08rem;font-weight:700;font-family:"Barlow Semi Condensed",sans-serif}
+.tag{font-size:.63rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;
+  border-radius:2px;white-space:nowrap;background:var(--accent-bg);color:var(--accent)}
+.tag.ind{background:var(--cost-bg);color:var(--cost)}
+.sec p{font-size:.96rem;line-height:1.6}
+.sec ul,.sec ol{margin:0;padding-left:1.3em;font-size:.96rem;line-height:1.58;display:flex;flex-direction:column;gap:5px}
+.sec li strong{font-weight:600}
+.dtable{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:3px}
+.dtable th{text-align:left;font-family:"Barlow Semi Condensed",sans-serif;font-size:.7rem;font-weight:600;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);padding:7px 10px;border-bottom:1px solid var(--line)}
+.dtable td{padding:8px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top;line-height:1.45}
+.dtable tr:last-child td{border-bottom:0}
+.scroll{overflow-x:auto}
+.sigblock{display:flex;flex-direction:column;gap:26px;padding-top:12px}
+.sigrow{display:grid;grid-template-columns:1fr 150px;gap:26px}
+.sigline{border-bottom:1px solid var(--ink);height:30px}
+.siglabel{font-size:.74rem;color:var(--ink-3);font-family:"Barlow Semi Condensed",sans-serif;
+  letter-spacing:.08em;text-transform:uppercase;font-weight:600;padding-top:4px}
+@media(max-width:520px){.sigrow{grid-template-columns:1fr}}
+
+.pagebreak{break-before:page}
+.hide{display:none !important}
+.printonly{display:none}
+@media (prefers-reduced-motion:reduce){*{transition:none !important;animation:none !important}}
+
+@media print{
+  @page{margin:16mm 15mm}
+  html,body{background:#fff;color:#000;font-size:10.5pt;line-height:1.42}
+  .shell{max-width:none;padding:0}
+  .noprint,.toolbar,.mast,.form,.btn,.note{display:none !important}
+  .printonly{display:block !important}
+  .doc{background:#fff;border:0;padding:0;margin:0;gap:15pt}
+  .dochead{border-bottom:1.5pt solid #000;padding-bottom:10pt}
+  .doctitle{font-size:16pt}
+  .dm .k{color:#444}
+  .sec{break-inside:auto}
+  .sechead{break-after:avoid}
+  .sec h3{font-size:11.5pt}
+  .snum{color:#000}
+  .tag{border:.5pt solid #888;background:#fff !important;color:#000 !important}
+  .sec p,.sec li{font-size:10pt}
+  .dtable{font-size:9pt}
+  .dtable th{color:#000;border-bottom:.75pt solid #000}
+  .dtable td{border-bottom:.5pt solid #bbb}
+  .sigline{border-bottom:.75pt solid #000}
+  .siglabel{color:#000}
+  .pagebreak{break-before:page}
+  a{color:#000;text-decoration:none}
+  .cite{color:#444}
+}
+</style>
+</head>
+<body>
+<header class="whp-sitebar noprint">
+  <div class="whp-sitebar-inner">
+    <a class="whp-brand" href="/"><span class="whp-brand-mark">WHP</span><span>We Heart Paperwork</span></a>
+    <nav class="whp-site-links" aria-label="Main navigation">
+      <a href="/features">What We Track</a>
+      <a href="/how-to">How to Stay Compliant</a>
+      <a href="/tools/" aria-current="page">Free Tools</a>
+      <a href="/pricing">Pricing</a>
+      <a href="/login">Sign in</a>
+      <a class="whp-create-account" href="/login?mode=create">Create account</a>
+    </nav>
+  </div>
+</header>
+<div class="shell">
+
+<!-- ============ INTRO ============ -->
+<section id="intro">
+  <div class="mast">
+    <p class="eyebrow">Free tool &middot; We Heart Paperwork</p>
+    <h1>Drug and alcohol policy builder</h1>
+    <p class="sub">If you have a CDL driver &mdash; including yourself &mdash; federal law says you must hand them a written policy covering twelve specific things, and keep their signed receipt. There is no government form for it. This builds both.</p>
+  </div>
+
+  <div class="facts">
+    <div class="fact"><span class="m">01</span><span><strong>FMCSA does not publish a template.</strong> The closest thing is a guidance chapter last updated in March 2014 &mdash; which predates the Clearinghouse and is missing a required item entirely.</span></div>
+    <div class="fact"><span class="m">02</span><span>Every section is labelled with the paragraph of <span class="cite">49 CFR 382.601(b)</span> it satisfies, so you and an auditor can both check the work.</span></div>
+    <div class="fact"><span class="m">03</span><span>Nothing you type leaves your device. No account, no database, no email required.</span></div>
+    <div class="fact"><span class="m">04</span><span>You get two documents: the policy, and the signed receipt form &mdash; one per driver. <strong>The receipt is the part carriers forget and the part auditors ask for.</strong></span></div>
+  </div>
+
+  <div class="btnrow" style="padding-top:22px">
+    <button class="btn" id="begin">Build my policy</button>
+  </div>
+</section>
+
+<!-- ============ FORM ============ -->
+<section id="form" class="hide">
+  <div class="mast" style="padding-bottom:0">
+    <p class="eyebrow">Step 1 of 2</p>
+    <h2>Tell us about your company</h2>
+    <p class="small" style="max-width:34rem">Six required fields. Everything else has a sensible default.</p>
+  </div>
+
+  <div class="form">
+    <fieldset>
+      <legend class="leg">The carrier</legend>
+      <div class="f2">
+        <div class="f">
+          <label for="co">Legal company name <span class="req">*</span></label>
+          <input type="text" id="co" placeholder="Rowe Trucking LLC" autocomplete="organization">
+          <p class="hint">Exactly as it appears on your FMCSA registration.</p>
+        </div>
+        <div class="f">
+          <label for="dot">USDOT number <span class="req">*</span></label>
+          <input type="text" id="dot" placeholder="1234567" inputmode="numeric">
+        </div>
+      </div>
+      <div class="f2">
+        <div class="f">
+          <label for="eff">Effective date <span class="req">*</span></label>
+          <input type="date" id="eff">
+        </div>
+        <div class="f">
+          <label for="addr">Business address <span class="opt">optional</span></label>
+          <input type="text" id="addr" placeholder="123 Main St, Yakima, WA 98901">
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend class="leg">Who runs the program</legend>
+      <div class="choice" id="soloChoice" role="group" aria-label="Company size">
+        <button class="opt" type="button" data-k="solo" data-v="yes" aria-pressed="false">
+          <span class="dotmark" aria-hidden="true"></span>
+          <span><span class="oh">It's just me — I'm the owner and the only driver</span>
+          <span class="od">You are your own Designated Employer Representative. A consortium can make certain testing decisions for you, but it cannot be your DER.</span></span></button>
+        <button class="opt" type="button" data-k="solo" data-v="no" aria-pressed="false">
+          <span class="dotmark" aria-hidden="true"></span>
+          <span><span class="oh">I have other drivers</span>
+          <span class="od">You need to name a DER, and anyone who supervises drivers needs two hours of reasonable-suspicion training.</span></span></button>
+      </div>
+
+      <div class="f2">
+        <div class="f">
+          <label for="der">Designated Employer Representative <span class="req">*</span></label>
+          <input type="text" id="der" placeholder="Aaron Attig">
+          <p class="hint">Must be an employee of the company. A consortium or service agent legally cannot fill this role.</p>
+        </div>
+        <div class="f">
+          <label for="dertitle">Their title <span class="opt">optional</span></label>
+          <input type="text" id="dertitle" placeholder="Owner">
+        </div>
+      </div>
+      <div class="f2">
+        <div class="f">
+          <label for="derphone">DER phone <span class="req">*</span></label>
+          <input type="tel" id="derphone" placeholder="(509) 555-0142">
+        </div>
+        <div class="f">
+          <label for="deremail">DER email <span class="opt">optional</span></label>
+          <input type="email" id="deremail" placeholder="aaron@example.com">
+        </div>
+      </div>
+      <div class="f">
+        <label for="ctpa">Consortium / third-party administrator <span class="opt">optional</span></label>
+        <input type="text" id="ctpa" placeholder="Name of your consortium, if you use one">
+        <p class="hint">If you are a single-driver operation you are required to be in a consortium — you cannot run a random pool of one.</p>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend class="leg">Two optional additions</legend>
+      <div class="f">
+        <label>Voluntary self-identification program</label>
+        <p class="hint" style="margin-bottom:3px">A driver who comes forward <em>before</em> reporting for duty can get evaluation and treatment without it becoming a DOT violation — but only if you have a written program. <span class="cite">49 CFR 382.121</span></p>
+        <div class="choice" id="vsiChoice" role="group" aria-label="Voluntary self-identification">
+          <button class="opt" type="button" data-k="vsi" data-v="yes" aria-pressed="false">
+            <span class="dotmark" aria-hidden="true"></span>
+            <span><span class="oh">Include it</span><span class="od">Adds a compliant written program. All testing under it is non-DOT.</span></span></button>
+          <button class="opt" type="button" data-k="vsi" data-v="no" aria-pressed="true">
+            <span class="dotmark" aria-hidden="true"></span>
+            <span><span class="oh">Leave it out</span><span class="od">Nothing requires you to have one.</span></span></button>
+        </div>
+      </div>
+      <div class="f">
+        <label for="extra">Company rules that go beyond DOT <span class="opt">optional</span></label>
+        <textarea id="extra" placeholder="For example: any positive test results in termination. Leave blank if you have none."></textarea>
+        <p class="hint">Anything here gets printed in its own clearly marked section. <span class="cite">49 CFR 382.601(c)</span> requires that policies based on your own authority be <strong>clearly and obviously</strong> separated from what DOT requires — mixing them is a violation on its own.</p>
+      </div>
+    </fieldset>
+
+    <div class="btnrow" style="padding-top:4px">
+      <button class="btn" id="gen">Generate both documents</button>
+      <button class="btn ghost" id="cancel">Back</button>
+    </div>
+    <p class="errmsg hide" id="formerr"></p>
+  </div>
+</section>
+
+<!-- ============ OUTPUT ============ -->
+<section id="out" class="hide">
+  <div class="toolbar noprint">
+    <span class="tl">Your policy &amp; receipt</span>
+    <div class="btnrow">
+      <button class="btn ghost" id="edit">Edit details</button>
+      <button class="btn" id="print">Print / Save as PDF</button>
+    </div>
+  </div>
+
+  <div class="note acc noprint" style="margin-top:20px">
+    <h3>Before you hand this out — three things</h3>
+    <p class="small"><strong>Read it.</strong> It is your policy now, and you are the one an auditor will ask about it. If anything in it does not describe how you actually operate, change it.</p>
+    <p class="small"><strong>Print two things.</strong> The policy goes to every driver. The receipt on the last page gets signed by each driver and <em>you</em> keep it — not them. Print one receipt per driver.</p>
+    <p class="small"><strong>Keep the signed receipt for as long as that driver works for you, plus two years.</strong> <span class="cite">49 CFR 382.401(b)(4), (c)(5)(ii)</span></p>
+  </div>
+
+  <div class="doc" id="doc"></div>
+
+  <div class="note noprint" style="margin-top:26px">
+    <h3>What this does not do</h3>
+    <p class="small">This builds the <em>policy document</em>. It does not enroll you in a consortium, run your random selections, train your supervisors, or register you in the Clearinghouse. Those are four separate things, and having a beautiful policy without them is how carriers fail a new entrant audit while feeling prepared.</p>
+    <p class="small">Not legal advice. Built from the regulation cited in each section. Verify anything that carries real consequence against the current eCFR.</p>
+  </div>
+
+  <div class="note noprint" style="margin-top:14px">
+    <h3>Want the dates tracked?</h3>
+    <p class="small">Annual Clearinghouse queries, random selections, MVR reviews, medical cards. We track them for $2 a month plus $1 per driver.</p>
+  </div>
+
+  <div style="margin-top:34px;padding-top:20px;border-top:1px solid var(--line)" class="noprint">
+    <p class="tiny"><strong>We are not FMCSA.</strong> We Heart Paperwork is a private company, not affiliated with or endorsed by the Federal Motor Carrier Safety Administration, the U.S. Department of Transportation, or any government agency.</p>
+  </div>
+</section>
+
+</div>
+
+<script>
+"use strict";
+const el = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+const state = { solo:null, vsi:"no" };
+
+/* ---- choice buttons ---- */
+document.querySelectorAll(".choice").forEach(group => {
+  group.querySelectorAll(".opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const k = btn.dataset.k;
+      group.querySelectorAll(".opt").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+      state[k] = btn.dataset.v;
+    });
+  });
+});
+
+/* ---- navigation ---- */
+el("begin").addEventListener("click", () => {
+  el("intro").classList.add("hide");
+  el("form").classList.remove("hide");
+  if (!el("eff").value) el("eff").value = new Date().toISOString().slice(0,10);
+  window.scrollTo({top:0,behavior:"instant"});
+  el("co").focus();
+});
+el("cancel").addEventListener("click", () => {
+  el("form").classList.add("hide"); el("intro").classList.remove("hide");
+  window.scrollTo({top:0,behavior:"instant"});
+});
+el("edit").addEventListener("click", () => {
+  el("out").classList.add("hide"); el("form").classList.remove("hide");
+  window.scrollTo({top:0,behavior:"instant"});
+});
+el("print").addEventListener("click", () => window.print());
+
+/* ---- validation ---- */
+function validate(){
+  const need = [["co","Company name"],["dot","USDOT number"],["eff","Effective date"],
+                ["der","DER name"],["derphone","DER phone"]];
+  let bad = [];
+  need.forEach(([id,label]) => {
+    const v = el(id).value.trim();
+    if (!v){ el(id).classList.add("err"); bad.push(label); }
+    else el(id).classList.remove("err");
+  });
+  if (state.solo === null) bad.push("whether you have other drivers");
+  const e = el("formerr");
+  if (bad.length){
+    e.textContent = "Still needed: " + bad.join(", ") + ".";
+    e.classList.remove("hide");
+    return false;
+  }
+  e.classList.add("hide");
+  return true;
+}
+
+el("gen").addEventListener("click", () => {
+  if (!validate()){
+    const f = document.querySelector(".err");
+    if (f) f.focus();
+    else document.getElementById("soloChoice").scrollIntoView({block:"center"});
+    return;
+  }
+  render();
+  el("form").classList.add("hide");
+  el("out").classList.remove("hide");
+  window.scrollTo({top:0,behavior:"instant"});
+});
+
+/* =====================================================================
+   DOCUMENT
+   ===================================================================== */
+function fmtDate(iso){
+  if (!iso) return "";
+  const [y,m,d] = iso.split("-").map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"});
+}
+
+function sec(n, title, item, bodyHtml, independent){
+  return '<div class="sec"><div class="sechead"><span class="snum">' + n + '</span>'
+    + '<h3>' + title + '</h3>'
+    + (item ? '<span class="tag' + (independent ? ' ind' : '') + '">' + item + '</span>' : '')
+    + '</div>' + bodyHtml + '</div>';
+}
+
+function render(){
+  const co    = el("co").value.trim();
+  const dot   = el("dot").value.trim();
+  const eff   = el("eff").value;
+  const addr  = el("addr").value.trim();
+  const der   = el("der").value.trim();
+  const dt    = el("dertitle").value.trim();
+  const dph   = el("derphone").value.trim();
+  const dem   = el("deremail").value.trim();
+  const ctpa  = el("ctpa").value.trim();
+  const extra = el("extra").value.trim();
+  const solo  = state.solo === "yes";
+
+  const C = esc(co);
+  const derFull = esc(der) + (dt ? ", " + esc(dt) : "");
+
+  let h = "";
+
+  /* ---------- header ---------- */
+  h += '<div class="dochead">'
+    + '<p class="eyebrow">Controlled substances and alcohol policy</p>'
+    + '<p class="doctitle">' + C + '</p>'
+    + '<div class="docmeta">'
+    + '<div class="dm"><span class="k">USDOT number</span><span class="v">' + esc(dot) + '</span></div>'
+    + '<div class="dm"><span class="k">Effective</span><span class="v">' + esc(fmtDate(eff)) + '</span></div>'
+    + '<div class="dm"><span class="k">Designated Employer Rep.</span><span class="v">' + derFull + '</span></div>'
+    + '<div class="dm"><span class="k">Issued under</span><span class="v">49 CFR Part 382, Subpart F</span></div>'
+    + (addr ? '<div class="dm"><span class="k">Address</span><span class="v">' + esc(addr) + '</span></div>' : '')
+    + (ctpa ? '<div class="dm"><span class="k">Consortium / C-TPA</span><span class="v">' + esc(ctpa) + '</span></div>' : '')
+    + '</div></div>';
+
+  h += '<div class="sec"><p>' + C + ' is required by <span class="cite">49 CFR 382.601</span> to give every driver who operates a commercial motor vehicle requiring a commercial driver\'s license a written explanation of the federal drug and alcohol rules and of this company\'s procedures for meeting them. This document is that explanation. Read all of it. You will be asked to sign a receipt confirming you got a copy.</p></div>';
+
+  /* ---------- 1 ---------- */
+  h += sec("1", "Who to ask about this policy", "382.601(b)(1)",
+    '<p>Questions about this policy, about the testing process, or about anything in it go to the Designated Employer Representative:</p>'
+    + '<p style="padding-left:2px"><strong>' + derFull + '</strong><br>'
+    + esc(dph) + (dem ? '<br>' + esc(dem) : '') + '</p>'
+    + (solo
+      ? '<p>' + C + ' is a single-driver operation. Under <span class="cite">49 CFR 40.3</span> and <span class="cite">382.107</span> the DER must be an employee of the company and a service agent cannot fill the role, so the owner serves as their own DER. Where <span class="cite">49 CFR 40.355(h)</span> and <span class="cite">(j)(1)</span> allow it, the consortium may make reasonable-suspicion, post-accident, return-to-duty and follow-up testing decisions, and may determine a refusal for a missed test, for a self-employed individual.</p>'
+      : '<p>The DER is authorized to remove a driver from safety-sensitive duties immediately and to make the required decisions in the testing process. <strong>A consortium or third-party administrator cannot be the DER</strong> and cannot make reasonable-suspicion, post-accident, return-to-duty or follow-up testing decisions on this company\'s behalf, or decide that a refusal occurred. <span class="cite">49 CFR 40.355(g), (i), (k)</span></p>'));
+
+  /* ---------- 2 ---------- */
+  h += sec("2", "Who this policy covers", "382.601(b)(2)",
+    '<p>This policy applies to every person employed by or under contract to ' + C + ' who operates a commercial motor vehicle requiring a commercial driver\'s license, including full-time, part-time, intermittent, casual and leased drivers, and owner-operators. <span class="cite">49 CFR 382.103</span></p>'
+    + (solo ? '<p>Because ' + C + ' is a single-driver operation, the owner is both the employer and a covered driver, and is subject to every prohibition and every testing requirement in this policy. <span class="cite">49 CFR 382.103(b)</span></p>' : ''));
+
+  /* ---------- 3 ---------- */
+  h += sec("3", "When these rules apply to you — safety-sensitive functions", "382.601(b)(3)",
+    '<p>These rules apply during any time you are performing, ready to perform, or immediately available to perform a safety-sensitive function. That means all time from when you begin work or are required to be ready to work until you are relieved from work and from all responsibility for performing work. Safety-sensitive functions are: <span class="cite">49 CFR 382.107</span></p>'
+    + '<ol>'
+    + '<li>All time at a company, shipper or other facility, or on public property, waiting to be dispatched — unless you have been relieved from duty.</li>'
+    + '<li>All time inspecting, servicing or conditioning any commercial motor vehicle at any time.</li>'
+    + '<li>All time at the driving controls of a commercial motor vehicle in operation.</li>'
+    + '<li>All time other than driving time in or upon a commercial motor vehicle, except time resting in a compliant sleeper berth.</li>'
+    + '<li>All time loading or unloading, supervising or assisting with loading or unloading, attending a vehicle being loaded or unloaded, remaining ready to operate the vehicle, or giving or receiving receipts for shipments.</li>'
+    + '<li>All time repairing, obtaining assistance for, or attending a disabled vehicle.</li>'
+    + '</ol>');
+
+  /* ---------- 4 ---------- */
+  h += sec("4", "What is prohibited", "382.601(b)(4)",
+    '<div class="scroll"><table class="dtable"><thead><tr><th>You must not</th><th>Rule</th></tr></thead><tbody>'
+    + '<tr><td>Report for duty or remain on duty performing safety-sensitive functions with an alcohol concentration of <strong>0.04 or greater</strong>.</td><td class="cite">382.201</td></tr>'
+    + '<tr><td>Use alcohol while performing safety-sensitive functions.</td><td class="cite">382.205</td></tr>'
+    + '<tr><td>Perform safety-sensitive functions <strong>within four hours after using alcohol</strong>.</td><td class="cite">382.207</td></tr>'
+    + '<tr><td>Use alcohol for <strong>eight hours following an accident</strong>, or until you take a post-accident alcohol test, whichever comes first — if you are required to take one.</td><td class="cite">382.209</td></tr>'
+    + '<tr><td>Refuse to submit to any required test.</td><td class="cite">382.211</td></tr>'
+    + '<tr><td>Report for duty, remain on duty, or perform a safety-sensitive function after testing positive, or after adulterating or substituting a specimen.</td><td class="cite">382.215</td></tr>'
+    + '<tr><td>Report for duty or remain on duty while using any Schedule I drug or substance. <strong>There is no prescription exception to this one.</strong></td><td class="cite">382.213(a)</td></tr>'
+    + '<tr><td>Report for duty or remain on duty while using a Schedule II&ndash;V drug — <em>unless</em> it is prescribed by a licensed medical practitioner who knows your medical history and has advised you it will not adversely affect your ability to operate a commercial motor vehicle safely.</td><td class="cite">382.213(b)</td></tr>'
+    + '</tbody></table></div>'
+    + '<p><strong>On marijuana specifically:</strong> marijuana remains a Schedule I substance under federal law. State legalization, a medical card, and a doctor\'s recommendation do not create an exception. A positive test is a positive test.</p>'
+    + '<p>' + C + ' may require you to report therapeutic drug use. <span class="cite">49 CFR 382.213(d)</span></p>');
+
+  /* ---------- 5 ---------- */
+  h += sec("5", "When you will be tested", "382.601(b)(5)",
+    '<div class="scroll"><table class="dtable"><thead><tr><th>Type</th><th>When</th><th>Rule</th></tr></thead><tbody>'
+    + '<tr><td><strong>Pre-employment</strong></td><td>Controlled substances test before you first perform a safety-sensitive function. ' + C + ' must receive a verified negative result first. Alcohol testing before employment is permitted but not required, and this company does not conduct it unless stated in section 13.</td><td class="cite">382.301</td></tr>'
+    + '<tr><td><strong>Post-accident</strong></td><td>See the table in section 6.</td><td class="cite">382.303</td></tr>'
+    + '<tr><td><strong>Random</strong></td><td>Selected by a scientifically valid random method. Every covered driver has an equal chance every time selections are made, and you may be selected more than once or not at all in a year. Minimum annual rates are <strong>50% of average driver positions for controlled substances and 10% for alcohol</strong>. Selections are unannounced and spread through the year. <strong>When notified, you must proceed to the collection site immediately.</strong> Random alcohol tests happen only while you are performing safety-sensitive functions, just before, or just after.</td><td class="cite">382.305</td></tr>'
+    + '<tr><td><strong>Reasonable suspicion</strong></td><td>When a trained supervisor makes a determination based on specific, contemporaneous, articulable observations of your appearance, behavior, speech or body odors. The person who makes the determination for an alcohol test may not administer that test.</td><td class="cite">382.307</td></tr>'
+    + '<tr><td><strong>Return-to-duty</strong></td><td>After a violation, before returning to safety-sensitive work, following the process in 49 CFR Part 40 Subpart O. Directly observed collection.</td><td class="cite">382.309</td></tr>'
+    + '<tr><td><strong>Follow-up</strong></td><td>Unannounced, as directed by a Substance Abuse Professional — at minimum six tests in the first twelve months back, and possibly for up to five years.</td><td class="cite">382.311</td></tr>'
+    + '</tbody></table></div>'
+    + (ctpa ? '<p>Random selections for ' + C + ' are administered through <strong>' + esc(ctpa) + '</strong>.</p>' : ''));
+
+  /* ---------- 6 ---------- */
+  h += sec("6", "How testing works, and what to do after an accident", "382.601(b)(6)",
+    '<p>All testing follows the procedures in <span class="cite">49 CFR Part 40</span>, which exist to protect you as much as the company: chain of custody on every specimen, a certified laboratory, split-specimen collection so you can request a second test of your own, and review of every non-negative result by a Medical Review Officer &mdash; a licensed physician &mdash; who will contact you privately and give you the chance to explain a legitimate medical reason before any result is reported to the company. Alcohol testing is done by a trained technician on an evidential breath testing device, with a confirmation test following any screening result of 0.02 or higher.</p>'
+    + '<p><strong>Post-accident testing.</strong> You must be tested after an accident in these circumstances: <span class="cite">49 CFR 382.303</span></p>'
+    + '<div class="scroll"><table class="dtable"><thead><tr><th>What happened</th><th>Were you cited?</th><th>Test required?</th></tr></thead><tbody>'
+    + '<tr><td>Someone died</td><td>Yes</td><td><strong>Yes</strong></td></tr>'
+    + '<tr><td>Someone died</td><td>No</td><td><strong>Yes</strong></td></tr>'
+    + '<tr><td>Injury treated immediately away from the scene</td><td>Yes</td><td><strong>Yes</strong></td></tr>'
+    + '<tr><td>Injury treated immediately away from the scene</td><td>No</td><td>No</td></tr>'
+    + '<tr><td>A vehicle towed away from the scene</td><td>Yes</td><td><strong>Yes</strong></td></tr>'
+    + '<tr><td>A vehicle towed away from the scene</td><td>No</td><td>No</td></tr>'
+    + '</tbody></table></div>'
+    + '<p>The citation must be issued <strong>within 8 hours</strong> for the alcohol test to be required, and <strong>within 32 hours</strong> for the controlled substances test.</p>'
+    + '<p><strong>What you must do:</strong></p>'
+    + '<ul>'
+    + '<li>Contact the DER as soon as it is safe and practical to do so.</li>'
+    + '<li>Do not use alcohol for 8 hours after the accident, or until you have been tested, whichever comes first.</li>'
+    + '<li><strong>Remain readily available for testing.</strong> If you do not, the company may treat it as a refusal.</li>'
+    + '<li>Nothing here delays necessary medical attention or stops you from leaving the scene to get help or emergency care. Take care of yourself and anyone hurt first.</li>'
+    + '</ul>'
+    + '<p>The company must attempt the alcohol test within 2 hours and stops attempting after 8 hours; the controlled substances test stops after 32 hours. If a test is not done in time, ' + C + ' records why and keeps that record on file. A breath, blood or urine test taken by law enforcement can satisfy the requirement if it meets the standards and the company obtains the result.</p>'
+    + '<p>Post-accident testing does not apply to an occurrence involving only boarding or alighting from a stationary vehicle, only loading or unloading cargo, or a passenger car or multipurpose passenger vehicle unless it was carrying passengers for hire or placarded for hazardous materials.</p>');
+
+  /* ---------- 7 ---------- */
+  h += sec("7", "You are required to submit to testing", "382.601(b)(7)",
+    '<p>If you drive a commercial motor vehicle requiring a CDL for ' + C + ', you must submit to alcohol and controlled substances tests administered under 49 CFR Part 382. This is not optional and it is not a company preference &mdash; it is a condition of performing safety-sensitive work under federal law. <span class="cite">49 CFR 382.211</span></p>');
+
+  /* ---------- 8 ---------- */
+  h += sec("8", "What counts as a refusal — and what happens", "382.601(b)(8)",
+    '<p><strong>A refusal is treated exactly the same as a positive test.</strong> It goes in the Clearinghouse, it removes you from safety-sensitive work immediately, and you cannot return without completing the return-to-duty process.</p>'
+    + '<p><strong>For a controlled substances test, you refuse if you:</strong> <span class="cite">49 CFR 40.191</span></p>'
+    + '<ul>'
+    + '<li>Fail to appear for any test (other than pre-employment) within a reasonable time after being directed to — including failing to appear when called by a consortium.</li>'
+    + '<li>Fail to remain at the testing site until the process is complete.</li>'
+    + '<li>Fail to provide a specimen.</li>'
+    + '<li>Fail to permit observation or monitoring where a directly observed or monitored collection is required.</li>'
+    + '<li>Fail to provide a sufficient amount of specimen, where a medical evaluation finds no adequate medical explanation.</li>'
+    + '<li>Fail or decline to take an additional test when directed.</li>'
+    + '<li>Fail to undergo a medical examination or evaluation directed by the Medical Review Officer or the DER.</li>'
+    + '<li>Fail to cooperate with any part of the process &mdash; refusing to empty pockets, behaving in a way that disrupts the collection, not washing your hands when directed, not removing objects from your mouth.</li>'
+    + '<li>For an observed collection, fail to follow the observer\'s instructions to raise and lower clothing and turn around.</li>'
+    + '<li>Possess or wear a device that could be used to interfere with the collection.</li>'
+    + '<li>Admit to the collector or MRO that you adulterated or substituted the specimen.</li>'
+    + '</ul>'
+    + '<p>A verified adulterated or substituted result is also a refusal.</p>'
+    + '<p><strong>For an alcohol test, you refuse if you:</strong> <span class="cite">49 CFR 40.261</span></p>'
+    + '<ul>'
+    + '<li>Fail to appear for any test (other than pre-employment) within a reasonable time after being directed to.</li>'
+    + '<li>Fail to remain at the testing site until the process is complete.</li>'
+    + '<li>Fail to provide an adequate amount of saliva or breath.</li>'
+    + '<li>Fail to provide a sufficient breath specimen where a physician finds no adequate medical explanation.</li>'
+    + '<li>Fail to undergo a directed medical examination or evaluation.</li>'
+    + '<li><strong>Fail to sign the certification at Step 2 of the alcohol testing form.</strong></li>'
+    + '<li>Fail to cooperate with any part of the process.</li>'
+    + '</ul>'
+    + '<p>The collector does not decide whether your conduct was a refusal. <strong>That decision belongs to ' + C + '</strong> and cannot be delegated. <span class="cite">49 CFR 40.355(i)</span></p>'
+    + '<p>Refusing a non-DOT test, or refusing to sign a non-DOT form, is not a DOT refusal. <span class="cite">49 CFR 40.191(e)</span></p>');
+
+  /* ---------- 9 ---------- */
+  h += sec("9", "What happens if you violate this policy", "382.601(b)(9)",
+    '<p>If you have a verified positive, adulterated or substituted controlled substances result, an alcohol confirmation test of 0.04 or greater, or a refusal:</p>'
+    + '<ul>'
+    + '<li><strong>You are removed from all safety-sensitive functions immediately.</strong> Not at the end of the shift, not after the load delivers. Immediately. <span class="cite">49 CFR 382.501</span></li>'
+    + '<li>The violation is reported to the FMCSA Drug and Alcohol Clearinghouse.</li>'
+    + '<li>You will be given the name and contact information of a Substance Abuse Professional. <span class="cite">49 CFR 382.605</span></li>'
+    + '<li>You cannot perform safety-sensitive work for any employer until you complete the return-to-duty process in <span class="cite">49 CFR Part 40, Subpart O</span>: evaluation by a SAP, completion of the education or treatment they prescribe, a follow-up SAP evaluation, and a negative return-to-duty test under direct observation.</li>'
+    + '<li>After you return, you are subject to unannounced follow-up testing as the SAP directs &mdash; at least six tests in the first twelve months, and potentially for up to five years.</li>'
+    + '<li>If your CDL privilege was removed by your state, you cannot drive until the state licensing agency reinstates it. <span class="cite">49 CFR 382.503(b)</span></li>'
+    + '</ul>'
+    + '<p>The cost of SAP evaluation, treatment and return-to-duty testing is not paid by ' + C + ' unless stated in section 13.</p>');
+
+  /* ---------- 10 ---------- */
+  h += sec("10", "If your alcohol test is 0.02 to 0.039", "382.601(b)(10)",
+    '<p>This is below the 0.04 violation threshold, so it is not a DOT violation and it is not reported to the Clearinghouse. But you still come off the road.</p>'
+    + '<p>You may not perform any safety-sensitive function <strong>until the start of your next regularly scheduled duty period, and in no case less than 24 hours after the test was administered.</strong> Whichever is longer. <span class="cite">49 CFR 382.505(a)</span></p>'
+    + '<p>Other than that removal, ' + C + ' will take no action under Part 382 based solely on a result below 0.04. <span class="cite">49 CFR 382.505(b)</span></p>');
+
+  /* ---------- 11 ---------- */
+  h += sec("11", "Effects, warning signs, and how to get help", "382.601(b)(11)",
+    '<p><strong>What alcohol and drugs do to a driver.</strong> Alcohol slows reaction time, impairs judgment and depth perception, and reduces the ability to track a moving object and divide attention between tasks &mdash; every one of which is a core driving skill. Impairment begins well below any legal threshold and continues as blood alcohol falls; you can be measurably impaired the morning after and still test under 0.04. Stimulants used to stay awake produce alertness followed by a hard crash, and are associated with aggression, paranoia and micro-sleeps. Marijuana impairs reaction time, short-term memory and time perception for hours after the subjective effects fade. Opioids, sedatives and some prescription medications cause drowsiness and slowed reaction. Chronic use damages the liver, heart and nervous system, raises cancer risk, and is linked to depression and anxiety.</p>'
+    + '<p><strong>What it does to the rest of a life.</strong> Lost licence, lost income, and for an owner-operator a lost business. Missed work, absenteeism, disciplinary problems, damaged equipment, preventable crashes. Strained marriages, money problems, isolation from family and friends, legal trouble.</p>'
+    + '<p><strong>Signs of a problem — in yourself or a co-worker.</strong> Drinking or using to cope with stress, or to start the day. Needing more for the same effect. Trying to cut down and not being able to. Blackouts or memory gaps. Hiding it or lying about how much. Missed shifts, lateness, unexplained absences, or a run of small accidents and near-misses. Mood swings, irritability, withdrawal from people. Money trouble that does not add up. Smelling of alcohol at work, unsteadiness, slurred or rapid speech, bloodshot eyes, tremors, or a sharp change in appearance or hygiene.</p>'
+    + '<p><strong>How to intervene.</strong> Three things you can do, and all of them are better than nothing:</p>'
+    + '<ul>'
+    + '<li><strong>Talk to the person directly.</strong> Privately, without an audience, describing what you have actually seen rather than what you conclude from it. Most people are more willing to hear "you have been late four times this month and you did not seem right on Tuesday" than an accusation.</li>'
+    + '<li><strong>Point them toward help.</strong> ' + C + ' will provide the name and contact information of a Substance Abuse Professional to any driver who asks. The <strong>SAMHSA National Helpline is 1-800-662-HELP (4357)</strong> &mdash; free, confidential, 24 hours a day, 365 days a year, in English and Spanish. It is not a DOT service and calling it is not a report to anyone.</li>'
+    + '<li><strong>Tell the DER.</strong> If someone is about to drive and you believe they are impaired, say so. A trained supervisor can order a reasonable-suspicion test. Making that call is uncomfortable and it is the only thing on this page that reliably stops a crash before it happens.</li>'
+    + '</ul>'
+    + '<p>Getting help before a positive test is always better than after one. After a positive test, the process is mandatory, expensive and slow.</p>');
+
+  /* ---------- 12 ---------- */
+  h += sec("12", "What gets reported to the Clearinghouse", "382.601(b)(12)",
+    '<p>The FMCSA Drug and Alcohol Clearinghouse is a federal database that any prospective employer must query before hiring you, and that your current employer must query at least once a year. The following information about you will be reported to it: <span class="cite">49 CFR 382.601(b)(12)</span></p>'
+    + '<ol>'
+    + '<li>A verified positive, adulterated or substituted drug test result.</li>'
+    + '<li>An alcohol confirmation test with a concentration of 0.04 or higher.</li>'
+    + '<li>A refusal to submit to any required test.</li>'
+    + '<li>An employer report of actual knowledge of on-duty alcohol use, pre-duty alcohol use, alcohol use following an accident, or controlled substance use.</li>'
+    + '<li>A Substance Abuse Professional report that you successfully completed the return-to-duty process.</li>'
+    + '<li>A negative return-to-duty test result.</li>'
+    + '<li>An employer report that you completed follow-up testing.</li>'
+    + '</ol>'
+    + '<p>A violation stays visible in the Clearinghouse for five years, or until the return-to-duty process is complete and follow-up testing is finished &mdash; whichever is later. Your state licensing agency also uses this information: a driver in prohibited status cannot have a CDL issued, renewed, upgraded or transferred, and the state must begin downgrading the CDL privilege within 60 days.</p>'
+    + '<p>You can see your own record for free by registering at <strong>clearinghouse.fmcsa.dot.gov</strong>. ' + C + ' encourages you to do so.</p>');
+
+  /* ---------- 13 optional: independent authority ---------- */
+  let n = 13;
+  if (extra){
+    h += sec(String(n), "Company rules that are not required by DOT", "Independent authority",
+      '<p style="font-weight:600">Everything in this section is based on the independent authority of ' + C + ' and is <em>not</em> required by the U.S. Department of Transportation or 49 CFR Part 382. It is set out separately as <span class="cite">49 CFR 382.601(c)</span> requires.</p>'
+      + '<p>' + esc(extra).replace(/\n{2,}/g,'</p><p>').replace(/\n/g,'<br>') + '</p>', true);
+    n++;
+  }
+
+  /* ---------- optional: voluntary self-identification ---------- */
+  if (state.vsi === "yes"){
+    h += sec(String(n), "Voluntary self-identification program", "382.121",
+      '<p>' + C + ' operates a voluntary self-identification program. If you come forward about alcohol or controlled substance use, you will not be subject to the DOT referral, evaluation and treatment requirements, provided all of the following are true: <span class="cite">49 CFR 382.121(a)</span></p>'
+      + '<ul>'
+      + '<li>You make the admission under this program.</li>'
+      + '<li>You are not doing it to avoid a test you have already been notified of.</li>'
+      + '<li><strong>You come forward before performing a safety-sensitive function — that is, before reporting for duty.</strong></li>'
+      + '<li>You do not perform any safety-sensitive function until the company is satisfied you have been evaluated and have completed the education or treatment you were directed to.</li>'
+      + '</ul>'
+      + '<p>Under this program ' + C + ': <span class="cite">49 CFR 382.121(b)</span></p>'
+      + '<ul>'
+      + '<li>Will not take adverse action against you for making a qualifying voluntary admission.</li>'
+      + '<li>Will allow you sufficient opportunity to seek evaluation, education or treatment.</li>'
+      + '<li>Will permit your return to safety-sensitive work only on successful completion, as determined by an employee assistance professional, a Substance Abuse Professional, or a qualified drug and alcohol counselor.</li>'
+      + '<li>Requires, before you return, a <strong>non-DOT</strong> return-to-duty alcohol test below 0.02 and/or a <strong>non-DOT</strong> return-to-duty controlled substances test with a verified negative result.</li>'
+      + '<li>May monitor you and require <strong>non-DOT</strong> follow-up testing.</li>'
+      + '</ul>'
+      + '<p>All testing under this program is non-DOT. This program does not apply once you have been notified of a test, and it does not excuse any conduct already reportable.</p>');
+    n++;
+  }
+
+  /* ---------- records ---------- */
+  h += sec(String(n), "Your records", "",
+    '<p>' + C + ' keeps drug and alcohol program records in a secure location with controlled access, and must make them available for inspection at its principal place of business <strong>within two business days</strong> of a request from an authorized FMCSA representative. <span class="cite">49 CFR 382.401(a), (d)</span></p>'
+    + '<div class="scroll"><table class="dtable"><thead><tr><th>Record</th><th>Kept for</th></tr></thead><tbody>'
+    + '<tr><td>Alcohol results of 0.02 or greater, verified positives, refusals, evaluations and referrals, program administration records, annual summaries</td><td><strong>5 years</strong></td></tr>'
+    + '<tr><td>Records of the collection process, including random selection documentation</td><td><strong>2 years</strong></td></tr>'
+    + '<tr><td>Negative and cancelled results, and alcohol results below 0.02</td><td><strong>1 year</strong></td></tr>'
+    + '<tr><td>Training records and your signed receipt for this policy</td><td><strong>While you perform the functions, plus 2 years</strong></td></tr>'
+    + '<tr><td>Clearinghouse query records</td><td><strong>3 years</strong> — satisfied by maintaining a valid Clearinghouse registration</td></tr>'
+    + '</tbody></table></div>'
+    + '<p>Your test results are released only as Part 40 allows: to you on request, to the DER, to the MRO and SAP, and to a subsequent employer with your specific written consent. <span class="cite">49 CFR 40.321</span></p>');
+
+  /* ---------- receipt ---------- */
+  h += '<div class="sec pagebreak" style="padding-top:6px">'
+    + '<div class="dochead" style="border-bottom-width:2px">'
+    + '<p class="eyebrow">Certificate of receipt &mdash; 49 CFR 382.601(d)</p>'
+    + '<p class="doctitle">' + C + '</p>'
+    + '<div class="docmeta">'
+    + '<div class="dm"><span class="k">USDOT number</span><span class="v">' + esc(dot) + '</span></div>'
+    + '<div class="dm"><span class="k">Policy effective</span><span class="v">' + esc(fmtDate(eff)) + '</span></div>'
+    + '</div></div>'
+    + '<p style="font-size:1.02rem;line-height:1.65;padding-top:8px">I have received a copy of the controlled substances and alcohol policy and procedures of <strong>' + C + '</strong>, dated ' + esc(fmtDate(eff)) + ', issued under 49 CFR Part 382.</p>'
+    + '<div class="sigblock">'
+    + '<div><div class="sigline"></div><p class="siglabel">Driver — printed name</p></div>'
+    + '<div class="sigrow"><div><div class="sigline"></div><p class="siglabel">Driver signature</p></div>'
+    + '<div><div class="sigline"></div><p class="siglabel">Date</p></div></div>'
+    + '<div class="sigrow"><div><div class="sigline"></div><p class="siglabel">Driver’s licence number and state</p></div>'
+    + '<div><div class="sigline"></div><p class="siglabel">Date of hire</p></div></div>'
+    + '<div class="sigrow"><div><div class="sigline"></div><p class="siglabel">Received by (company representative)</p></div>'
+    + '<div><div class="sigline"></div><p class="siglabel">Date</p></div></div>'
+    + '</div>'
+    + '<p class="tiny" style="padding-top:16px">Print one of these for every driver. <strong>' + C + ' keeps the signed original</strong> — the driver may be given a copy but is not required to be. Retain it for as long as the driver performs safety-sensitive functions and for two years afterward. <span class="cite">49 CFR 382.601(d), 382.401(b)(4), (c)(5)(ii)</span></p>'
+    + '</div>';
+
+  /* ---------- compliance map ---------- */
+  h += '<div class="sec pagebreak"><div class="sechead"><h3>Where each required item lives</h3></div>'
+    + '<p class="small">49 CFR 382.601(b) lists twelve things this document has to cover. This is the map, so you or an auditor can check it in a minute.</p>'
+    + '<div class="scroll"><table class="dtable"><thead><tr><th>Required by</th><th>What it requires</th><th>Section</th></tr></thead><tbody>'
+    + [["(b)(1)","The person designated to answer driver questions","1"],
+       ["(b)(2)","The categories of drivers subject to the rules","2"],
+       ["(b)(3)","Sufficient information about safety-sensitive functions","3"],
+       ["(b)(4)","Specific information on prohibited driver conduct","4"],
+       ["(b)(5)","The circumstances under which a driver will be tested","5"],
+       ["(b)(6)","Testing procedures and post-accident instructions","6"],
+       ["(b)(7)","The requirement that a driver submit to testing","7"],
+       ["(b)(8)","What constitutes a refusal, and the consequences","8"],
+       ["(b)(9)","Consequences of a Subpart B violation, and Part 40 Subpart O","9"],
+       ["(b)(10)","Consequences of an alcohol concentration of 0.02 to 0.039","10"],
+       ["(b)(11)","Effects, signs and symptoms, and methods of intervening","11"],
+       ["(b)(12)","What is reported to the Clearinghouse","12"]]
+      .map(r=>'<tr><td class="cite">382.601'+r[0]+'</td><td>'+r[1]+'</td><td><strong>'+r[2]+'</strong></td></tr>').join("")
+    + '</tbody></table></div>'
+    + '<p class="tiny" style="padding-top:10px">Generated ' + esc(new Date().toLocaleDateString()) + ' by weheartpaperwork.com. '
+    + 'We Heart Paperwork is a private company and is not affiliated with FMCSA, the U.S. Department of Transportation, or any government agency. '
+    + 'Regulations reviewed September 2026.</p>'
+    + '</div>';
+
+  el("doc").innerHTML = h;
+}
+</script>
+</body>
+</html>

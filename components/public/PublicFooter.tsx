@@ -62,21 +62,17 @@ export default function PublicFooter() {
             </Pressable>
           </Link>
 
-          <Link href="/compliance" asChild>
-            <Pressable>
-              <Text style={styles.footerLink}>
-                Compliance Guides
-              </Text>
-            </Pressable>
-          </Link>
-
           <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/new-entrant-audit/")}><Text style={styles.footerLink}>New Entrant Audit Tool</Text></Pressable>
 
           <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/driver-qualification-file/")}><Text style={styles.footerLink}>DQ File Builder</Text></Pressable>
 
+          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/drug-alcohol-policy/")}><Text style={styles.footerLink}>Drug &amp; Alcohol Policy Builder</Text></Pressable>
+
           <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/vehicle-maintenance-file/")}><Text style={styles.footerLink}>Maintenance File Builder</Text></Pressable>
 
           <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/accident-register/")}><Text style={styles.footerLink}>Accident Register Builder</Text></Pressable>
+
+          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/what-do-i-need/")}><Text style={styles.footerLink}>Paperwork Checklist Tool</Text></Pressable>
 
           <Link href={"/how-to" as any} asChild>
             <Pressable><Text style={styles.footerLink}>How-To Walkthroughs</Text></Pressable>

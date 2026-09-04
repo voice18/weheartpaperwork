@@ -271,7 +271,8 @@ export async function syncSubscriptionToCarrier(
 export async function handleCheckoutCompleted(
   db: FirebaseFirestore.Firestore,
   stripe: Stripe,
-  session: Stripe.Checkout.Session
+  session: Stripe.Checkout.Session,
+  driverPriceId: string
 ) {
   const carrierId =
     session.metadata?.carrierId;
@@ -346,16 +347,53 @@ if (
 }
 
 
-  const subscription =
+  let subscription =
     await stripe.subscriptions.retrieve(
       stripeSubscriptionId
     );
+
+  // Checkout can remain open while drivers are added or deactivated. Recount
+  // at completion so the subscription begins with the current fleet state.
+  const currentDrivers = await carrierRef.collection("drivers").get();
+  const currentActiveDriverCount = currentDrivers.docs.filter(
+    document => document.data().status !== "inactive"
+  ).length;
+  const driverItem = subscription.items.data.find(
+    item => item.price.id === driverPriceId
+  );
+
+  if (currentActiveDriverCount > 0 && driverItem?.quantity !== currentActiveDriverCount) {
+    if (driverItem) {
+      await stripe.subscriptionItems.update(
+        driverItem.id,
+        { quantity: currentActiveDriverCount, proration_behavior: "create_prorations" },
+        { idempotencyKey: `checkout_driver_count_${session.id}` }
+      );
+    } else {
+      await stripe.subscriptionItems.create(
+        {
+          subscription: stripeSubscriptionId,
+          price: driverPriceId,
+          quantity: currentActiveDriverCount,
+          proration_behavior: "create_prorations",
+        },
+        { idempotencyKey: `checkout_driver_count_${session.id}` }
+      );
+    }
+  } else if (currentActiveDriverCount === 0 && driverItem) {
+    await stripe.subscriptionItems.del(
+      driverItem.id,
+      { proration_behavior: "create_prorations" }
+    );
+  }
+
+  subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
 
   await syncSubscriptionToCarrier(
     db,
     subscription,
     carrierId,
-    activeDriverCount
+    currentActiveDriverCount
   );
   await carrierRef.update({
   "billing.hasUsedTrial": true,
