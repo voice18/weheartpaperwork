@@ -118,6 +118,7 @@ export default function DriverRenewalField({
 const [completionDate, setCompletionDate] = useState(
   isoToInput(today)
 );
+const [replacementDueDate, setReplacementDueDate] = useState("");
 
 const [historyOpen, setHistoryOpen] = useState(false);
 
@@ -259,10 +260,11 @@ const {
           </Text>
       {nextDue && onMarkComplete ? (
   <TouchableOpacity
-    onPress={() => {
+  onPress={() => {
       setCompletionDate(
       isoToInput(today)
     );
+  setReplacementDueDate("");
   setConfirming(true);
     }}
     style={{
@@ -302,6 +304,31 @@ const {
       }}
     />
 
+    {dateRepresentsDueDate ? (
+      <>
+        <Text style={{ fontSize: 12, color: "#706E68", marginTop: 10, marginBottom: 4 }}>
+          New expiration date
+        </Text>
+        <TextInput
+          placeholder="MM-DD-YYYY"
+          value={replacementDueDate}
+          onChangeText={(text) => setReplacementDueDate(formatDateInput(text))}
+          style={{
+            width: 160,
+            backgroundColor: "#fff",
+            borderWidth: 1,
+            borderColor: "#D3D1C7",
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+          }}
+        />
+        <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
+          Enter the expiration shown on the new medical certification.
+        </Text>
+      </>
+    ) : null}
+
     <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
       <TouchableOpacity
         onPress={() => setConfirming(false)}
@@ -332,7 +359,7 @@ const {
 
           const confirmedNextDue =
             dateRepresentsDueDate
-              ? nextDue
+              ? inputToIso(replacementDueDate)
               : addInterval(
                   isoCompletionDate,
                   years,

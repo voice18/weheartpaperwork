@@ -16,6 +16,7 @@ import {
   serverTimestamp,
   Timestamp,
   writeBatch,
+  runTransaction,
 } from "firebase/firestore";
 import { auth, db } from "../lib/firebase";
 import type { ComplianceRecord, RequirementId } from "../lib/types";
@@ -23,6 +24,9 @@ import {
   addDays,
   addYears,
   calcUsdotDue,
+  followingIftaQuarterDue,
+  iftaQuarterEndFromDueDate,
+  nextIftaQuarterDue,
 } from "../lib/requirements";
 
 function fixedCalendarDueDate(
@@ -41,6 +45,42 @@ function fixedCalendarDueDate(
     default:
       return null;
   }
+}
+
+const BUILT_IN_REQUIREMENT_IDS: RequirementId[] = [
+  "mcs150", "tax2290", "fmcsa-portal", "ucr", "ifta",
+  "ifta-quarterly", "irp", "insurance", "drug", "boc3",
+];
+
+function initialRequirementDueDate(
+  reqId: RequirementId,
+  usdotNumber: string
+): string | null {
+  if (reqId === "mcs150") return calcUsdotDue(usdotNumber);
+  if (reqId === "ifta-quarterly") return nextIftaQuarterDue();
+  return fixedCalendarDueDate(reqId);
+}
+
+async function ensureBuiltInRequirement(
+  carrierId: string,
+  reqId: RequirementId,
+  usdotNumber: string,
+  applicable = true
+): Promise<void> {
+  const ref = doc(db, "carriers", carrierId, "compliance", reqId);
+  await runTransaction(db, async transaction => {
+    const existing = await transaction.get(ref);
+    if (existing.exists()) return;
+    const dueDate = initialRequirementDueDate(reqId, usdotNumber);
+    transaction.set(ref, {
+      enteredDate: null,
+      dueDate,
+      completed: false,
+      completedAt: null,
+      applicable,
+      lastUpdated: serverTimestamp(),
+    });
+  });
 }
 
 interface StoreState {
@@ -111,6 +151,20 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
         };
       });
       set({ compliance: records, loading: false });
+      const existingIds = new Set(snapshot.docs.map(item => item.id));
+      for (const reqId of BUILT_IN_REQUIREMENT_IDS) {
+        if (existingIds.has(reqId)) continue;
+        void ensureBuiltInRequirement(
+          carrierId,
+          reqId,
+          get().usdotNumber,
+          reqId === "ifta-quarterly"
+            ? records.ifta?.applicable !== false
+            : true
+        ).catch(error => {
+          console.log(`Built-in requirement setup failed (${reqId}):`, error);
+        });
+      }
     }, err => {
       set({ error: err.message, loading: false });
     });
@@ -126,6 +180,23 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
     set({ usdotNumber: num });
     if (!carrierId) return;
     await setDoc(doc(db, "carriers", carrierId), { usdotNumber: num }, { merge: true });
+    const calculatedDueDate = calcUsdotDue(num);
+    if (calculatedDueDate) {
+      const mcs150Ref = doc(db, "carriers", carrierId, "compliance", "mcs150");
+      await runTransaction(db, async transaction => {
+        const snapshot = await transaction.get(mcs150Ref);
+        if (!snapshot.exists() || !snapshot.data()?.dueDate) {
+          transaction.set(mcs150Ref, {
+            dueDate: calculatedDueDate,
+            enteredDate: null,
+            completed: false,
+            completedAt: null,
+            applicable: snapshot.data()?.applicable !== false,
+            lastUpdated: serverTimestamp(),
+          }, { merge: true });
+        }
+      });
+    }
   },
 
   // ── saveDate ───────────────────────────────────────────────────────────────
@@ -278,6 +349,7 @@ async markComplete(reqId, completionDate = null) {
       };
     } else if (
       reqId === "irp" ||
+      reqId === "insurance" ||
       reqId === "drug"
     ) {
     const currentDue =
@@ -304,6 +376,28 @@ async markComplete(reqId, completionDate = null) {
       enteredDate: currentDue,
       dueDate: nextDueDate,
       completed: false,
+      completedAt: null,
+      lastUpdated: serverTimestamp(),
+      notified30: false,
+      notified90: false,
+    };
+  } else if (reqId === "ifta-quarterly") {
+    const currentDue =
+      compliance[reqId]?.dueDate ||
+      nextIftaQuarterDue();
+
+    previousDueDate = currentDue;
+    const quarterEnd = iftaQuarterEndFromDueDate(currentDue);
+    if (!completionDate || !quarterEnd || completionDate <= quarterEnd) {
+      return;
+    }
+    nextDueDate = followingIftaQuarterDue(currentDue);
+
+    complianceUpdate = {
+      previousDueDate: currentDue,
+      dueDate: nextDueDate,
+      completed: false,
+      completedDate: null,
       completedAt: null,
       lastUpdated: serverTimestamp(),
       notified30: false,

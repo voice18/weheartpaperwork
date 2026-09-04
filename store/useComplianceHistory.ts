@@ -41,7 +41,8 @@ export type ComplianceHistoryRecord = {
 
 export function useComplianceHistory(
   requirementId: string,
-  driverId?: string
+  driverId?: string,
+  isCustom = false
 ) {
   const [records, setRecords] = useState<
     ComplianceHistoryRecord[]
@@ -67,7 +68,16 @@ export function useComplianceHistory(
     setLoading(true);
     setError(null);
 
-    const historyRef = driverId
+    const historyRef = isCustom
+  ? collection(
+      db,
+      "carriers",
+      carrierId,
+      "customRequirements",
+      requirementId,
+      "history"
+    )
+  : driverId
   ? collection(
       db,
       "carriers",
@@ -200,7 +210,7 @@ export function useComplianceHistory(
     );
 
     return unsubscribe;
-  }, [requirementId, driverId]);
+  }, [requirementId, driverId, isCustom]);
 
 async function deleteRecord(
   recordId: string
@@ -214,7 +224,17 @@ async function deleteRecord(
     );
   }
 
-  const recordRef = driverId
+  const recordRef = isCustom
+    ? doc(
+        db,
+        "carriers",
+        carrierId,
+        "customRequirements",
+        requirementId,
+        "history",
+        recordId
+      )
+    : driverId
     ? doc(
         db,
         "carriers",
@@ -253,6 +273,41 @@ async function deleteRecord(
     records[0]?.id !== recordId
   ) {
     await deleteDoc(recordRef);
+    return;
+  }
+
+  if (isCustom) {
+    const requirementRef = doc(
+      db, "carriers", carrierId, "customRequirements", requirementId
+    );
+    const requirementSnapshot = await getDoc(requirementRef);
+    if (!requirementSnapshot.exists()) {
+      await deleteDoc(recordRef);
+      return;
+    }
+    const liveData = requirementSnapshot.data();
+    const expectedDue = targetRecord.nextDueDate;
+    const liveCompletionDate =
+      typeof liveData.completedDate === "string" ? liveData.completedDate : null;
+    if (
+      liveData.dueDate !== expectedDue ||
+      (targetRecord.completionDate && liveCompletionDate !== targetRecord.completionDate)
+    ) {
+      await deleteDoc(recordRef);
+      return;
+    }
+    const batch = writeBatch(db);
+    batch.set(requirementRef, {
+      dueDate: targetRecord.previousDueDate,
+      completed: false,
+      completedDate: null,
+      completedAt: null,
+      notified30: false,
+      notified90: false,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+    batch.delete(recordRef);
+    await batch.commit();
     return;
   }
 

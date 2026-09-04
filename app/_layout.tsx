@@ -47,13 +47,36 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
 
+const alwaysPublicRoutes = [
+  "/compliance-guide",
+  "/privacy",
+  "/support",
+];
+
+const webPublicRoutes = [
+  "/",
+  "/pricing",
+  "/features",
+  "/about",
+  "/referrals",
+  "/compliance-service-or-tracker",
+  "/for-owner-operators",
+  "/fmcsa-updates",
+  "/tools/mcs-150-due-date-calculator",
+  "/tools",
+];
+
 const isPublicRoute =
-  ["/compliance-guide", "/privacy", "/support"].includes(
-    pathname
-  ) ||
+  alwaysPublicRoutes.includes(pathname) ||
   (
     Platform.OS === "web" &&
-    pathname === "/"
+    (
+      webPublicRoutes.includes(pathname) ||
+      pathname === "/compliance" ||
+      pathname.startsWith("/compliance/") ||
+      pathname === "/how-to" ||
+      pathname.startsWith("/how-to/")
+    )
   );
 
 const isAccountRoute =

@@ -276,10 +276,10 @@ const billingNote = hasUsedTrial
               Running a trucking company is hard
               enough without worrying about missed
               DOT paperwork. We Heart Paperwork
-              helps organize company and driver
-              compliance so you know what is due,
-              what is coming next, and what needs
-              attention.
+              helps organize company, driver,
+              truck, and trailer requirements so
+              you know what is due, what is coming
+              next, and what needs attention.
             </Text>
           </View>
 
@@ -305,8 +305,8 @@ const billingNote = hasUsedTrial
               />
 
               <BenefitRow
-                title="Audit readiness"
-                description="Keep important compliance information organized and accessible."
+                title="Organized records"
+                description="Keep compliance dates, status, reminders, and completion history together in one place."
                 showDivider={false}
               />
             </View>

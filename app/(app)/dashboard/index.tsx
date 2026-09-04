@@ -16,21 +16,25 @@ import {
   urgency,
   fmtDate,
   daysFrom,
+  addDays,
   addYears,
 } from "../../../lib/requirements";
 import { useEffect, useState  }                      from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
 import SignalCards from "../../../components/dashboard/SignalCards";
 import RequirementRow from "../../../components/dashboard/RequirementRow";
 import CompanyRequirements from "../../../components/dashboard/CompanyRequirements";
+import CustomRequirementsPanel from "../../../components/dashboard/CustomRequirementsPanel";
 import DriversPanel from "../../../components/dashboard/DriversPanel";
+import FleetPanel, {
+  vehicleDeadlineItems,
+} from "../../../components/dashboard/FleetPanel";
+import type { FleetVehicle } from "../../../components/dashboard/FleetPanel";
 import {
   collection,
   onSnapshot,
   doc,
-  setDoc,
-  serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/firebase";
 
@@ -38,7 +42,6 @@ import { auth, db } from "../../../lib/firebase";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
 
   const params = useLocalSearchParams<{
   alertType?: string;
@@ -58,7 +61,7 @@ export default function DashboardScreen() {
 
   const [filter, setFilter] = useState<"od"|"sn"|"up"|null>(null);
   const [tab, setTab] =
-  useState<"overview" | "company" | "drivers">("overview");
+  useState<"overview" | "company" | "drivers" | "fleet">("overview");
   useEffect(() => {
     if (params.alertType || params.itemIds) {
       setTab("overview");
@@ -67,10 +70,10 @@ export default function DashboardScreen() {
   }, [params.alertType, params.itemIds]);
 
   const [drivers, setDrivers] = useState<any[]>([]);
+  const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [companyName, setCompanyName] = useState("");
+  const [customReqs, setCustomReqs] = useState<any[]>([]);
 
-  const [showNextStep, setShowNextStep] = useState(false);
-  const hasDrivers = drivers.length > 0;
 
   useEffect(() => {
   const user = auth.currentUser;
@@ -82,7 +85,6 @@ export default function DashboardScreen() {
     const data = snap.data();
 
     setCompanyName(data?.companyName || "");
-    setShowNextStep(data?.nextStepDismissed !== true);
   });
 
   const unsubCompliance =
@@ -108,39 +110,21 @@ export default function DashboardScreen() {
     setDrivers(activeDrivers);
   });
 
+  const unsubVehicles = onSnapshot(
+    collection(db, "carriers", user.uid, "vehicles"),
+    snapshot => setVehicles(snapshot.docs.map(item => ({
+      id: item.id,
+      ...item.data(),
+    })) as FleetVehicle[])
+  );
+
   return () => {
     unsubCompliance();
     unsubDrivers();
+    unsubVehicles();
     unsubCarrier();
   };
 }, []);
-
-  const dismissNextStep = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  // Hide immediately so the button feels responsive.
-  setShowNextStep(false);
-
-  try {
-    await setDoc(
-      doc(db, "carriers", user.uid),
-      {
-        nextStepDismissed: true,
-        nextStepDismissedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (error) {
-    console.error("Failed to save Next Step dismissal:", error);
-
-    // Restore the card if Firestore did not save the preference.
-    setShowNextStep(true);
-  }
-};
-
-
-  
 
   if (loading) return (
     <View style={styles.center}>
@@ -189,7 +173,7 @@ export default function DashboardScreen() {
     id: `driver-${driver.id}-clearinghouse`,
     n: `Clearinghouse query — ${driver.name}`,
     f: "Driver",
-    due: addYears(driver.clearinghouseDue, 1),
+    due: addDays(driver.clearinghouseDue, 365),
     de: false,
     notes: "Annual Clearinghouse query deadline.",
     cons: "Missing annual Clearinghouse query is a DOT compliance issue.",
@@ -202,81 +186,18 @@ export default function DashboardScreen() {
   return u === "od" || u === "sn" || u === "up";
 });
 
-const allReqs = [...reqs, ...visibleDriverReqs];
-  const od   = allReqs.filter(r => urgency(r) === "od");
-  const sn   = allReqs.filter(r => urgency(r) === "sn");
-  const up   = allReqs.filter(r => urgency(r) === "up");
+const activeCustomReqs = customReqs.filter(item => item.applicable !== false);
+const allReqs = [...reqs, ...activeCustomReqs, ...visibleDriverReqs];
+const vehicleReqs = vehicleDeadlineItems(vehicles).filter((r: any) => {
+  const u = urgency(r);
+  return u === "od" || u === "sn" || u === "up";
+});
+const allTrackedReqs = [...allReqs, ...vehicleReqs];
+  const od   = allTrackedReqs.filter(r => urgency(r) === "od");
+  const sn   = allTrackedReqs.filter(r => urgency(r) === "sn");
+  const up   = allTrackedReqs.filter(r => urgency(r) === "up");
   const exc  = [...od, ...sn, ...up];
   const active = filter === "od" ? od : filter === "sn" ? sn : filter === "up" ? up : exc;
-
-    const companyItemsMissingDates = reqs.filter(
-  (item: any) =>
-    item.applicable !== false &&
-    !item.due &&
-    !item.completed
-).length;
-
-  const hasCompanyProfile = Boolean(companyName || usdotNumber);
- 
-
-  const nextStep = (() => {
-    if (!hasCompanyProfile) {
-      return {
-        eyebrow: "Finish setup",
-        title: "Add your company information",
-        description:
-          "Start with your company name and USDOT number so your compliance dashboard is tied to the correct carrier.",
-        buttonLabel: "Open Company",
-        destination: "company" as const,
-      };
-    }
-
-    if (companyItemsMissingDates > 0) {
-      return {
-        eyebrow: "Recommended next step",
-        title: "Add your compliance dates",
-        description: `${companyItemsMissingDates} company ${
-          companyItemsMissingDates === 1 ? "item needs" : "items need"
-        } a date before we can accurately track deadlines.`,
-        buttonLabel: "Review Company",
-        destination: "company" as const,
-      };
-    }
-
-        if (!hasDrivers) {
-      return {
-        eyebrow: "Recommended next step",
-        title: "Add your first driver",
-        description:
-           "Track CDL, medical card, MVR, and Clearinghouse deadlines here. If you only want to manage company requirements, you can skip this step.",
-        buttonLabel: "Add a Driver",
-        destination: "drivers" as const,
-      };
-    }
-  
-
-    if (exc.length > 0) {
-      return {
-        eyebrow: "Needs attention",
-        title: `${exc.length} ${
-          exc.length === 1 ? "item needs" : "items need"
-        } your attention`,
-        description:
-          "Review the items below, then open the correct section to update or complete them.",
-        buttonLabel: "Review Items",
-        destination: "overview" as const,
-      };
-    }
-
-    return {
-      eyebrow: "You're in good shape",
-      title: "Nothing currently needs attention",
-      description:
-        "Your entered compliance dates are outside the current alert windows. We’ll keep watching them for you.",
-      buttonLabel: "View Company",
-      destination: "company" as const,
-    };
-  })();
 
       return (
       <ScrollView
@@ -295,42 +216,6 @@ const allReqs = [...reqs, ...visibleDriverReqs];
       usdotNumber={usdotNumber}
     />
 
-      {showNextStep && (
-  <View style={styles.nextStepCard}>
-    <TouchableOpacity
-      onPress={dismissNextStep}
-      accessibilityRole="button"
-      accessibilityLabel="Dismiss next step guidance"
-      style={styles.nextStepCloseButton}
-    >
-      <Text style={styles.nextStepCloseText}>×</Text>
-    </TouchableOpacity>
-
-    <Text style={styles.nextStepEyebrow}>
-      {nextStep.eyebrow}
-    </Text>
-
-    <Text style={styles.nextStepTitle}>
-      {nextStep.title}
-    </Text>
-
-    <Text style={styles.nextStepDescription}>
-      {nextStep.description}
-    </Text>
-
-    <TouchableOpacity
-      onPress={() => {
-        setFilter(null);
-        setTab(nextStep.destination);
-      }}
-      style={styles.nextStepButton}
-    >
-      <Text style={styles.nextStepButtonText}>
-        {nextStep.buttonLabel}
-      </Text>
-    </TouchableOpacity>
-  </View>
-)}
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
  
   <TouchableOpacity
@@ -373,6 +258,20 @@ const allReqs = [...reqs, ...visibleDriverReqs];
     }}
   >
     <Text>Drivers</Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    onPress={() => setTab("fleet")}
+    style={{
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: tab === "fleet" ? "#EAF3DE" : "#fff",
+      borderWidth: 1,
+      borderColor: "#D3D1C7",
+    }}
+  >
+    <Text>Fleet</Text>
   </TouchableOpacity>
 </View>
 
@@ -422,7 +321,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
             color: "#706E68",
           }}
         >
-          Review the item here, then open Company or Drivers to update it.
+          Review the item here, then open Company, Drivers, or Fleet to update it.
         </Text>
       </View>
 
@@ -457,6 +356,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
       ) : (
         (filter ? active : exc).map((item, index) => {
           const isDriverItem = String(item.id).startsWith("driver-");
+          const isVehicleItem = String(item.id).startsWith("vehicle:");
           const itemUrgency = urgency(item);
 
           const daysRemaining =
@@ -522,7 +422,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
                       color: "#706E68",
                     }}
                   >
-                    {isDriverItem ? "Driver requirement" : "Company requirement"}
+                    {isDriverItem ? "Driver requirement" : isVehicleItem ? "Fleet requirement" : "Company requirement"}
                     {item.due ? ` · Due ${fmtDate(item.due)}` : ""}
                   </Text>
                 </View>
@@ -549,7 +449,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
 
               <TouchableOpacity
                 onPress={() =>
-                  setTab(isDriverItem ? "drivers" : "company")
+                  setTab(isDriverItem ? "drivers" : isVehicleItem ? "fleet" : "company")
                 }
                 style={{
                   alignSelf: "flex-start",
@@ -571,7 +471,9 @@ const allReqs = [...reqs, ...visibleDriverReqs];
                 >
                   {isDriverItem
                     ? "Review in Drivers"
-                    : "Review in Company"}
+                    : isVehicleItem
+                      ? "Review in Fleet"
+                      : "Review in Company"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -581,6 +483,7 @@ const allReqs = [...reqs, ...visibleDriverReqs];
     </View>
   </>
 ) : tab === "company" ? (
+  <>
       <CompanyRequirements
       items={reqs}
       onSave={saveDate}
@@ -589,8 +492,12 @@ const allReqs = [...reqs, ...visibleDriverReqs];
       onSetUsdot={setUsdot}
       onSetApplicable={setApplicable}
     />
-) : (
+    <CustomRequirementsPanel onItemsChange={setCustomReqs} />
+  </>
+) : tab === "drivers" ? (
   <DriversPanel />
+) : (
+  <FleetPanel />
 )}
  </ScrollView>
 
@@ -664,70 +571,4 @@ const styles = StyleSheet.create({
   undoBtn:        { padding:8, alignItems:"center" },
   undoBtnText:    { fontSize:12, color:"#3B6D11", textDecorationLine:"underline" },
     
-  nextStepEyebrow: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#3B6D11",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-
-  nextStepTitle: {
-    marginTop: 6,
-    fontSize: 20,
-    lineHeight: 25,
-    fontWeight: "700",
-    color: "#1A1915",
-  },
-
-  nextStepDescription: {
-    marginTop: 7,
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#5F5D57",
-  },
-
-  nextStepButton: {
-    alignSelf: "flex-start",
-    marginTop: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: "#27500A",
-  },
-
-  nextStepButtonText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  nextStepCard: {
-    backgroundColor: "#F1F6EC",
-    borderWidth: 1,
-    borderColor: "#D6E4C9",
-    borderRadius: 14,
-    padding: 18,
-    paddingRight: 48,
-    marginBottom: 16,
-    position: "relative",
-},
-  nextStepCloseButton: {
-  position: "absolute",
-  top: 8,
-  right: 8,
-  width: 34,
-  height: 34,
-  borderRadius: 17,
-  alignItems: "center",
-  justifyContent: "center",
-  zIndex: 1,
-},
-
-nextStepCloseText: {
-  fontSize: 24,
-  lineHeight: 26,
-  fontWeight: "400",
-  color: "#706E68",
-},
-
 });

@@ -53,6 +53,10 @@ function handleAccountAction() {
   router.replace("/(auth)/login");
 }
 
+function handleCreateAccount() {
+  router.push({ pathname: "/(auth)/login", params: { mode: "create" } });
+}
+
   if (selectedEntry) {
     return (
       <SafeAreaView
@@ -159,6 +163,23 @@ function handleAccountAction() {
                   {isSignedIn ? "Account" : "Sign in"}
                 </Text>
               </TouchableOpacity>
+              {!isSignedIn ? (
+                <TouchableOpacity
+                  onPress={handleCreateAccount}
+                  activeOpacity={0.75}
+                  style={{
+                    marginLeft: 6,
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                    borderRadius: 8,
+                    backgroundColor: "#27500A",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: "#FFFFFF" }}>
+                    Create account
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
 
