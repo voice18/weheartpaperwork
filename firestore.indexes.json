@@ -1,0 +1,21 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "referralParticipationEvents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "carrierId", "order": "ASCENDING" },
+        { "fieldPath": "effectiveAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "referralReviewQueue",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "referrerCarrierId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

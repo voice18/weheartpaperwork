@@ -1,4 +1,8 @@
+import PublicHeader from "../components/public/PublicHeader";
+import PublicFooter from "../components/public/PublicFooter";
+import AuditToolCard from "../components/public/AuditToolCard";
 import { Link } from "expo-router";
+import Head from "expo-router/head";
 import {
   Pressable,
   ScrollView,
@@ -9,50 +13,24 @@ import {
 
 export default function WebLandingPage() {
   return (
+  <>
+    <Head>
+      <title>DOT Compliance Tracker | We Heart Paperwork</title>
+      <meta
+        name="description"
+        content="A simple DOT compliance tracker for carriers who handle their own paperwork. Track company, driver, truck, and trailer deadlines from $3 a month."
+      />
+    </Head>
+
     <ScrollView
       style={styles.page}
       contentContainerStyle={styles.pageContent}
     >
-      <View style={styles.header}>
-        <View style={styles.headerInner}>
-          <View style={styles.brandRow}>
-            <View style={styles.logo}>
-              <Text style={styles.logoText}>WHP</Text>
-            </View>
-
-            <Text style={styles.brandName}>
-              We Heart Paperwork
-            </Text>
-          </View>
-
-          <View style={styles.headerLinks}>
-            <Link href="/privacy" asChild>
-              <Pressable>
-                <Text style={styles.headerLink}>Privacy</Text>
-              </Pressable>
-            </Link>
-
-            <Link href="/support" asChild>
-              <Pressable>
-                <Text style={styles.headerLink}>Support</Text>
-              </Pressable>
-            </Link>
-
-            <Link href="/(auth)/login" asChild>
-              <Pressable style={styles.loginButton}>
-                <Text style={styles.loginButtonText}>
-                  Sign in
-                </Text>
-              </Pressable>
-            </Link>
-          </View>
-        </View>
-      </View>
-
+      <PublicHeader />
       <View style={styles.hero}>
         <View style={styles.heroCopy}>
           <Text style={styles.eyebrow}>
-            BUILT FOR SMALL TRUCKING COMPANIES
+            BUILT BY A TRUCKING COMPANY. SHARED WITH YOURS.
           </Text>
 
           <Text style={styles.heroTitle}>
@@ -60,45 +38,48 @@ export default function WebLandingPage() {
           </Text>
 
           <Text style={styles.heroTitleAccent}>
-            We’ll help with the paperwork.
+            {"We'll help with the paperwork."}
           </Text>
 
           <Text style={styles.heroDescription}>
-            Track company deadlines, driver records,
-            renewals, and completion history from one clear
-            dashboard.
+            A simple deadline and recordkeeping system for carriers
+            who handle their own compliance. Track company filings,
+            driver qualification setup, quarterly IFTA returns, and
+            truck and trailer renewals without paying for a managed
+            compliance service.
           </Text>
 
           <View style={styles.heroButtons}>
-            <Link href="/(auth)/login" asChild>
+            <Link href="/pricing" asChild>
               <Pressable style={styles.primaryButton}>
                 <Text style={styles.primaryButtonText}>
-                  Sign in to your account
+                  See pricing
                 </Text>
               </Pressable>
             </Link>
 
-            <Pressable
-              onPress={() => {
-                if (typeof window !== "undefined") {
-                  window.location.href =
-                    "mailto:voice18@gmail.com?subject=We%20Heart%20Paperwork";
-                }
-              }}
-              style={styles.secondaryButton}
-            >
-              <Text style={styles.secondaryButtonText}>
-                Contact us
-              </Text>
-            </Pressable>
+            <Link href={{ pathname: "/(auth)/login", params: { mode: "create" } }} asChild>
+              <Pressable style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>
+                  Create account
+                </Text>
+              </Pressable>
+            </Link>
           </View>
 
           <Text style={styles.availability}>
-            Built for iPhone and Android.
+            Built in Yakima, Washington. Available on iPhone and Android.
           </Text>
         </View>
 
         <DashboardPreview />
+      </View>
+
+      <View style={styles.auditToolSection}>
+        <AuditToolCard />
+        <AuditToolCard tool="dq" />
+        <AuditToolCard tool="maintenance" />
+        <AuditToolCard tool="accident" />
       </View>
 
       <View style={styles.section}>
@@ -114,7 +95,7 @@ export default function WebLandingPage() {
           <FeatureCard
             number="01"
             title="Know what is coming"
-            description="See company and driver deadlines before they become last-minute problems."
+            description="See company, driver, truck, and trailer deadlines before they become last-minute problems."
           />
 
           <FeatureCard
@@ -131,24 +112,122 @@ export default function WebLandingPage() {
         </View>
       </View>
 
+
+      <View style={styles.referralSection}>
+        <View style={styles.referralInner}>
+          <View style={styles.referralStory}>
+            <Text style={styles.referralEyebrow}>
+              WHY THIS COMPANY EXISTS
+            </Text>
+
+            <Text style={styles.referralTitle}>
+              I built it for my company first.
+            </Text>
+
+            <Text style={styles.referralBody}>
+              I own trucks. I built We Heart Paperwork because
+              keeping up with company deadlines, driver files,
+              renewals, and changing requirements was taking time
+              away from the actual business. Once it worked for my
+              operation, I wanted other trucking companies to have
+              it too — without turning it into another overpriced
+              software subscription.
+            </Text>
+
+            <Text style={styles.referralBody}>
+              And if the people using We Heart Paperwork help it
+              grow, I think they should benefit from that too.
+            </Text>
+          </View>
+
+          <View style={styles.referralCard}>
+            <Text style={styles.referralPercent}>10%</Text>
+            <Text style={styles.referralCardLabel}>
+              REFERRAL REWARD
+            </Text>
+
+            <Text style={styles.referralCardTitle}>
+              Help us grow. We return the favor.
+            </Text>
+
+            <Text style={styles.referralCardText}>
+              Eligible accounts can create a referral code. Earn 10% of
+              qualifying subscription payments from companies you directly
+              refer. The new company must claim your code within 24 hours
+              of account creation. Refunds, credits and taxes are excluded;
+              payout verification and program terms apply.
+            </Text>
+
+            <Text style={styles.referralCardTextStrong}>
+                You helped us grow. That should matter.
+              </Text>
+
+              <Link href="/referrals" asChild>
+                <Pressable
+                  style={{
+                    marginTop: 20,
+                    alignSelf: "flex-start",
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    borderWidth: 1,
+                    borderColor: "#5B5953",
+                    borderRadius: 10,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: "#FFFFFF",
+                      fontSize: 15,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Referral program details & terms →
+                  </Text>
+                </Pressable>
+              </Link>
+
+              <Text style={styles.referralFinePrint}>
+                Referral rewards are compensation for successful
+                referrals. They do not represent stock, equity, or
+                ownership in We Heart Paperwork. Program terms apply.
+              </Text>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.greenSection}>
         <View style={styles.greenSectionInner}>
           <View style={styles.greenSectionHeading}>
             <Text style={styles.eyebrow}>
-              MADE FOR OWNER-OPERATORS AND SMALL FLEETS
+              FOR CARRIERS WHO DO THEIR OWN PAPERWORK
             </Text>
 
             <Text style={styles.sectionTitle}>
-              Paperwork should not be what stops the truck.
+              A compliance system, not a compliance service.
             </Text>
           </View>
 
           <Text style={styles.greenSectionText}>
-            We Heart Paperwork is designed to reduce the
-            administrative burden of staying organized so
-            owners can spend more time operating their
-            business.
+            If you want someone to file forms, manage audits, and
+            answer FMCSA for you, you need a full-service provider.
+            If you are capable of handling the work and need one
+            dependable place to see what is due, that is what We
+            Heart Paperwork is built for. An owner-operator pays $36
+            a year—less than the $50 minimum penalty for one late
+            IFTA return.
           </Text>
+          <View style={styles.positionLinks}>
+            <Link href={"/compliance-service-or-tracker" as any} asChild>
+              <Pressable style={styles.positionLinkButton}>
+                <Text style={styles.positionLinkText}>Service or tracker?</Text>
+              </Pressable>
+            </Link>
+            <Link href={"/for-owner-operators" as any} asChild>
+              <Pressable style={styles.positionLinkButton}>
+                <Text style={styles.positionLinkText}>For owner-operators</Text>
+              </Pressable>
+            </Link>
+          </View>
         </View>
       </View>
 
@@ -160,65 +239,26 @@ export default function WebLandingPage() {
             </Text>
 
             <Text style={styles.finalTitle}>
-              Stay organized. Stay ready. Keep moving.
+              Built for my trucks. Shared with yours.
             </Text>
           </View>
 
-          <Pressable
-            onPress={() => {
-              if (typeof window !== "undefined") {
-                window.location.href =
-                  "mailto:voice18@gmail.com?subject=We%20Heart%20Paperwork";
-              }
-            }}
-            style={styles.finalButton}
+          <Link
+            href="/tools/mcs-150-due-date-calculator"
+            asChild
           >
-            <Text style={styles.finalButtonText}>
-              Contact us
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.footer}>
-        <View>
-          <Text style={styles.footerBrand}>
-            We Heart Paperwork
-          </Text>
-
-          <Text style={styles.footerDescription}>
-            Practical compliance organization for trucking
-            companies.
-          </Text>
-        </View>
-
-        <View style={styles.footerLinks}>
-          <Link href="/privacy" asChild>
-            <Pressable>
-              <Text style={styles.footerLink}>Privacy</Text>
-            </Pressable>
-          </Link>
-
-          <Link href="/support" asChild>
-            <Pressable>
-              <Text style={styles.footerLink}>Support</Text>
+            <Pressable style={styles.finalButton}>
+              <Text style={styles.finalButtonText}>
+                Free MCS-150 calculator
+              </Text>
             </Pressable>
           </Link>
         </View>
       </View>
 
-      <View style={styles.legal}>
-        <Text style={styles.legalText}>
-          © 2026 We Heart Paperwork
-        </Text>
-
-        <Text style={styles.legalText}>
-          We Heart Paperwork helps organize compliance
-          information and does not provide legal advice or
-          guarantee regulatory compliance.
-        </Text>
-      </View>
-    </ScrollView>
+      <PublicFooter />
+        </ScrollView>
+  </>
   );
 }
 
@@ -262,8 +302,14 @@ function DashboardPreview() {
         />
 
         <RequirementPreview
-          title="Insurance renewal"
+          title="Quarterly IFTA return"
           subtitle="Company requirement"
+          status="Upcoming"
+        />
+
+        <RequirementPreview
+          title="Trailer T-12 annual inspection"
+          subtitle="Fleet requirement"
           status="Upcoming"
           last
         />
@@ -683,6 +729,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 100,
   },
+  auditToolSection: {
+    width: "100%",
+    maxWidth: 1120,
+    alignSelf: "center",
+    paddingHorizontal: 24,
+    paddingTop: 30,
+    paddingBottom: 34,
+    gap: 16,
+  },
 
   sectionTitle: {
     maxWidth: 760,
@@ -696,11 +751,13 @@ const styles = StyleSheet.create({
   featureGrid: {
     marginTop: 44,
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 18,
   },
 
   featureCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 260,
     minHeight: 250,
     padding: 26,
     borderWidth: 1,
@@ -729,6 +786,119 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 
+
+  referralSection: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#E5E3DA",
+    backgroundColor: "#FFFFFF",
+  },
+
+  referralInner: {
+    width: "100%",
+    maxWidth: 1120,
+    alignSelf: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 100,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "stretch",
+    gap: 56,
+  },
+
+  referralStory: {
+  flexGrow: 1,
+  flexShrink: 1,
+  flexBasis: 420,
+  justifyContent: "center",
+},
+
+  referralEyebrow: {
+    marginBottom: 14,
+    color: "#3B6D11",
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+
+  referralTitle: {
+    maxWidth: 610,
+    color: "#1A1915",
+    fontSize: 46,
+    lineHeight: 50,
+    fontWeight: "800",
+    letterSpacing: -1.8,
+  },
+
+  referralBody: {
+    maxWidth: 610,
+    marginTop: 22,
+    color: "#5F5D57",
+    fontSize: 18,
+    lineHeight: 30,
+  },
+
+  referralCard: {
+  flexGrow: 1,
+  flexShrink: 1,
+  flexBasis: 360,
+  maxWidth: 470,
+  padding: 34,
+  borderRadius: 24,
+  backgroundColor: "#1A1915",
+},
+
+  referralPercent: {
+    color: "#B8D5A2",
+    fontSize: 72,
+    lineHeight: 78,
+    fontWeight: "800",
+    letterSpacing: -3,
+  },
+
+  referralCardLabel: {
+    marginTop: 2,
+    color: "#B8D5A2",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+
+  referralCardTitle: {
+    marginTop: 26,
+    color: "#FFFFFF",
+    fontSize: 29,
+    lineHeight: 34,
+    fontWeight: "800",
+    letterSpacing: -0.8,
+  },
+
+  referralCardText: {
+    marginTop: 18,
+    color: "#E5E3DA",
+    fontSize: 16,
+    lineHeight: 26,
+  },
+
+  referralCardTextStrong: {
+    marginTop: 20,
+    color: "#FFFFFF",
+    fontSize: 17,
+    lineHeight: 25,
+    fontWeight: "800",
+  },
+
+  referralFinePrint: {
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: "#3C3A35",
+    color: "#AAA79F",
+    fontSize: 11,
+    lineHeight: 18,
+  },
+
   greenSection: {
     borderTopWidth: 1,
     borderBottomWidth: 1,
@@ -737,26 +907,35 @@ const styles = StyleSheet.create({
   },
 
   greenSectionInner: {
-    width: "100%",
-    maxWidth: 1120,
-    alignSelf: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 100,
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 80,
-  },
+  width: "100%",
+  maxWidth: 1120,
+  alignSelf: "center",
+  paddingHorizontal: 24,
+  paddingVertical: 100,
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "flex-end",
+  gap: 80,
+},
 
   greenSectionHeading: {
-    flex: 1.1,
-  },
+  flexGrow: 1,
+  flexShrink: 1,
+  flexBasis: 420,
+},
 
   greenSectionText: {
-    flex: 0.9,
-    color: "#5F5D57",
-    fontSize: 19,
-    lineHeight: 32,
-  },
+  flexGrow: 1,
+  flexShrink: 1,
+  flexBasis: 360,
+  color: "#5F5D57",
+  fontSize: 19,
+  lineHeight: 32,
+},
+
+  positionLinks: { flexGrow: 1, flexBasis: "100%", flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  positionLinkButton: { minHeight: 44, paddingHorizontal: 15, borderWidth: 1, borderColor: "#B9D3A3", borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
+  positionLinkText: { color: "#27500A", fontSize: 13, fontWeight: "800" },
 
   finalSection: {
     width: "100%",
@@ -767,18 +946,21 @@ const styles = StyleSheet.create({
   },
 
   finalCard: {
-    padding: 40,
-    borderRadius: 24,
-    backgroundColor: "#1A1915",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 30,
-  },
+  padding: 40,
+  borderRadius: 24,
+  backgroundColor: "#1A1915",
+  flexDirection: "row",
+  flexWrap: "wrap",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 30,
+},
 
   finalCopy: {
-    flex: 1,
-  },
+  flexGrow: 1,
+  flexShrink: 1,
+  flexBasis: 420,
+},
 
   finalEyebrow: {
     marginBottom: 12,
@@ -821,6 +1003,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E5E3DA",
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 30,
   },
@@ -838,9 +1021,10 @@ const styles = StyleSheet.create({
   },
 
   footerLinks: {
-    flexDirection: "row",
-    gap: 20,
-  },
+  flexDirection: "row",
+  flexWrap: "wrap",
+  gap: 20,
+},
 
   footerLink: {
     color: "#706E68",
@@ -857,6 +1041,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E5E3DA",
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
     gap: 30,
   },

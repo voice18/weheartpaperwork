@@ -1,6 +1,5 @@
-import { router } from "expo-router";
+import PublicHeader from "../components/public/PublicHeader";
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,25 +13,12 @@ export default function PrivacyPage() {
   edges={["top", "bottom"]}
   style={styles.page}
 >
+  <PublicHeader />
+
     <ScrollView
       style={styles.page}
       contentContainerStyle={styles.content}
     >
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace("/compliance-guide");
-            }
-          }}
-        >
-          <Text style={styles.backLink}>
-            ‹ Back
-          </Text>
-        </Pressable>
-      </View>
 
       <View style={styles.article}>
         <Text style={styles.eyebrow}>
@@ -70,7 +56,7 @@ export default function PrivacyPage() {
 
         <Section
           title="Data retention and deletion"
-          text="We retain information for as long as needed to provide the service, meet legitimate business and legal requirements, resolve disputes, and maintain records requested by the account owner."
+          text="We retain information for as long as needed to provide the service, meet legitimate business and legal requirements, resolve disputes, and maintain records requested by the account owner. Account deletion removes user-owned service data and deactivates referral codes, but does not erase referral attribution, payment, reward, adjustment, payout, fraud-prevention, tax, or audit records that must remain for accounting, legal, or dispute purposes. We minimize nonessential personal information separately."
         />
 
         <Section
@@ -92,7 +78,7 @@ export default function PrivacyPage() {
 
         <Text style={styles.paragraph}>
           Questions or privacy requests may be sent to
-          voice18@gmail.com.
+          aaron@weheartpaperwork.com.
         </Text>
       </View>
     </ScrollView>

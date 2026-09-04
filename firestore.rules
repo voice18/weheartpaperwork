@@ -27,7 +27,9 @@ service cloud.firestore {
     }
 
     function allowedCarrierUpdate() {
-      return request.resource.data
+      return (!resource.data.keys().hasAny(["referralCompanyKey"])
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(["usdotNumber"]))
+        && request.resource.data
         .diff(resource.data)
         .affectedKeys()
         .hasOnly([
@@ -62,6 +64,26 @@ service cloud.firestore {
       }
 
       match /drivers/{driverId} {
+        allow read, write: if ownsCarrier(carrierId);
+
+        match /complianceRecords/{requirementId} {
+          allow read, write: if ownsCarrier(carrierId);
+
+          match /history/{recordId} {
+            allow read, write: if ownsCarrier(carrierId);
+          }
+        }
+      }
+
+      match /customRequirements/{requirementId} {
+        allow read, write: if ownsCarrier(carrierId);
+
+        match /history/{recordId} {
+          allow read, write: if ownsCarrier(carrierId);
+        }
+      }
+
+      match /vehicles/{vehicleId} {
         allow read, write: if ownsCarrier(carrierId);
 
         match /complianceRecords/{requirementId} {
@@ -108,6 +130,61 @@ service cloud.firestore {
         "notificationTokenUpdatedAt",
         "updatedAt"
       ]);
+    }
+
+    // Referral attribution and all financial records are server-authoritative.
+    // Clients use callable Cloud Functions that return only their own sanitized data.
+    match /referralCodes/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /carrierReferralCodes/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referrals/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralRewards/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralRewardAdjustments/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralRewardMaturities/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralPendingDisputes/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralSummaries/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralPayouts/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralAdminAudit/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /referralClaimAttempts/{documentId} {
+      allow read, write: if false;
+    }
+
+    match /stripeWebhookEvents/{documentId} {
+      allow read, write: if false;
+    }
+
+    // Default deny also protects future financial collections and nested docs.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
