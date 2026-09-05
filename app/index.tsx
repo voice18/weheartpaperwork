@@ -151,10 +151,11 @@ export default function WebLandingPage() {
             </Text>
 
             <Text style={styles.referralCardText}>
-              Every subscriber gets a referral code. When a new
-              trucking company signs up through your code and
-              becomes a paying customer, you earn a 10% referral
-              commission on that account.
+              Eligible accounts can create a referral code. Earn 10% of
+              qualifying subscription payments from companies you directly
+              refer. The new company must claim your code within 24 hours
+              of account creation. Refunds, credits and taxes are excluded;
+              payout verification and program terms apply.
             </Text>
 
             <Text style={styles.referralCardTextStrong}>

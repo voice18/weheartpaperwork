@@ -199,7 +199,18 @@ export async function syncSubscriptionToCarrier(
       subscription
     );
 
-  await carrierRef.update({
+  await db.runTransaction(async transaction => {
+    const current = await transaction.get(carrierRef);
+    if (!current.exists || current.data()?.deletingAccount) return;
+    const billing = current.data()?.billing ?? {};
+    if (billing.stripeSubscriptionId && billing.stripeSubscriptionId !== subscription.id) {
+      // A delayed deletion of an old subscription must not disable a newly
+      // reactivated subscription. Compare creation time for other replacements.
+      if (["canceled", "incomplete_expired"].includes(subscription.status) ||
+          (billing.stripeSubscriptionCreatedAt ?? 0) > subscription.created) return;
+    }
+    transaction.update(carrierRef, {
+  "billing.stripeSubscriptionCreatedAt": subscription.created,
   "billing.status":
     subscription.status,
 
@@ -237,6 +248,7 @@ export async function syncSubscriptionToCarrier(
   "billing.updatedAt":
     admin.firestore.FieldValue.serverTimestamp(),
 });
+  });
 
   console.log(
     "Stripe subscription synchronized",

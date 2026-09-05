@@ -158,7 +158,7 @@ export default function ReferralRewardsPage() {
           <StepCard
             number="01"
             title="Get your code"
-            description="Participating We Heart Paperwork accounts receive a unique referral code tied to their company."
+              description="Eligible We Heart Paperwork accounts can accept the current terms and create one referral code tied to their company."
           />
           <StepCard
             number="02"
@@ -168,7 +168,7 @@ export default function ReferralRewardsPage() {
           <StepCard
             number="03"
             title="They sign up"
-            description="The new company uses your valid code during its initial account signup and becomes a qualifying paying customer."
+              description="The new company claims your valid code within 24 hours after account creation, before its first qualifying payment."
           />
           <StepCard
             number="04"
@@ -307,7 +307,7 @@ export default function ReferralRewardsPage() {
           <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>
             Referral Rewards Program — Rules & Conditions
           </Text>
-          <Text style={styles.effective}>Effective August 22, 2026</Text>
+          <Text style={styles.effective}>Updated September 4, 2026. Changes apply prospectively.</Text>
 
           <View style={styles.rulesCard}>
             <Rule
@@ -316,7 +316,7 @@ export default function ReferralRewardsPage() {
             />
             <Rule
               title="2. Qualifying referral"
-              text="A qualifying referral must be a new We Heart Paperwork company account that uses a valid referral code within 24 hours after the account is created and subsequently becomes a qualifying paying customer."
+              text="A qualifying referral must be a new We Heart Paperwork company account that claims a valid referral code within 24 hours after account creation, before its qualifying payment. Both companies must provide their USDOT numbers. One company identity cannot receive a second attribution through another login. Company ownership and eligibility are subject to verification."
             />
             <Rule
               title="3. One company, one referrer"
@@ -332,7 +332,7 @@ export default function ReferralRewardsPage() {
             />
             <Rule
               title="6. Qualifying subscription fees"
-              text="Qualifying subscription fees may include the base company subscription and applicable active-driver subscription charges. Taxes, refunds, credits, disputed payments, chargebacks, fraudulent transactions, free periods, and other amounts not ultimately retained by We Heart Paperwork do not qualify."
+              text="Qualifying fees are USD payments actually collected through Stripe for approved base-company and active-driver subscriptions, after discounts and taxes. Trial/free periods, customer credits, manually marked-paid invoices, unrelated purchases and fraudulent payments do not qualify. Driver changes affect the actual invoice, never an earlier reward. Refunds, post-payment credits and lost chargebacks reduce qualifying revenue. Payment-level reductions are allocated proportionately to qualifying fees, and the remaining reward is rounded down to whole cents. Open disputes hold the invoice reward for review. Mixed or unsupported payment arrangements require reconciliation before any reward is available."
             />
             <Rule
               title="7. No recruiting compensation"
@@ -340,15 +340,15 @@ export default function ReferralRewardsPage() {
             />
             <Rule
               title="8. Continued eligibility"
-              text="Valid attribution remains part of the historical record. Future rewards require the referring account to remain open and in good standing and the referred account to continue generating qualifying payments. Canceling either subscription stops future qualifying rewards but does not erase a reward already earned from a qualifying payment."
+              text="Attribution stays on record. A qualifying payment requires the referring account to be open, in good standing and subscribed (including an eligible trial), and the referred company to generate a qualifying subscription payment. Cancellation itself creates no reward or reversal; earned rewards remain subject to payment adjustments. Payments after participation ends do not qualify. Reactivation can resume eligibility under the original attribution and locked rate. If payment-time eligibility cannot be established automatically, the reward is held for documented review."
             />
             <Rule
               title="9. Tracking and payout administration"
-              text="A qualifying reward remains pending for 30 days after payment. Once payouts are activated, available balances of at least $25 are scheduled for monthly payout; smaller balances roll forward. Identity, payment, tax, fraud, or account-review requirements may delay payout. Until payout activation, qualifying rewards are tracked in the participant's ledger but are not represented as an immediately payable balance."
+              text="A qualifying reward has a 30-day hold measured from the invoice payment time. After maturity processing and resolution of any review holds, it becomes available. Once payout processing is activated, administrators can reserve available USD balances of at least $25 after offsets, verify company ownership and payment/tax information, and issue a manual transfer. Smaller balances roll forward. There is no automatic monthly transfer or guaranteed payment date. Reserved funds cannot be included in another payout. The ledger records transfer confirmation; preparing a payout does not itself send money. Activation status and balances are shown in account settings."
             />
             <Rule
               title="10. Refunds, disputes, fraud, and errors"
-              text="Rewards connected to refunded, reversed, disputed, fraudulent, duplicate, erroneous, or otherwise invalid transactions may be canceled, corrected, or deducted from future rewards. Attempts to manipulate the program may result in removal from Referral Rewards."
+              text="Refunded, credited, disputed, fraudulent, duplicate, erroneous or otherwise invalid payments can reduce rewards. Adjustments remain in the accounting history. A reversal after a payout leaves an overpayment balance that offsets future available earnings; the past transfer remains recorded. A won dispute can restore the qualifying reward after other holds are resolved. Attempts to manipulate the program may result in removal from Referral Rewards."
             />
             <Rule
               title="11. Marketing disclosure"

@@ -24,6 +24,7 @@ service cloud.firestore {
         "onboardingComplete",
         "notificationsEnabled",
         "expoPushToken",
+        "expoPushTokens",
         "notificationTokenUpdatedAt",
         "nextStepDismissed",
         "nextStepDismissedAt",
@@ -32,7 +33,9 @@ service cloud.firestore {
     }
 
     function allowedCarrierUpdate() {
-      return request.resource.data
+      return (!resource.data.keys().hasAny(["referralCompanyKey"])
+          || !request.resource.data.diff(resource.data).affectedKeys().hasAny(["usdotNumber"]))
+        && request.resource.data
         .diff(resource.data)
         .affectedKeys()
         .hasOnly([
@@ -42,6 +45,7 @@ service cloud.firestore {
           "onboardingComplete",
           "notificationsEnabled",
           "expoPushToken",
+          "expoPushTokens",
           "notificationTokenUpdatedAt",
           "nextStepDismissed",
           "nextStepDismissedAt",
@@ -203,6 +207,11 @@ service cloud.firestore {
     }
 
     match /notificationPushReceipts/{documentId} {
+      allow read, write: if false;
+    }
+
+    // Default deny also protects future financial collections and nested docs.
+    match /{document=**} {
       allow read, write: if false;
     }
   }

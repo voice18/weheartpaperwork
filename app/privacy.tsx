@@ -56,7 +56,7 @@ export default function PrivacyPage() {
 
         <Section
           title="Data retention and deletion"
-          text="We retain information for as long as needed to provide the service, meet legitimate business and legal requirements, resolve disputes, and maintain records requested by the account owner."
+          text="We retain information for as long as needed to provide the service, meet legitimate business and legal requirements, resolve disputes, and maintain records requested by the account owner. Account deletion removes user-owned service data and deactivates referral codes, but does not erase referral attribution, payment, reward, adjustment, payout, fraud-prevention, tax, or audit records that must remain for accounting, legal, or dispute purposes. We minimize nonessential personal information separately."
         />
 
         <Section

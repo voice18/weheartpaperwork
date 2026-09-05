@@ -65,6 +65,25 @@ export default function SettingsScreen() {
 
   const [loadingReferralCode, setLoadingReferralCode] =
     useState(false);
+  const [rewardSummary, setRewardSummary] = useState<string>("View balances");
+  const loadRewardSummary = async () => {
+    try {
+      const result = await httpsCallable<Record<string, never>, {
+        accountingActive: boolean; payoutsActive: boolean;
+        summary: { pendingCents: number; heldCents: number; availableCents: number; reservedCents: number; paidCents: number };
+      }>(functions, "getReferralDashboard")({});
+      const data = result.data;
+      if (!data.accountingActive) { setRewardSummary("Accounting activation pending"); return; }
+      const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+      setRewardSummary(`${money(data.summary.availableCents)} available`);
+      Alert.alert("Referral rewards", [
+        `Pending: ${money(data.summary.pendingCents)}`, `Under review: ${money(data.summary.heldCents)}`,
+        `Available (after offsets): ${money(data.summary.availableCents)}`, `Reserved for payout: ${money(data.summary.reservedCents)}`,
+        `Paid: ${money(data.summary.paidCents)}`, "30-day hold; $25 minimum. Transfers are processed manually after verification.",
+        data.payoutsActive ? "Payout processing is active." : "Payout processing is awaiting activation.",
+      ].join("\n"));
+    } catch { setRewardSummary("Unable to load — tap to retry"); }
+  };
 
   useEffect(() => {
   const userId = auth.currentUser?.uid;
@@ -749,14 +768,14 @@ const loadReferralCode =
       setLoadingReferralCode(true);
 
       const getReferralCode = httpsCallable<
-        Record<string, never>,
+        { acceptTerms: boolean },
         { code: string }
       >(
         functions,
         "getReferralCode"
       );
 
-      const result = await getReferralCode({});
+      const result = await getReferralCode({ acceptTerms: true });
 
       if (
         !result.data?.code ||
@@ -1281,6 +1300,12 @@ const trialEndLabel = (() => {
                 }
           }
         />
+
+        <SettingsRow label="Referral terms — creating a code accepts them" onPress={() => router.push("/referrals")} />
+        <SettingsRow label="Rewards and payout balances" value={rewardSummary} onPress={() => { void loadRewardSummary(); }} />
+        <Text style={{ padding: 16, color: "#555", fontSize: 13 }}>
+          Disclose that you may receive a referral reward when publicly sharing your code. Rewards apply only to direct qualifying payments; 30-day hold and $25 minimum apply.
+        </Text>
 
         <SettingsRow
           label="Share referral link"

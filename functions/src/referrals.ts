@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import {
   REFERRAL_RATE_BPS,
   REFERRAL_TERMS_VERSION,
+  claimIsTimely,
 } from "./referralPolicy";
 
 const REFERRAL_CODE_ALPHABET =
@@ -19,7 +20,8 @@ const REFERRAL_CODE_PATTERN =
   /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/;
 
 function normalizedUsdot(value: unknown): string {
-  return typeof value === "string" ? value.replace(/\D/g, "") : "";
+  if (typeof value !== "string" || !/^\s*\d{1,8}\s*$/.test(value)) return "";
+  return value.trim().replace(/^0+/, "");
 }
 
 function generateReferralCode(): string {
@@ -75,15 +77,11 @@ export const getReferralCode = onCall(
               );
             }
 
-            if (carrierSnapshot.data()?.deletingAccount === true) {
-              throw new HttpsError(
-                "failed-precondition",
-                "Account deletion is already in progress."
-              );
-            }
-
 
             const billingStatus = carrierSnapshot.data()?.billing?.status;
+            if (carrierSnapshot.data()?.deletingAccount || carrierSnapshot.data()?.referralProgramSuspended) {
+              throw new HttpsError("failed-precondition", "Referral participation is under review or closing.");
+            }
             if (billingStatus !== "active" && billingStatus !== "trialing") {
               throw new HttpsError(
                 "failed-precondition",
@@ -156,6 +154,10 @@ export const getReferralCode = onCall(
 
             if (codeSnapshot.exists) {
               return null;
+            }
+
+            if (request.data?.acceptTerms !== true) {
+              throw new HttpsError("failed-precondition", "Accept the Referral Rewards terms before creating a code.");
             }
 
             transaction.set(ownerRef, {
@@ -304,17 +306,8 @@ export const claimReferral = onCall(
         referredUser.metadata.creationTime
       );
 
-    const accountAgeMillis =
-      Date.now() - createdAtMillis;
-
-    const maxReferralClaimAgeMillis =
-      24 * 60 * 60 * 1000;
-
     if (
-      !Number.isFinite(createdAtMillis) ||
-      accountAgeMillis < 0 ||
-      accountAgeMillis >
-        maxReferralClaimAgeMillis
+      !claimIsTimely(createdAtMillis, Date.now())
     ) {
       throw new HttpsError(
         "failed-precondition",
@@ -431,13 +424,6 @@ export const claimReferral = onCall(
           );
         }
 
-        if (referrerCarrierSnapshot.data()?.deletingAccount === true) {
-          throw new HttpsError(
-            "failed-precondition",
-            "The referring company is no longer eligible for referral rewards."
-          );
-        }
-
         const referredCarrierSnapshot = await transaction.get(
           db.collection("carriers").doc(referredCarrierId)
         );
@@ -449,17 +435,17 @@ export const claimReferral = onCall(
           );
         }
 
-        if (referredCarrierSnapshot.data()?.deletingAccount === true) {
-          throw new HttpsError(
-            "failed-precondition",
-            "Account deletion is already in progress."
-          );
-        }
-
         const referrerData = referrerCarrierSnapshot.data();
         const referredData = referredCarrierSnapshot.data();
         const referrerUsdot = normalizedUsdot(referrerData?.usdotNumber);
         const referredUsdot = normalizedUsdot(referredData?.usdotNumber);
+
+        if (!referrerUsdot || !referredUsdot) {
+          throw new HttpsError("failed-precondition", "Both companies must provide a valid USDOT number before a referral is claimed.");
+        }
+        if (referrerData?.deletingAccount || referredData?.deletingAccount || referrerData?.referralProgramSuspended) {
+          throw new HttpsError("failed-precondition", "A company is closing or under review.");
+        }
 
         if (referrerUsdot && referredUsdot && referrerUsdot === referredUsdot) {
           throw new HttpsError(
@@ -476,6 +462,25 @@ export const claimReferral = onCall(
           );
         }
 
+        // Company identity survives account deletion. An alternate Firebase
+        // login cannot claim the same USDOT company a second time.
+        const referrerCompanyRef = db.collection("referralCompanies").doc(referrerUsdot);
+        const referredCompanyRef = db.collection("referralCompanies").doc(referredUsdot);
+        const [referrerCompany, referredCompany] = await Promise.all([
+          transaction.get(referrerCompanyRef), transaction.get(referredCompanyRef),
+        ]);
+        if ((referrerCompany.exists && referrerCompany.data()?.carrierId !== referrerCarrierId) ||
+            (referredCompany.exists && referredCompany.data()?.carrierId !== referredCarrierId) ||
+            referredCompany.data()?.attributed === true) {
+          throw new HttpsError("already-exists", "This company identity is already registered or attributed. Contact support for a documented correction.");
+        }
+        // Check the deadline again inside the transaction, after all reads.
+        if (!claimIsTimely(createdAtMillis, Date.now())) throw new HttpsError("failed-precondition", "The 24-hour referral claim window has ended.");
+        transaction.set(referrerCompanyRef, { carrierId: referrerCarrierId }, { merge: true });
+        transaction.set(referredCompanyRef, { carrierId: referredCarrierId, attributed: true, referralId: referredCarrierId }, { merge: true });
+        transaction.update(referrerCarrierRef, { referralCompanyKey: referrerUsdot });
+        transaction.update(referredCarrierSnapshot.ref, { referralCompanyKey: referredUsdot });
+
         transaction.create(referralRef, {
           referrerCarrierId,
           referredCarrierId,
@@ -484,20 +489,12 @@ export const claimReferral = onCall(
             REFERRAL_RATE_BPS,
           termsVersion: REFERRAL_TERMS_VERSION,
           status: "active",
+          referrerCompanyKey: referrerUsdot,
+          referredCompanyKey: referredUsdot,
           claimedAt:
             admin.firestore.FieldValue
               .serverTimestamp(),
         });
-
-        transaction.set(
-          db.collection("referralSummaries").doc(referrerCarrierId),
-          {
-            referrerCarrierId,
-            directReferralCount: admin.firestore.FieldValue.increment(1),
-            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
 
         return {
           status: "claimed",

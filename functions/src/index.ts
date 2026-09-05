@@ -20,16 +20,17 @@ import {
 import { defineSecret } from "firebase-functions/params";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import Stripe from "stripe";
+import { randomUUID } from "node:crypto";
+import { recordReferralParticipation } from "./referralEligibility";
 import {
   handleCheckoutCompleted,
   syncSubscriptionToCarrier,
 } from "./stripeWebhookHandlers";
 import {
   recordReferralRewardForPaidInvoice,
-  recordRefundAdjustments,
-  holdRewardForDispute,
-  resolveRewardDispute,
-} from "./referralRewards";
+  reconcileReferralCharge,
+  stringId,
+} from "./referralLedgerRewards";
 
 
 admin.initializeApp();
@@ -1103,12 +1104,13 @@ const carrierId = userId;
 
     const carrierSnapshot =
       await carrierRef.get();
+    const accountDeletionStartedAt = admin.firestore.Timestamp.now();
 
     if (carrierSnapshot.exists) {
   await carrierRef.update({
     deletingAccount: true,
     deletingAccountStartedAt:
-      admin.firestore.FieldValue.serverTimestamp(),
+      accountDeletionStartedAt,
   });
 }
 
@@ -1273,14 +1275,16 @@ const carrierId = userId;
         .get();
 
     const referralWriter = db.bulkWriter();
+    referralWriter.set(db.collection("referralAccountClosures").doc(carrierId), {
+      carrierId, closedAt: accountDeletionStartedAt,
+    }, { merge: true });
 
-    referralWriter.set(
-      referralCodeOwnerRef,
-      {
-        active: false,
-        deactivatedReason: "account_deleted",
-        deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
+    // Preserve code tombstones and financial identities, remove the user-owned
+    // code lookup. A late refund can still resolve the deleted company.
+    referralWriter.delete(referralCodeOwnerRef);
+    if (stripeCustomerId) referralWriter.set(
+      db.collection("referralBillingIdentities").doc(stripeCustomerId),
+      { carrierId, deletedAt: admin.firestore.FieldValue.serverTimestamp() },
       { merge: true }
     );
 
@@ -2677,9 +2681,11 @@ export const queueDailyDriverBillingReconciliation = functions.scheduler.onSched
 export const stripeWebhook = onRequest(
   {
     region: "us-central1",
+    timeoutSeconds: 120,
     secrets: [
       stripeSecretKey,
       stripeWebhookSecret,
+      stripeCompanyPriceId,
       stripeDriverPriceId,
     ],
   },
@@ -2736,6 +2742,7 @@ export const stripeWebhook = onRequest(
     const webhookEventRef = db
   .collection("stripeWebhookEvents")
   .doc(event.id);
+    const processingToken = randomUUID();
     
     const eventClaimed = await db.runTransaction(
   async (transaction) => {
@@ -2767,6 +2774,7 @@ export const stripeWebhook = onRequest(
         ),
       livemode: event.livemode,
       status: "processing",
+      processingToken,
       processingStartedAt:
         admin.firestore.FieldValue.serverTimestamp(),
       processingAttempts:
@@ -2802,6 +2810,7 @@ if (eventClaimed === "busy") {
 }
 
     try {
+      await recordReferralParticipation(db, event);
       switch (event.type) {
       case "checkout.session.completed": {
         const session =
@@ -2918,25 +2927,58 @@ if (eventClaimed === "busy") {
 
       case "invoice.paid": {
         const invoice = event.data.object as Stripe.Invoice;
-        await recordReferralRewardForPaidInvoice(db, stripe, event.id, event.created, invoice);
+        await recordReferralRewardForPaidInvoice(db, stripe, event.id, event.created, invoice,
+          [stripeCompanyPriceId.value(), stripeDriverPriceId.value()]);
         break;
       }
 
       case "charge.refunded": {
         const charge = event.data.object as Stripe.Charge;
-        await recordRefundAdjustments(db, stripe, event.id, charge);
+        await reconcileReferralCharge(db, stripe, event.id, charge.id,
+          [stripeCompanyPriceId.value(), stripeDriverPriceId.value()]);
         break;
       }
 
-      case "charge.dispute.created": {
-        const dispute = event.data.object as Stripe.Dispute;
-        await holdRewardForDispute(db, event.id, dispute);
-        break;
-      }
-
+      case "charge.dispute.created":
+      case "charge.dispute.updated":
+      case "charge.dispute.funds_withdrawn":
+      case "charge.dispute.funds_reinstated":
       case "charge.dispute.closed": {
         const dispute = event.data.object as Stripe.Dispute;
-        await resolveRewardDispute(db, event.id, dispute);
+        const chargeId = stringId(dispute.charge);
+        if (chargeId) await reconcileReferralCharge(db, stripe, event.id, chargeId,
+          [stripeCompanyPriceId.value(), stripeDriverPriceId.value()]);
+        break;
+      }
+
+      case "refund.created":
+      case "refund.updated":
+      case "refund.failed": {
+        const refund = event.data.object as Stripe.Refund;
+        const chargeId = stringId(refund.charge);
+        if (chargeId) await reconcileReferralCharge(db, stripe, event.id, chargeId,
+          [stripeCompanyPriceId.value(), stripeDriverPriceId.value()]);
+        break;
+      }
+      case "credit_note.created":
+      case "credit_note.updated":
+      case "credit_note.voided": {
+        const note = event.data.object as Stripe.CreditNote;
+        const invoiceId = stringId(note.invoice);
+        if (invoiceId) await recordReferralRewardForPaidInvoice(db, stripe, event.id, event.created, { id: invoiceId },
+          [stripeCompanyPriceId.value(), stripeDriverPriceId.value()]);
+        break;
+      }
+      case "radar.early_fraud_warning.created":
+      case "radar.early_fraud_warning.updated": {
+        const warning = event.data.object as Stripe.Radar.EarlyFraudWarning;
+        const chargeId = stringId(warning.charge);
+        if (chargeId) {
+          await db.collection("referralFraudFlags").doc(chargeId).set({ active: warning.actionable === true, sourceEventId: event.id,
+            warningId: warning.id, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+          await reconcileReferralCharge(db, stripe, event.id, chargeId,
+            [stripeCompanyPriceId.value(), stripeDriverPriceId.value()]);
+        }
         break;
       }
 
@@ -2979,7 +3021,12 @@ if (eventClaimed === "busy") {
       );
 
       try {
-  await webhookEventRef.delete();
+  await db.runTransaction(async tx => {
+    if ((await tx.get(webhookEventRef)).data()?.processingToken === processingToken) {
+      tx.update(webhookEventRef, { status: "failed", processingStartedAt: admin.firestore.Timestamp.fromMillis(0),
+        lastError: String(error), failedAt: admin.firestore.FieldValue.serverTimestamp() });
+    }
+  });
 } catch (cleanupError) {
   console.error(
     "Unable to release failed Stripe event claim:",
@@ -3004,5 +3051,6 @@ export {
 export {
   getReferralDashboard,
   matureReferralRewards,
-} from "./referralRewards";
+} from "./referralLedgerRewards";
+export { referralAdminReport, prepareReferralPayout, transitionReferralPayout, reviewReferralReward, correctReferralAttribution, reconcileReferralInvoice } from "./referralAdmin";
 
