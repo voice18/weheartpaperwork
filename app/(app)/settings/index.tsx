@@ -66,23 +66,44 @@ export default function SettingsScreen() {
   const [loadingReferralCode, setLoadingReferralCode] =
     useState(false);
   const [rewardSummary, setRewardSummary] = useState<string>("View balances");
+  const [rewardDetailsOpen, setRewardDetailsOpen] = useState(false);
+  const [loadingRewardDetails, setLoadingRewardDetails] = useState(false);
+  const [rewardDetails, setRewardDetails] = useState<{
+    accountingActive: boolean;
+    payoutsActive: boolean;
+    pendingCents: number;
+    heldCents: number;
+    availableCents: number;
+    reservedCents: number;
+    paidCents: number;
+  } | null>(null);
   const loadRewardSummary = async () => {
+    setRewardDetailsOpen(true);
+    setLoadingRewardDetails(true);
     try {
       const result = await httpsCallable<Record<string, never>, {
         accountingActive: boolean; payoutsActive: boolean;
         summary: { pendingCents: number; heldCents: number; availableCents: number; reservedCents: number; paidCents: number };
       }>(functions, "getReferralDashboard")({});
       const data = result.data;
+      setRewardDetails({
+        accountingActive: data.accountingActive,
+        payoutsActive: data.payoutsActive,
+        pendingCents: data.summary.pendingCents,
+        heldCents: data.summary.heldCents,
+        availableCents: data.summary.availableCents,
+        reservedCents: data.summary.reservedCents,
+        paidCents: data.summary.paidCents,
+      });
       if (!data.accountingActive) { setRewardSummary("Accounting activation pending"); return; }
       const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
       setRewardSummary(`${money(data.summary.availableCents)} available`);
-      Alert.alert("Referral rewards", [
-        `Pending: ${money(data.summary.pendingCents)}`, `Under review: ${money(data.summary.heldCents)}`,
-        `Available (after offsets): ${money(data.summary.availableCents)}`, `Reserved for payout: ${money(data.summary.reservedCents)}`,
-        `Paid: ${money(data.summary.paidCents)}`, "30-day hold; $25 minimum. Transfers are processed manually after verification.",
-        data.payoutsActive ? "Payout processing is active." : "Payout processing is awaiting activation.",
-      ].join("\n"));
-    } catch { setRewardSummary("Unable to load — tap to retry"); }
+    } catch {
+      setRewardDetails(null);
+      setRewardSummary("Unable to load — tap to retry");
+    } finally {
+      setLoadingRewardDetails(false);
+    }
   };
 
   useEffect(() => {
@@ -1303,8 +1324,8 @@ const trialEndLabel = (() => {
 
         <SettingsRow label="Referral terms — creating a code accepts them" onPress={() => router.push("/referrals")} />
         <SettingsRow label="Rewards and payout balances" value={rewardSummary} onPress={() => { void loadRewardSummary(); }} />
-        <Text style={{ padding: 16, color: "#555", fontSize: 13 }}>
-          Disclose that you may receive a referral reward when publicly sharing your code. Rewards apply only to direct qualifying payments; 30-day hold and $25 minimum apply.
+        <Text style={{ padding: 16, color: "#555", fontSize: 13, lineHeight: 18 }}>
+          Sharing your link online? Include a simple note such as: “I may receive a referral reward if you sign up through this link.” Rewards apply to direct qualifying payments and become available after a 30-day hold. A $25 minimum applies to payouts.
         </Text>
 
         <SettingsRow
@@ -1625,6 +1646,61 @@ const trialEndLabel = (() => {
   </KeyboardAvoidingView>
 </Modal>
 
+<Modal
+  visible={rewardDetailsOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setRewardDetailsOpen(false)}
+>
+  <View style={styles.modalBackdrop}>
+    <View style={styles.modalCard}>
+      <Text style={styles.modalTitle}>Rewards and payout balances</Text>
+
+      {loadingRewardDetails ? (
+        <Text style={styles.modalDescription}>Loading your referral balances…</Text>
+      ) : rewardDetails ? (
+        <>
+          {[
+            ["Pending (30-day hold)", rewardDetails.pendingCents],
+            ["Under review", rewardDetails.heldCents],
+            ["Available", rewardDetails.availableCents],
+            ["Reserved for payout", rewardDetails.reservedCents],
+            ["Paid", rewardDetails.paidCents],
+          ].map(([label, cents]) => (
+            <View key={String(label)} style={styles.rewardBalanceRow}>
+              <Text style={styles.rewardBalanceLabel}>{label}</Text>
+              <Text style={styles.rewardBalanceAmount}>
+                ${((cents as number) / 100).toFixed(2)}
+              </Text>
+            </View>
+          ))}
+
+          <Text style={styles.rewardStatusText}>
+            {!rewardDetails.accountingActive
+              ? "Reward accounting is awaiting activation."
+              : rewardDetails.payoutsActive
+                ? "Payout processing is active. Available balances require at least $25 and verification before payment."
+                : "Rewards are being tracked. Payout processing will begin after the payment program is activated."}
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.modalDescription}>
+          We couldn’t load your balances. Close this window and try again.
+        </Text>
+      )}
+
+      <View style={styles.modalActions}>
+        <TouchableOpacity
+          style={styles.modalSaveButton}
+          onPress={() => setRewardDetailsOpen(false)}
+        >
+          <Text style={styles.modalSaveText}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
     </SafeAreaView>
   );
 }
@@ -1793,5 +1869,31 @@ const styles = StyleSheet.create({
   lineHeight: 18,
   color: "#706E68",
 },
+
+  rewardBalanceRow: {
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#E5E3DA",
+  },
+  rewardBalanceLabel: {
+    flex: 1,
+    paddingRight: 12,
+    fontSize: 14,
+    color: "#55534D",
+  },
+  rewardBalanceAmount: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#25241F",
+  },
+  rewardStatusText: {
+    marginTop: 16,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#706E68",
+  },
 
 });
