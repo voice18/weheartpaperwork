@@ -3,6 +3,7 @@
   "scripts": {
     "build": "tsc",
     "test:referrals": "npm run build && node --test test/referrals.test.cjs",
+    "test:notifications": "npm run build && node --test test/notifications.test.cjs",
     "build:watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",

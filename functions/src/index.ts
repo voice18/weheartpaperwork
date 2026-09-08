@@ -7,7 +7,7 @@
 //
 // Firebase Functions backend.
 //   dailyComplianceCheck — runs every day at 11am Pacific, scans all carriers,
-//      sends push notifications for items due in 30 days / 15 days / 5 days
+//      and sends each eligible user one summary for 15-day, 5-day, and due-day alerts.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as functions from "firebase-functions/v2";
@@ -31,6 +31,15 @@ import {
   reconcileReferralCharge,
   stringId,
 } from "./referralLedgerRewards";
+import {
+  AlertType,
+  ReminderPolicy,
+  ReminderState,
+  VEHICLE_NOTIFICATION_DEADLINES,
+  customReminderPolicy,
+  getAlertDecision,
+  notificationDueDate,
+} from "./notificationPolicy";
 
 
 admin.initializeApp();
@@ -54,17 +63,6 @@ function publicAppBaseUrl(): string {
 
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-type AlertType = "15_days" | "5_days" | "due_today";
-type ReminderPolicy = "standard" | "five-day-and-due" | "due-day-only";
-
-type ReminderState = {
-  dueDate: string;
-  notified30: boolean;
-  notified15: boolean;
-  notified5: boolean;
-  notifiedDue: boolean;
-};
 
 type ReminderUpdate = {
   ref: admin.firestore.DocumentReference;
@@ -91,107 +89,6 @@ type DailyNotificationSummary = {
   dueIn5DaysIds: string[];
   dueTodayIds: string[];
 };
-
-function customReminderPolicy(data: admin.firestore.DocumentData): ReminderPolicy {
-  if (data.scheduleType !== "rolling") return "standard";
-  if (
-    data.recurrenceKind === "calendar-monthly" ||
-    data.recurrenceKind === "calendar-quarterly"
-  ) return "five-day-and-due";
-
-  const value = typeof data.intervalValue === "number" ? data.intervalValue : 1;
-  if (data.intervalUnit === "year" || (data.intervalUnit === "month" && value >= 12)) {
-    return "standard";
-  }
-  const approximateDays =
-    data.intervalUnit === "day" ? value :
-    data.intervalUnit === "week" ? value * 7 :
-    data.intervalUnit === "month" ? value * 30 :
-    data.intervalUnit === "year" ? value * 365 : 365;
-
-  if (approximateDays <= 7) return "due-day-only";
-  if (approximateDays < 365) return "five-day-and-due";
-  return "standard";
-}
-
-function getAlertDecision(
-  days: number,
-  dueDate: string,
-  savedState: unknown,
-  requirementId?: string,
-  policy: ReminderPolicy = "standard"
-): { alertType: AlertType; state: ReminderState } | null {
-  if (days < 0) return null;
-
-  const data =
-    savedState && typeof savedState === "object"
-      ? savedState as Partial<ReminderState>
-      : {};
-  const sameOccurrence = data.dueDate === dueDate;
-  const state: ReminderState = {
-    dueDate,
-    notified30: sameOccurrence && data.notified30 === true,
-    notified15: sameOccurrence && data.notified15 === true,
-    notified5: sameOccurrence && data.notified5 === true,
-    notifiedDue: sameOccurrence && data.notifiedDue === true,
-  };
-
-  // The 90-day Portal login cycle is intentionally quieter: reminders five
-  // days before and on the maintenance date.
-  if (requirementId === "fmcsa-portal") {
-    if (days === 0 && !state.notifiedDue) {
-      return {
-        alertType: "due_today",
-        state: { ...state, notified5: true, notifiedDue: true },
-      };
-    }
-    if (days <= 5 && !state.notified5) {
-      return {
-        alertType: "5_days",
-        state: { ...state, notified5: true },
-      };
-    }
-    return null;
-  }
-
-  if (policy === "due-day-only") {
-    if (days === 0 && !state.notifiedDue) {
-      return { alertType: "due_today", state: { ...state, notifiedDue: true } };
-    }
-    return null;
-  }
-
-  if (days === 0 && !state.notifiedDue) {
-    return {
-      alertType: "due_today",
-      state: { ...state, notified15: true, notified5: true, notifiedDue: true },
-    };
-  }
-
-  if (requirementId === "ifta-quarterly" || policy === "five-day-and-due") {
-    if (days <= 5 && !state.notified5) {
-      return { alertType: "5_days", state: { ...state, notified5: true } };
-    }
-    return null;
-  }
-
-  // Recover a missed scheduler day by sending the most urgent unsent
-  // threshold, while marking broader thresholds complete so reminders
-  // never run backward (for example, 5 days followed by 15 days).
-  if (days <= 5 && !state.notified5) {
-    return {
-      alertType: "5_days",
-      state: { ...state, notified15: true, notified5: true },
-    };
-  }
-  if (days <= 15 && !state.notified15) {
-    return {
-      alertType: "15_days",
-      state: { ...state, notified15: true },
-    };
-  }
-  return null;
-}
 
 async function saveReminderUpdates(updates: ReminderUpdate[]): Promise<void> {
   const byDocument = new Map<
@@ -545,15 +442,10 @@ export const dailyComplianceCheck = functions.scheduler.onSchedule(
 
         const data = compDoc.data();
 
-        if (
-          data.applicable === false ||
-          data.completed === true ||
-          !data.dueDate
-        ) {
+        const dueDate = notificationDueDate(data);
+        if (data.applicable === false || data.completed === true || !dueDate) {
           continue;
         }
-
-        const dueDate = String(data.dueDate);
         const days = daysUntil(dueDate);
             console.log("Compliance item checked", {
       carrierId,
@@ -676,20 +568,7 @@ for (const vehicleDoc of vehiclesSnap.docs) {
       ? "Trailer"
       : "Truck";
 
-  const deadlines = [
-    {
-      field: "registrationExpiration",
-      itemType: "registration",
-      label: "Registration",
-    },
-    {
-      field: "inspectionExpiration",
-      itemType: "inspection",
-      label: "Annual DOT inspection",
-    },
-  ];
-
-  for (const deadline of deadlines) {
+  for (const deadline of VEHICLE_NOTIFICATION_DEADLINES) {
     if (
       deadline.field === "registrationExpiration" &&
       vehicleData.type === "trailer" &&
