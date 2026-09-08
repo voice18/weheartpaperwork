@@ -61,6 +61,30 @@ function publicAppBaseUrl(): string {
     : "https://weheartpaperwork.com";
 }
 
+function checkoutReturnBaseUrl(candidate: unknown): string {
+  const fallback = publicAppBaseUrl();
+  if (typeof candidate !== "string" || !candidate.trim()) return fallback;
+
+  try {
+    const url = new URL(candidate);
+    const projectId =
+      process.env.GCLOUD_PROJECT ??
+      process.env.GCP_PROJECT ??
+      admin.app().options.projectId;
+    const isStagingProject = projectId === "weheartpaperwork-staging";
+    const isLocalStagingOrigin =
+      isStagingProject &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+      (url.protocol === "http:" || url.protocol === "https:");
+
+    if (isLocalStagingOrigin || url.origin === fallback) return url.origin;
+  } catch {
+    // Invalid and unapproved origins fall back to the configured public site.
+  }
+
+  return fallback;
+}
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1780,6 +1804,18 @@ export const createCheckoutSession = onCall(
 
       const carrierData = carrierSnapshot.data();
 
+      if (
+        typeof carrierData?.companyName !== "string" ||
+        !carrierData.companyName.trim() ||
+        carrierData?.businessUseConfirmed !== true ||
+        carrierData?.businessUseTermsVersion !== "2026-09-08"
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Confirm that this account represents a motor-carrier business before starting a subscription."
+        );
+      }
+
 const existingBilling =
   carrierData?.billing ?? {};
 
@@ -1918,8 +1954,9 @@ console.log(
           }
         );
 
-        const customer =
+          const customer =
           await stripe.customers.create({
+            name: carrierData.companyName.trim(),
             email:
               typeof userData?.email === "string"
                 ? userData.email
@@ -1931,6 +1968,8 @@ console.log(
             metadata: {
               carrierId,
               firebaseUserId: userId,
+              accountType: "motor_carrier_business",
+              businessUseTermsVersion: "2026-09-08",
             },
           });
 
@@ -2006,6 +2045,8 @@ console.log(
         };
       }
 
+      const checkoutBaseUrl = checkoutReturnBaseUrl(request.data?.returnOrigin);
+
       const openCheckoutSessions = await stripe.checkout.sessions.list({
         customer: stripeCustomerId,
         status: "open",
@@ -2015,6 +2056,7 @@ console.log(
         session =>
           session.mode === "subscription" &&
           session.metadata?.carrierId === carrierId &&
+          session.success_url?.startsWith(`${checkoutBaseUrl}/`) &&
           typeof session.url === "string"
       );
 
@@ -2060,6 +2102,8 @@ console.log(
             firebaseUserId: userId,
             activeDriverCountAtCheckout:
               String(activeDriverCount),
+            accountType: "motor_carrier_business",
+            businessUseTermsVersion: "2026-09-08",
           },
         };
 
@@ -2077,14 +2121,16 @@ console.log(
         }
       );
 
-const checkoutBaseUrl = publicAppBaseUrl();
-
 console.log("Checkout return origin resolved", {
   firebaseProjectId:
     process.env.GCLOUD_PROJECT ??
     process.env.GCP_PROJECT ??
     admin.app().options.projectId ?? null,
   checkoutBaseUrl,
+  requestedReturnOrigin:
+    typeof request.data?.returnOrigin === "string"
+      ? request.data.returnOrigin
+      : null,
 });
 
       const checkoutSession =
@@ -2103,6 +2149,8 @@ console.log("Checkout return origin resolved", {
             firebaseUserId: userId,
             activeDriverCountAtCheckout:
               String(activeDriverCount),
+            accountType: "motor_carrier_business",
+            businessUseTermsVersion: "2026-09-08",
           },
 
           success_url:

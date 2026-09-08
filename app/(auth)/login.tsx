@@ -59,8 +59,13 @@ export default function Login() {
     try {
       setWorking(true);
       setMessage(mode === "create" ? "Creating your account…" : "Signing you in…");
-      if (isWeb && mode === "create") await createUserWithEmailAndPassword(auth, cleanedEmail, password);
-      else await signInWithEmailAndPassword(auth, cleanedEmail, password);
+      if (isWeb && mode === "create") {
+        await createUserWithEmailAndPassword(auth, cleanedEmail, password);
+        router.replace("/(onboarding)/company");
+      } else {
+        await signInWithEmailAndPassword(auth, cleanedEmail, password);
+        router.replace("/(app)/dashboard");
+      }
     } catch (error) {
       setMessage(friendlyAuthError(error, mode));
     } finally {
@@ -98,6 +103,9 @@ export default function Login() {
           {creating
             ? "Start organizing your company, driver, truck, and trailer deadlines in one place."
             : "Welcome back. Use the email and password for your existing account."}
+        </Text>
+        <Text style={styles.businessOnly}>
+          Business accounts only. We Heart Paperwork is for motor-carrier companies and organizations, including owner-operated businesses. It is not for personal, household, or family use.
         </Text>
 
         <Text style={styles.label}>Email address</Text>
@@ -165,6 +173,7 @@ const styles = StyleSheet.create({
   heart: { color: "#C0392B" },
   title: { color: "#1A1915", fontSize: 30, lineHeight: 36, fontWeight: "800", textAlign: "center" },
   description: { marginTop: 10, marginBottom: 28, color: "#706E68", fontSize: 15, lineHeight: 22, textAlign: "center" },
+  businessOnly: { marginTop: -16, marginBottom: 24, padding: 10, borderRadius: 8, backgroundColor: "#EEF4E8", color: "#31551A", fontSize: 12, lineHeight: 18, textAlign: "center" },
   label: { marginBottom: 7, color: "#45433F", fontSize: 13, fontWeight: "700" },
   input: { minHeight: 50, marginBottom: 16, paddingHorizontal: 14, borderWidth: 1, borderColor: "#C9C7BF", borderRadius: 10, backgroundColor: "#FFFFFF", color: "#25241F", fontSize: 16 },
   passwordHelp: { marginTop: -9, marginBottom: 16, color: "#706E68", fontSize: 12 },

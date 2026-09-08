@@ -130,6 +130,7 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
 
     // Real-time listener on the compliance sub-collection
     const compRef = collection(db, "carriers", carrierId, "compliance");
+    const setupPromises = new Map<string, Promise<void>>();
     const unsub = onSnapshot(compRef, snapshot => {
       const records: Record<string, ComplianceRecord> = {};
       snapshot.forEach(d => {
@@ -153,8 +154,8 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
       set({ compliance: records, loading: false });
       const existingIds = new Set(snapshot.docs.map(item => item.id));
       for (const reqId of BUILT_IN_REQUIREMENT_IDS) {
-        if (existingIds.has(reqId)) continue;
-        void ensureBuiltInRequirement(
+        if (existingIds.has(reqId) || setupPromises.has(reqId)) continue;
+        const setup = ensureBuiltInRequirement(
           carrierId,
           reqId,
           get().usdotNumber,
@@ -163,7 +164,10 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
             : true
         ).catch(error => {
           console.log(`Built-in requirement setup failed (${reqId}):`, error);
+        }).finally(() => {
+          setupPromises.delete(reqId);
         });
+        setupPromises.set(reqId, setup);
       }
     }, err => {
       set({ error: err.message, loading: false });

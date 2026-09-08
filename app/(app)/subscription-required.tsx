@@ -213,7 +213,7 @@ const billingNote = hasUsedTrial
       setIsStartingTrial(true);
 
       const createCheckoutSession = httpsCallable<
-        Record<string, never>,
+        { returnOrigin?: string },
         {
           url: string;
           activeDriverCount: number;
@@ -225,7 +225,12 @@ const billingNote = hasUsedTrial
       );
 
       const result =
-        await createCheckoutSession({});
+        await createCheckoutSession({
+          returnOrigin:
+            Platform.OS === "web" && typeof window !== "undefined"
+              ? window.location.origin
+              : undefined,
+        });
 
       const {
         url,
@@ -397,7 +402,7 @@ const billingNote = hasUsedTrial
               <Text style={styles.planLabel}>ACCOUNT ACCESS</Text>
               <Text style={styles.planTitle}>This account does not currently have access.</Text>
               <Text style={styles.planDescription}>
-                If your company already uses We Heart Paperwork, confirm that you signed in with the correct email address. For help accessing an existing company account, contact support.
+                We Heart Paperwork accounts are purchased by motor-carrier businesses and organizations for business use. If your company already subscribes, confirm that you signed in with the correct company account. For help accessing it, contact support.
               </Text>
               <TouchableOpacity
                 accessibilityRole="link"

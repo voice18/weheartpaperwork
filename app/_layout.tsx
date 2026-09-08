@@ -23,7 +23,6 @@ import * as Notifications from "expo-notifications";
 import { onAuthStateChanged } from "firebase/auth";
 
 import { auth, db } from "../lib/firebase";
-import { useComplianceStore } from "../store/useComplianceStore";
 import { syncCurrentDevicePushToken } from "../lib/syncPushToken";
 import {
   hasBillingAccess,
@@ -84,7 +83,6 @@ const isPublicRoute =
 const isAccountRoute =
   pathname === "/account";
   const rootNavigationState = useRootNavigationState();
-  const init = useComplianceStore((state) => state.init);
 
   const pendingNotification = useRef<PendingNotification | null>(null);
   const appReady = useRef(false);
@@ -186,6 +184,10 @@ const carrierRef = doc(
           }
 
           if (!snapshot.exists()) {
+            if (snapshot.metadata.fromCache) {
+              return;
+            }
+
             appReady.current = false;
 
             router.replace("/(onboarding)/company");
@@ -201,7 +203,15 @@ const carrierRef = doc(
               ? carrierData.companyName.trim()
               : "";
 
-          if (!companyName) {
+          const hasConfirmedBusinessUse =
+            carrierData?.businessUseConfirmed === true &&
+            carrierData?.businessUseTermsVersion === "2026-09-08";
+
+          if (!companyName || !hasConfirmedBusinessUse) {
+            if (snapshot.metadata.fromCache) {
+              return;
+            }
+
             appReady.current = false;
 
             router.replace("/(onboarding)/company");
@@ -239,15 +249,6 @@ const carrierRef = doc(
                 "/(app)/subscription-required"
               );
 
-              return;
-            }
-
-            await init(user.uid);
-
-            if (
-              !effectActive ||
-              !componentMounted.current
-            ) {
               return;
             }
 
@@ -301,7 +302,6 @@ const carrierRef = doc(
     unsubscribeAuth();
   };
 }, [
-  init,
   navigationReady,
   openDashboard,
   router,
@@ -311,6 +311,10 @@ const carrierRef = doc(
 
   useEffect(() => {
     if (!navigationReady) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
       return;
     }
 

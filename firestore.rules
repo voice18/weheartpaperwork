@@ -19,6 +19,9 @@ service cloud.firestore {
     function allowedCarrierCreate() {
       return request.resource.data.keys().hasOnly([
         "companyName",
+        "businessUseConfirmed",
+        "businessUseConfirmedAt",
+        "businessUseTermsVersion",
         "phoneNumber",
         "usdotNumber",
         "onboardingComplete",
@@ -29,7 +32,9 @@ service cloud.firestore {
         "nextStepDismissed",
         "nextStepDismissedAt",
         "updatedAt"
-      ]);
+      ])
+      && request.resource.data.businessUseConfirmed == true
+      && request.resource.data.businessUseTermsVersion == "2026-09-08";
     }
 
     function allowedCarrierUpdate() {
@@ -40,6 +45,9 @@ service cloud.firestore {
         .affectedKeys()
         .hasOnly([
           "companyName",
+          "businessUseConfirmed",
+          "businessUseConfirmedAt",
+          "businessUseTermsVersion",
           "phoneNumber",
           "usdotNumber",
           "onboardingComplete",
@@ -50,7 +58,9 @@ service cloud.firestore {
           "nextStepDismissed",
           "nextStepDismissedAt",
           "updatedAt"
-        ]);
+        ])
+        && request.resource.data.businessUseConfirmed == true
+        && request.resource.data.businessUseTermsVersion == "2026-09-08";
     }
 
     match /carriers/{carrierId} {
