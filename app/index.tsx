@@ -33,8 +33,8 @@ export default function WebLandingPage() {
             BUILT BY A TRUCKING COMPANY. SHARED WITH YOURS.
           </Text>
 
-          <Text style={styles.heroTitle}>
-            Keep your trucks moving.
+          <Text accessibilityRole="header" style={styles.heroTitle}>
+            Keep your trucks moving with organized DOT compliance.
           </Text>
 
           <Text style={styles.heroTitleAccent}>
