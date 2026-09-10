@@ -24,8 +24,10 @@ function friendlyAuthError(error: unknown, mode: AuthMode): string {
 
 export default function Login() {
   const isWeb = Platform.OS === "web";
-  const params = useLocalSearchParams<{ ref?: string | string[]; mode?: string | string[] }>();
+  const params = useLocalSearchParams<{ ref?: string | string[]; mode?: string | string[]; returnTo?: string | string[] }>();
   const referralCode = firstParam(params.ref);
+  const requestedReturnTo = firstParam(params.returnTo);
+  const returnTo = requestedReturnTo === "/review" ? "/review" : null;
   const requestedMode: AuthMode = isWeb && firstParam(params.mode) === "create" ? "create" : "login";
   const [mode, setMode] = useState<AuthMode>(requestedMode);
   const [email, setEmail] = useState("");
@@ -64,7 +66,7 @@ export default function Login() {
         router.replace("/(onboarding)/company");
       } else {
         await signInWithEmailAndPassword(auth, cleanedEmail, password);
-        router.replace("/(app)/dashboard");
+        router.replace((returnTo || "/(app)/dashboard") as any);
       }
     } catch (error) {
       setMessage(friendlyAuthError(error, mode));

@@ -104,6 +104,10 @@ export default function PublicFooter() {
             </Pressable>
           </Link>
 
+          <Link href={"/reviews" as any} asChild>
+            <Pressable><Text style={styles.footerLink}>Customer Reviews</Text></Pressable>
+          </Link>
+
           <Link href="/support" asChild>
             <Pressable>
               <Text style={styles.footerLink}>Support</Text>

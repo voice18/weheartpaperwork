@@ -1361,6 +1361,11 @@ const trialEndLabel = (() => {
 
         <View style={styles.card}>
           <SettingsRow
+            label="Leave a verified customer review"
+            onPress={() => router.push("/review" as any)}
+          />
+
+          <SettingsRow
             label="Support"
             onPress={() =>
               router.push("/support")

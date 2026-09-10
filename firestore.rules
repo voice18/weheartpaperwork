@@ -220,6 +220,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Review submissions contain account-linked moderation data and are server-only.
+    match /customerReviewSubmissions/{documentId} {
+      allow read, write: if false;
+    }
+
+    // Only a server-side moderation action can publish these sanitized documents.
+    match /publicCustomerReviews/{documentId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Default deny also protects future financial collections and nested docs.
     match /{document=**} {
       allow read, write: if false;

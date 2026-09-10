@@ -113,6 +113,17 @@ export default function WebLandingPage() {
       </View>
 
 
+      <View style={styles.reviewsSection}>
+        <View style={styles.reviewsInner}>
+          <View style={styles.reviewsCopy}>
+            <Text style={styles.eyebrow}>VERIFIED CUSTOMER FEEDBACK</Text>
+            <Text style={styles.sectionTitle}>Trust matters in trucking.</Text>
+            <Text style={styles.reviewsText}>Reviews on our site come from authenticated customers with an active account or trial. We identify verified customers, disclose incentives, and apply the same publication rules to praise and criticism.</Text>
+          </View>
+          <Link href={"/reviews" as any} asChild><Pressable style={styles.reviewsButton}><Text style={styles.reviewsButtonText}>Read customer reviews</Text></Pressable></Link>
+        </View>
+      </View>
+
       <View style={styles.referralSection}>
         <View style={styles.referralInner}>
           <View style={styles.referralStory}>
@@ -880,6 +891,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 26,
   },
+
+  reviewsSection: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#E5E3DA", backgroundColor: "#F6F3EA" },
+  reviewsInner: { width: "100%", maxWidth: 1120, alignSelf: "center", paddingHorizontal: 24, paddingVertical: 72, flexDirection: "row", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 30 },
+  reviewsCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 520 },
+  reviewsText: { maxWidth: 700, color: "#5F5D57", fontSize: 16, lineHeight: 27 },
+  reviewsButton: { minHeight: 48, paddingHorizontal: 20, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#27500A" },
+  reviewsButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "800" },
 
   referralCardTextStrong: {
     marginTop: 20,

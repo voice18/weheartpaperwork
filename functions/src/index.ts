@@ -1208,6 +1208,13 @@ const carrierId = userId;
 
     await referralWriter.close();
 
+    // Account deletion also withdraws any customer review and removes its
+    // sanitized public copy. Financial referral records remain separate.
+    await Promise.all([
+      db.collection("customerReviewSubmissions").doc(carrierId).delete(),
+      db.collection("publicCustomerReviews").doc(carrierId).delete(),
+    ]);
+
     console.log(
       "Referral code records deactivated during account deletion",
       {
@@ -2980,4 +2987,5 @@ export {
   matureReferralRewards,
 } from "./referralLedgerRewards";
 export { referralAdminReport, prepareReferralPayout, transitionReferralPayout, reviewReferralReward, correctReferralAttribution, reconcileReferralInvoice } from "./referralAdmin";
+export { submitCustomerReview, withdrawCustomerReview } from "./customerReviews";
 

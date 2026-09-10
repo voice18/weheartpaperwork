@@ -65,6 +65,8 @@ const webPublicRoutes = [
   "/fmcsa-updates",
   "/tools/mcs-150-due-date-calculator",
   "/tools",
+  "/reviews",
+  "/review",
 ];
 
 const isPublicRoute =
@@ -254,7 +256,7 @@ const carrierRef = doc(
 
             appReady.current = true;
 
-            if (pathname === "/settings") {
+            if (pathname === "/settings" || pathname === "/review") {
                return;
               }
 
