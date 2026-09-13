@@ -1361,6 +1361,19 @@ const trialEndLabel = (() => {
 
         <View style={styles.card}>
           <SettingsRow
+            label="Help shape We Heart Paperwork"
+            value="Send feedback directly to Aaron"
+            onPress={() => router.push("/(app)/feedback" as any)}
+          />
+
+          {auth.currentUser?.email?.toLowerCase() === "aaron@weheartpaperwork.com" ? (
+            <SettingsRow
+              label="Owner review inbox"
+              onPress={() => router.push("/(app)/owner-reviews" as any)}
+            />
+          ) : null}
+
+          <SettingsRow
             label="Leave a verified customer review"
             onPress={() => router.push("/review" as any)}
           />

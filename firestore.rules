@@ -225,10 +225,20 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Feedback can contain account contact information and is server-only.
+    match /customerFeedback/{documentId} {
+      allow read, write: if false;
+    }
+
     // Only a server-side moderation action can publish these sanitized documents.
     match /publicCustomerReviews/{documentId} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // Outbound owner email is written and processed only by trusted servers.
+    match /mail/{documentId} {
+      allow read, write: if false;
     }
 
     // Default deny also protects future financial collections and nested docs.

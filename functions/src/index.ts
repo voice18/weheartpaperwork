@@ -21,6 +21,7 @@ import { defineSecret } from "firebase-functions/params";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import Stripe from "stripe";
 import { randomUUID } from "node:crypto";
+import { queueOwnerEmail } from "./ownerNotifications";
 import { recordReferralParticipation } from "./referralEligibility";
 import {
   handleCheckoutCompleted,
@@ -2794,6 +2795,14 @@ if (eventClaimed === "busy") {
             latestSubscription
           );
 
+        if (["active", "trialing"].includes(latestSubscription.status)) {
+          const carrierId = latestSubscription.metadata?.carrierId || latestSubscription.metadata?.firebaseUserId || "unknown";
+          const carrier = carrierId === "unknown" ? null : await db.collection("carriers").doc(carrierId).get();
+          const companyName = carrier?.data()?.companyName || "Company name unavailable";
+          await queueOwnerEmail(db, `subscription_${event.id}`, `New We Heart Paperwork subscription: ${companyName}`,
+            `A new company subscription started.\n\nCompany: ${companyName}\nCarrier ID: ${carrierId}\nStripe subscription: ${latestSubscription.id}\nStatus: ${latestSubscription.status}\n\nOpen Stripe: https://dashboard.stripe.com/subscriptions/${latestSubscription.id}`);
+        }
+
         break;
       }
 
@@ -2987,5 +2996,6 @@ export {
   matureReferralRewards,
 } from "./referralLedgerRewards";
 export { referralAdminReport, prepareReferralPayout, transitionReferralPayout, reviewReferralReward, correctReferralAttribution, reconcileReferralInvoice } from "./referralAdmin";
-export { submitCustomerReview, withdrawCustomerReview } from "./customerReviews";
+export { submitCustomerReview, withdrawCustomerReview, listCustomerReviewsForModeration, moderateCustomerReview,
+  submitCustomerFeedback, updateCustomerFeedbackStatus } from "./customerReviews";
 
