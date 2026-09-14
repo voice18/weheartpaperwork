@@ -12,6 +12,7 @@
     "build:web": "node scripts/run-expo-production.mjs export --platform web",
     "build:web:staging": "node scripts/run-expo-staging.mjs export --platform web",
     "validate:mobile": "node scripts/validate-mobile-config.mjs",
+    "validate:seo": "node scripts/validate-seo.mjs",
     "deploy:production:web": "npm run build:web && firebase deploy --project dot-compliance-dashboard --only hosting",
     "deploy:production:functions": "firebase deploy --project dot-compliance-dashboard --only functions",
     "deploy:production:rules": "firebase deploy --project dot-compliance-dashboard --only firestore:rules",

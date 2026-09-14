@@ -16,6 +16,7 @@ export default function WebLandingPage() {
   <>
     <Head>
       <title>DOT Compliance Tracker | We Heart Paperwork</title>
+      <link rel="canonical" href="https://weheartpaperwork.com/" />
       <meta
         name="description"
         content="A simple DOT compliance tracker for carriers who handle their own paperwork. Track company, driver, truck, and trailer deadlines from $3 a month."

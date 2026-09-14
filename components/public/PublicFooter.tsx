@@ -5,7 +5,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { openStaticTool } from "../../lib/openStaticTool";
+import StaticToolLink from "./StaticToolLink";
 
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 
@@ -62,17 +62,17 @@ export default function PublicFooter() {
             </Pressable>
           </Link>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/new-entrant-audit/")}><Text style={styles.footerLink}>New Entrant Audit Tool</Text></Pressable>
+          <StaticToolLink href={"/tools/new-entrant-audit/"}><Text style={styles.footerLink}>New Entrant Audit Tool</Text></StaticToolLink>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/driver-qualification-file/")}><Text style={styles.footerLink}>DQ File Builder</Text></Pressable>
+          <StaticToolLink href={"/tools/driver-qualification-file/"}><Text style={styles.footerLink}>DQ File Builder</Text></StaticToolLink>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/drug-alcohol-policy/")}><Text style={styles.footerLink}>Drug &amp; Alcohol Policy Builder</Text></Pressable>
+          <StaticToolLink href={"/tools/drug-alcohol-policy/"}><Text style={styles.footerLink}>Drug &amp; Alcohol Policy Builder</Text></StaticToolLink>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/vehicle-maintenance-file/")}><Text style={styles.footerLink}>Maintenance File Builder</Text></Pressable>
+          <StaticToolLink href={"/tools/vehicle-maintenance-file/"}><Text style={styles.footerLink}>Maintenance File Builder</Text></StaticToolLink>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/accident-register/")}><Text style={styles.footerLink}>Accident Register Builder</Text></Pressable>
+          <StaticToolLink href={"/tools/accident-register/"}><Text style={styles.footerLink}>Accident Register Builder</Text></StaticToolLink>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/what-do-i-need/")}><Text style={styles.footerLink}>Paperwork Checklist Tool</Text></Pressable>
+          <StaticToolLink href={"/tools/what-do-i-need/"}><Text style={styles.footerLink}>Paperwork Checklist Tool</Text></StaticToolLink>
 
           <Link href={"/how-to" as any} asChild>
             <Pressable><Text style={styles.footerLink}>How-To Walkthroughs</Text></Pressable>

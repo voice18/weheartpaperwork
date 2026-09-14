@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 import JsonLd from "../../components/public/JsonLd";
+import BreadcrumbJsonLd from "../../components/public/BreadcrumbJsonLd";
 import { howToGuides } from "../../lib/howToGuides";
 
 import {
@@ -55,6 +56,11 @@ export default function ComplianceDetailPage() {
         <meta property="og:description" content={page.metaDescription} />
         <meta property="og:url" content={canonical} />
       </Head>
+      <BreadcrumbJsonLd items={[
+        { name: "Home", url: "https://weheartpaperwork.com/" },
+        { name: "Compliance guides", url: "https://weheartpaperwork.com/compliance" },
+        { name: page.title, url: canonical },
+      ]} />
 
       <JsonLd
         data={{

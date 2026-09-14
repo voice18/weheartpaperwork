@@ -5,7 +5,7 @@ import PublicFooter from "../../components/public/PublicFooter";
 import PublicHeader from "../../components/public/PublicHeader";
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 import { howToGuideBySlug } from "../../lib/howToGuides";
-import { openStaticTool } from "../../lib/openStaticTool";
+import StaticToolLink from "../../components/public/StaticToolLink";
 
 const groups = [
   {
@@ -58,7 +58,7 @@ export default function HowToIndexPage() {
         <Text style={styles.eyebrow}>NOT SURE WHERE TO START?</Text>
         <Text style={[styles.startHereTitle, compact && styles.startHereTitleCompact]}>Find the paperwork that applies to your operation.</Text>
         <Text style={styles.startHereText}>Answer a few questions and get a federal checklist tailored to how you haul, what you drive, and who drives for you.</Text>
-        <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/what-do-i-need/")} style={styles.startHereButton}><Text style={styles.startHereButtonText}>Build my checklist →</Text></Pressable>
+        <StaticToolLink href={"/tools/what-do-i-need/"} style={styles.startHereButton}><Text style={styles.startHereButtonText}>Build my checklist →</Text></StaticToolLink>
       </View>
 
       <View style={[styles.groupList, compact && styles.groupListCompact]}>
@@ -82,10 +82,10 @@ export default function HowToIndexPage() {
         <Text style={styles.eyebrow}>PREPARE FOR AN AUDIT</Text>
         <Text style={[styles.toolsTitle, compact && styles.toolsTitleCompact]}>Check what you have. Build what is missing.</Text>
         <View style={[styles.toolLinks, compact && styles.toolLinksCompact]}>
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/new-entrant-audit/")} style={styles.toolCard}><Text style={styles.toolTitle}>New Entrant Audit Tool</Text><Text style={styles.toolText}>Walk through the records an auditor may request and leave with an action list.</Text><Text style={styles.toolArrow}>Open the audit tool →</Text></Pressable>
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/driver-qualification-file/")} style={styles.toolCard}><Text style={styles.toolTitle}>DQ File Builder</Text><Text style={styles.toolText}>Create a DQ file index, carrier-authored forms, and a list of official records still needed.</Text><Text style={styles.toolArrow}>Build a DQ packet →</Text></Pressable>
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/vehicle-maintenance-file/")} style={styles.toolCard}><Text style={styles.toolTitle}>Maintenance File Builder</Text><Text style={styles.toolText}>Create one organized inspection, repair, and maintenance file for every controlled vehicle.</Text><Text style={styles.toolArrow}>Build a maintenance file →</Text></Pressable>
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/accident-register/")} style={styles.toolCard}><Text style={styles.toolTitle}>Accident Register Builder</Text><Text style={styles.toolText}>Decide what belongs on the federal register and organize the reports behind every entry.</Text><Text style={styles.toolArrow}>Build an accident register →</Text></Pressable>
+          <StaticToolLink href={"/tools/new-entrant-audit/"} style={styles.toolCard}><Text style={styles.toolTitle}>New Entrant Audit Tool</Text><Text style={styles.toolText}>Walk through the records an auditor may request and leave with an action list.</Text><Text style={styles.toolArrow}>Open the audit tool →</Text></StaticToolLink>
+          <StaticToolLink href={"/tools/driver-qualification-file/"} style={styles.toolCard}><Text style={styles.toolTitle}>DQ File Builder</Text><Text style={styles.toolText}>Create a DQ file index, carrier-authored forms, and a list of official records still needed.</Text><Text style={styles.toolArrow}>Build a DQ packet →</Text></StaticToolLink>
+          <StaticToolLink href={"/tools/vehicle-maintenance-file/"} style={styles.toolCard}><Text style={styles.toolTitle}>Maintenance File Builder</Text><Text style={styles.toolText}>Create one organized inspection, repair, and maintenance file for every controlled vehicle.</Text><Text style={styles.toolArrow}>Build a maintenance file →</Text></StaticToolLink>
+          <StaticToolLink href={"/tools/accident-register/"} style={styles.toolCard}><Text style={styles.toolTitle}>Accident Register Builder</Text><Text style={styles.toolText}>Decide what belongs on the federal register and organize the reports behind every entry.</Text><Text style={styles.toolArrow}>Build an accident register →</Text></StaticToolLink>
         </View>
       </View>
       <View style={[styles.closing, compact && styles.closingCompact]}><Text style={[styles.closingTitle, compact && styles.closingTitleCompact]}>The work is finite. The dates keep moving.</Text><Text style={styles.closingText}>Use the website to get the work done, then use We Heart Paperwork to remember when it comes back.</Text><Link href="/pricing" asChild><Pressable style={styles.cta}><Text style={styles.ctaText}>See pricing</Text></Pressable></Link></View>

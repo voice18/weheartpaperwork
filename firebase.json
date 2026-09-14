@@ -2,6 +2,9 @@
   "hosting": {
   "public": "dist",
   "cleanUrls": true,
+  "redirects": [
+    { "source": "/tools/mcs-150-due-date-calculator/", "destination": "/tools/mcs-150-due-date-calculator", "type": 301 }
+  ],
   "ignore": [
     "firebase.json",
     "**/.*",

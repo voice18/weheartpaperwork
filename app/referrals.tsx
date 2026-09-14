@@ -1,4 +1,5 @@
 import { Link } from "expo-router";
+import Head from "expo-router/head";
 import { useState } from "react";
 import {
   Pressable,
@@ -47,6 +48,11 @@ export default function ReferralRewardsPage() {
       contentContainerStyle={styles.pageContent}
       showsVerticalScrollIndicator={false}
     >
+      <Head>
+        <title>Referral Rewards and Program Terms | We Heart Paperwork</title>
+        <meta name="description" content="Learn how eligible We Heart Paperwork accounts can earn referral rewards, estimate potential rewards, and review program terms and payout requirements." />
+        <link rel="canonical" href="https://weheartpaperwork.com/referrals" />
+      </Head>
       <View style={styles.header}>
         <View
           style={[

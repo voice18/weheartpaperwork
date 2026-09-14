@@ -6,7 +6,7 @@ import {
   View,
 } from "react-native";
 import { usePublicCompact } from "../../hooks/usePublicCompact";
-import { openStaticTool } from "../../lib/openStaticTool";
+import StaticToolLink from "./StaticToolLink";
 
 export default function PublicHeader() {
   const pathname = usePathname();
@@ -65,7 +65,7 @@ export default function PublicHeader() {
             </Pressable>
           </Link>
 
-          <Pressable accessibilityRole="link" onPress={() => openStaticTool("/tools/")}><Text style={[styles.headerLink, pathname.startsWith("/tools") && styles.headerLinkActive]}>Free Tools</Text></Pressable>
+          <StaticToolLink href={"/tools"}><Text style={[styles.headerLink, pathname.startsWith("/tools") && styles.headerLinkActive]}>Free Tools</Text></StaticToolLink>
 
           <Link href="/pricing" asChild><Pressable><Text style={linkStyle("/pricing")}>Pricing</Text></Pressable></Link>
 

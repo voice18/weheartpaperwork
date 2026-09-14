@@ -4,6 +4,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import PublicFooter from "../../components/public/PublicFooter";
 import PublicHeader from "../../components/public/PublicHeader";
 import JsonLd from "../../components/public/JsonLd";
+import BreadcrumbJsonLd from "../../components/public/BreadcrumbJsonLd";
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 import { howToGuideBySlug, howToGuides } from "../../lib/howToGuides";
 import { howToConnections } from "../../lib/howToConnections";
@@ -26,6 +27,11 @@ export default function HowToDetailPage() {
 
   return <>
     <Head><title>{guide.metaTitle}</title><meta name="description" content={guide.metaDescription} /><link rel="canonical" href={canonical} /></Head>
+    <BreadcrumbJsonLd items={[
+      { name: "Home", url: "https://weheartpaperwork.com/" },
+      { name: "How-to walkthroughs", url: "https://weheartpaperwork.com/how-to" },
+      { name: guide.title, url: canonical },
+    ]} />
     <JsonLd data={{ "@context": "https://schema.org", "@type": "HowTo", name: guide.title, description: guide.metaDescription, step: guide.steps.map(step => ({ "@type": "HowToStep", name: step.title, text: step.text })) }} />
     {faqs.length ? <JsonLd data={{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map(faq => ({ "@type": "Question", name: faq.question, acceptedAnswer: { "@type": "Answer", text: faq.answer } })) }} /> : null}
     <ScrollView style={styles.page} contentContainerStyle={styles.pageContent}>

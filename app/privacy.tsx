@@ -1,4 +1,5 @@
 import PublicHeader from "../components/public/PublicHeader";
+import Head from "expo-router/head";
 import {
   ScrollView,
   StyleSheet,
@@ -13,6 +14,11 @@ export default function PrivacyPage() {
   edges={["top", "bottom"]}
   style={styles.page}
 >
+  <Head>
+    <title>Privacy Policy | We Heart Paperwork</title>
+    <meta name="description" content="Learn how We Heart Paperwork collects, uses, and protects account and compliance information, and how to contact us about your data." />
+    <link rel="canonical" href="https://weheartpaperwork.com/privacy" />
+  </Head>
   <PublicHeader />
 
     <ScrollView

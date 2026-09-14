@@ -1,5 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { openStaticTool } from "../../lib/openStaticTool";
+import { StyleSheet, Text, View } from "react-native";
+import StaticToolLink from "./StaticToolLink";
 
 const tools = {
   audit: {
@@ -39,7 +39,7 @@ const tools = {
 export default function AuditToolCard({ tool = "audit" }: { tool?: keyof typeof tools }) {
   const content = tools[tool];
   return (
-    <Pressable accessibilityRole="link" onPress={() => openStaticTool(content.href)} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
+    <StaticToolLink href={content.href} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
       <Text style={styles.eyebrow}>{content.eyebrow}</Text>
       <Text style={styles.title}>{content.title}</Text>
       <Text style={styles.body}>{content.body}</Text>
@@ -47,7 +47,7 @@ export default function AuditToolCard({ tool = "audit" }: { tool?: keyof typeof 
         {content.meta.map((item, index) => <Text key={item} style={styles.meta}>{index ? `·  ${item}` : item}</Text>)}
       </View>
       <Text style={styles.cta}>{content.cta}</Text>
-    </Pressable>
+    </StaticToolLink>
   );
 }
 
