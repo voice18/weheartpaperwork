@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 import StaticToolLink from "./StaticToolLink";
+import AppStoreLink from "./AppStoreLink";
 
 export default function PublicHeader() {
   const pathname = usePathname();
@@ -70,6 +71,7 @@ export default function PublicHeader() {
           <Link href="/pricing" asChild><Pressable><Text style={linkStyle("/pricing")}>Pricing</Text></Pressable></Link>
 
           <View style={styles.authActions}>
+            <AppStoreLink />
             <Link href="/(auth)/login" asChild>
               <Pressable style={styles.signInButton}>
                 <Text style={styles.signInButtonText}>Sign in</Text>
@@ -143,6 +145,8 @@ const styles = StyleSheet.create({
   },
 
   headerLinks: {
+    flexShrink: 1,
+    flexWrap: "wrap",
     flexDirection: "row",
     alignItems: "center",
     gap: 20,
@@ -166,6 +170,7 @@ const styles = StyleSheet.create({
   },
 
   authActions: {
+    flexWrap: "wrap",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,

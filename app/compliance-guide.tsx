@@ -9,6 +9,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { router } from "expo-router";
 import Head from "expo-router/head";
+import AppStoreLink from "../components/public/AppStoreLink";
 import { auth } from "../lib/firebase";
 import {
   SafeAreaView,
@@ -105,6 +106,7 @@ function handleCreateAccount() {
             alignSelf: "center",
           }}
         >
+          <AppStoreLink />
           <View
             style={{
               flexDirection: "row",

@@ -6,6 +6,7 @@ import {
   View,
 } from "react-native";
 import StaticToolLink from "./StaticToolLink";
+import AppStoreLink from "./AppStoreLink";
 
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 
@@ -28,6 +29,7 @@ export default function PublicFooter() {
           <Text style={styles.footerDescription}>
             Built by a trucking company for trucking companies.
           </Text>
+          <AppStoreLink />
         </View>
 
         <View

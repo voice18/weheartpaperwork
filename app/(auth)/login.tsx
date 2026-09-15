@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmail
 import { router, useLocalSearchParams } from "expo-router";
 
 import { auth } from "../../lib/firebase";
+import AppStoreLink from "../../components/public/AppStoreLink";
 import { savePendingReferralCode } from "../../lib/referrals";
 
 type AuthMode = "login" | "create";
@@ -163,6 +164,7 @@ export default function Login() {
           </Text>
         )}
         <Text style={styles.version}>v0.1.0 Beta</Text>
+        <AppStoreLink />
       </View>
     </ScrollView>
   );

@@ -1,5 +1,6 @@
 import PublicHeader from "../components/public/PublicHeader";
 import PublicFooter from "../components/public/PublicFooter";
+import AppStoreLink from "../components/public/AppStoreLink";
 import AuditToolCard from "../components/public/AuditToolCard";
 import { Link } from "expo-router";
 import Head from "expo-router/head";
@@ -71,6 +72,7 @@ export default function WebLandingPage() {
           <Text style={styles.availability}>
             Built in Yakima, Washington. Available on iPhone and Android.
           </Text>
+          <View style={{ marginTop: 14 }}><AppStoreLink prominent /></View>
         </View>
 
         <DashboardPreview />

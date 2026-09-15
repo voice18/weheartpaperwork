@@ -7,6 +7,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
+import IPhoneAppCard from "../../components/IPhoneAppCard";
 
 import {
   arrayUnion,
@@ -216,6 +217,8 @@ export default function NotificationsOnboarding() {
           ? "Push notifications are available through the We Heart Paperwork app on Android and iOS. You can continue using the full dashboard on this computer."
           : "We’ll let you know before:"}
       </Text>
+
+        <IPhoneAppCard />
 
         {!isWeb ? (
         <View style={{ gap: 10, marginBottom: 26 }}>

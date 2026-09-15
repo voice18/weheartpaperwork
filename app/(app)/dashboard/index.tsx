@@ -23,6 +23,7 @@ import {
 import { useEffect, useState  }                      from "react";
 import { useLocalSearchParams } from "expo-router";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
+import IPhoneAppCard from "../../../components/IPhoneAppCard";
 import SignalCards from "../../../components/dashboard/SignalCards";
 import RequirementRow from "../../../components/dashboard/RequirementRow";
 import CompanyRequirements from "../../../components/dashboard/CompanyRequirements";
@@ -218,6 +219,7 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
       companyName={companyName}
       usdotNumber={usdotNumber}
     />
+      <IPhoneAppCard />
 
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
  

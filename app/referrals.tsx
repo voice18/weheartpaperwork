@@ -1,5 +1,6 @@
 import { Link } from "expo-router";
 import Head from "expo-router/head";
+import AppStoreLink from "../components/public/AppStoreLink";
 import { useState } from "react";
 import {
   Pressable,
@@ -412,6 +413,7 @@ export default function ReferralRewardsPage() {
         </View>
 
         <View style={[styles.footerLinks, compact && styles.footerLinksCompact]}>
+          <AppStoreLink />
           <Link href="/" asChild>
             <Pressable><Text style={styles.footerLink}>Home</Text></Pressable>
           </Link>

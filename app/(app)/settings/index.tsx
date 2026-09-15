@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import * as Notifications from "expo-notifications";
+import IPhoneAppCard from "../../../components/IPhoneAppCard";
 import {
   sendPasswordResetEmail,
   signOut,
@@ -1190,6 +1191,7 @@ const trialEndLabel = (() => {
         <Text style={styles.sectionLabel}>
           Notifications
         </Text>
+        <IPhoneAppCard />
 
         <View style={styles.card}>
         <View style={styles.switchRow}>
