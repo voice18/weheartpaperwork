@@ -1,4 +1,5 @@
 import { Link, usePathname } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -11,7 +12,10 @@ import AppStoreLink from "./AppStoreLink";
 
 export default function PublicHeader() {
   const pathname = usePathname();
-  const compact = usePublicCompact();
+  const compact = usePublicCompact(1200);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname, compact]);
 
   const linkStyle = (path: string) => [
     styles.headerLink,
@@ -32,16 +36,21 @@ export default function PublicHeader() {
               <Text style={styles.logoText}>WHP</Text>
             </View>
 
-            <Text style={styles.brandName}>
+            <Text style={[styles.brandName, compact && styles.brandNameCompact]}>
               We Heart Paperwork
             </Text>
           </Pressable>
         </Link>
 
+        {compact && <Pressable accessibilityRole="button" accessibilityLabel={menuOpen ? "Close navigation menu" : "Open navigation menu"} accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen(!menuOpen)} style={styles.signInButton}>
+          <Text style={styles.signInButtonText}>{menuOpen ? "Close" : "Menu"}</Text>
+        </Pressable>}
+
         <View
           style={[
             styles.headerLinks,
             compact && styles.headerLinksCompact,
+            compact && !menuOpen && styles.hidden,
           ]}
         >
           <Link href="/features" asChild>
@@ -70,8 +79,8 @@ export default function PublicHeader() {
 
           <Link href="/pricing" asChild><Pressable><Text style={linkStyle("/pricing")}>Pricing</Text></Pressable></Link>
 
-          <View style={styles.authActions}>
-            <AppStoreLink />
+          <View style={[styles.authActions, compact && styles.authActionsCompact]}>
+            {compact && <AppStoreLink />}
             <Link href="/(auth)/login" asChild>
               <Pressable style={styles.signInButton}>
                 <Text style={styles.signInButtonText}>Sign in</Text>
@@ -99,7 +108,7 @@ const styles = StyleSheet.create({
 
   headerInner: {
     width: "100%",
-    maxWidth: 1120,
+    maxWidth: 1280,
     alignSelf: "center",
     minHeight: 72,
     paddingHorizontal: 24,
@@ -110,13 +119,15 @@ const styles = StyleSheet.create({
   },
 
   headerInnerCompact: {
+    paddingHorizontal: 16,
+    gap: 8,
     paddingTop: 14,
     paddingBottom: 14,
-    alignItems: "flex-start",
-    flexDirection: "column",
+    flexWrap: "wrap",
   },
 
   brandRow: {
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
@@ -144,9 +155,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
+  brandNameCompact: { fontSize: 14 },
+
   headerLinks: {
-    flexShrink: 1,
-    flexWrap: "wrap",
+    flexShrink: 0,
     flexDirection: "row",
     alignItems: "center",
     gap: 20,
@@ -154,9 +166,13 @@ const styles = StyleSheet.create({
 
   headerLinksCompact: {
     width: "100%",
-    flexWrap: "wrap",
+    flexDirection: "column",
+    alignItems: "flex-start",
     gap: 16,
+    paddingVertical: 12,
   },
+
+  hidden: { display: "none" },
 
   headerLink: {
     color: "#706E68",
@@ -170,11 +186,12 @@ const styles = StyleSheet.create({
   },
 
   authActions: {
-    flexWrap: "wrap",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
+
+  authActionsCompact: { flexDirection: "column", alignItems: "flex-start" },
 
   signInButton: {
     minHeight: 40,
