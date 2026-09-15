@@ -1,3 +1,4 @@
+import AppStoreLink from "../components/public/AppStoreLink";
 import { useState } from "react";
 import { Link } from "expo-router";
 import PublicHeader from "../components/public/PublicHeader";
@@ -537,7 +538,7 @@ export default function PricingPage() {
           <View>
             <Text style={styles.footerBrand}>
               We Heart Paperwork
-            </Text>
+            </Text><AppStoreLink />
 
             <Text style={styles.footerDescription}>
               Practical compliance organization for trucking

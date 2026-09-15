@@ -402,7 +402,7 @@ const billingNote = hasUsedTrial
               <Text style={styles.planLabel}>ACCOUNT ACCESS</Text>
               <Text style={styles.planTitle}>This account does not currently have access.</Text>
               <Text style={styles.planDescription}>
-                We Heart Paperwork accounts are purchased by motor-carrier businesses and organizations for business use. If your company already subscribes, confirm that you signed in with the correct company account. For help accessing it, contact support.
+                This companion app uses the account you set up at weheartpaperwork.com. Access requires completed company setup and an active trial or subscription on that account. Downloading the app alone does not activate access. If your company already has access, confirm that you signed in with the same email you use on the website. For help, contact support.
               </Text>
               <TouchableOpacity
                 accessibilityRole="link"

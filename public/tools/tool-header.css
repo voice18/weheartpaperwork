@@ -98,3 +98,7 @@
 @media print {
   .whp-sitebar { display: none !important; }
 }
+
+.whp-companion { max-width: 1060px; margin: 32px auto; padding: 20px 24px; color: #45433f; background: #f2f6ed; border-radius: 12px; font: 14px/1.6 system-ui, sans-serif; }
+.whp-companion a { color: #27500a; font-weight: 700; }
+@media print { .whp-companion { display: none !important; } }

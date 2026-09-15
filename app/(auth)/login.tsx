@@ -105,7 +105,8 @@ export default function Login() {
         <Text style={styles.description}>
           {creating
             ? "Start organizing your company, driver, truck, and trailer deadlines in one place."
-            : "Welcome back. Use the email and password for your existing account."}
+            : isWeb ? "Welcome back. Use the email and password for your existing account."
+            : "This is the We Heart Paperwork companion app. First, sign up and complete your company setup at weheartpaperwork.com. Then sign in here with the same email and password. You cannot create an account inside the app."}
         </Text>
         <Text style={styles.businessOnly}>
           Business accounts only. We Heart Paperwork is for motor-carrier companies and organizations, including owner-operated businesses. It is not for personal, household, or family use.
@@ -160,7 +161,7 @@ export default function Login() {
           </View>
         ) : (
           <Text style={styles.companionNote}>
-            Sign in with the account your company already uses for We Heart Paperwork.
+            App access requires an active trial or subscription on your website account. Downloading the app does not create an account or activate access. If your company already has an account, use that account to sign in.
           </Text>
         )}
         <Text style={styles.version}>v0.1.0 Beta</Text>

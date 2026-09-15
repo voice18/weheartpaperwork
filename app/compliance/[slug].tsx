@@ -1,3 +1,4 @@
+import AppStoreLink from "../../components/public/AppStoreLink";
 import { Link, useLocalSearchParams } from "expo-router";
 import PublicHeader from "../../components/public/PublicHeader";
 import Head from "expo-router/head";
@@ -284,7 +285,7 @@ function Footer({ compact }: { compact: boolean }) {
     <>
       <View style={[styles.footer, compact && styles.footerCompact]}>
         <View>
-          <Text style={styles.footerBrand}>We Heart Paperwork</Text>
+          <Text style={styles.footerBrand}>We Heart Paperwork</Text><AppStoreLink />
           <Text style={styles.footerDescription}>Practical compliance organization for trucking companies.</Text>
         </View>
         <View style={styles.footerLinks}>
