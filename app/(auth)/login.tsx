@@ -166,7 +166,7 @@ export default function Login() {
           </Text>
         )}
         <Text style={styles.version}>v{Constants.expoConfig?.version ?? "1.0.1"}</Text>
-        <AppStoreLink />
+        {!creating ? <AppStoreLink /> : null}
       </View>
     </ScrollView>
   );

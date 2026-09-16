@@ -7,7 +7,6 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import IPhoneAppCard from "../../components/IPhoneAppCard";
 
 import {
   arrayUnion,
@@ -200,7 +199,7 @@ export default function NotificationsOnboarding() {
           }}
         >
           {isWeb
-      ? "Keep using your dashboard here"
+      ? "Finish setting up your account"
       : "Would you like us to watch your paperwork?"}
         </Text>
 
@@ -214,11 +213,23 @@ export default function NotificationsOnboarding() {
         }}
       >
         {isWeb
-          ? "Push notifications are available through the We Heart Paperwork app on Android and iOS. You can continue using the full dashboard on this computer."
+          ? "Your company account is ready. Continue to secure checkout to start your trial."
           : "We’ll let you know before:"}
       </Text>
 
-        <IPhoneAppCard />
+        {isWeb ? (
+          <Text
+            style={{
+              fontSize: 14,
+              color: "#5F5D57",
+              textAlign: "center",
+              lineHeight: 21,
+              marginBottom: 24,
+            }}
+          >
+            After checkout, download the We Heart Paperwork app and sign in with this same email and password.
+          </Text>
+        ) : null}
 
         {!isWeb ? (
         <View style={{ gap: 10, marginBottom: 26 }}>
@@ -273,7 +284,7 @@ export default function NotificationsOnboarding() {
           {working
             ? "Finishing setup..."
             : isWeb
-              ? "Continue to dashboard"
+              ? "Continue to secure checkout"
               : "Yes, watch my paperwork"}
         </Text>
       </TouchableOpacity>

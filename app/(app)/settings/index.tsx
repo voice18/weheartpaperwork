@@ -1327,7 +1327,7 @@ const trialEndLabel = (() => {
         {Platform.OS === "web" && <SettingsRow label="Referral terms — creating a code accepts them" onPress={() => router.push("/referrals")} />}
         {Platform.OS === "web" && <SettingsRow label="Rewards and payout balances" value={rewardSummary} onPress={() => { void loadRewardSummary(); }} />}
         <Text style={{ padding: 16, color: "#555", fontSize: 13, lineHeight: 18 }}>
-          Share honestly: your message automatically says that you may receive a referral reward. Creating a code accepts the Referral Rewards terms. Rewards apply only to direct qualifying referrals.
+          Your shared message discloses that you may receive a referral reward. Creating a code accepts the Referral Rewards terms. Rewards apply only to direct qualifying referrals.
         </Text>
 
         <SettingsRow
