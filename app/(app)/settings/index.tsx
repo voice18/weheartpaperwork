@@ -830,9 +830,8 @@ const loadReferralCode =
     }
   };
   const handleShareReferralLink = async () => {
-  if (!referralCode) {
-    return;
-  }
+  const code = referralCode || await loadReferralCode();
+  if (!code) return;
 
   const referralBaseUrl =
     Platform.OS === "web" && typeof window !== "undefined"
@@ -841,7 +840,7 @@ const loadReferralCode =
         ? "https://weheartpaperwork-staging.web.app"
         : "https://weheartpaperwork.com";
   const referralLink =
-    `${referralBaseUrl}/login?mode=create&ref=${referralCode}`;
+    `${referralBaseUrl}/join?ref=${code}`;
 
   try {
     if (Platform.OS === "web") {
@@ -869,8 +868,10 @@ const loadReferralCode =
 
     await Share.share({
       message:
-        `I use We Heart Paperwork to help keep trucking compliance organized. ` +
-        `Here is my referral link: ${referralLink}`,
+        `I use We Heart Paperwork to help manage my company's trucking compliance. ` +
+        `If you operate a motor-carrier company, you can learn more and create your company account here: ${referralLink} ` +
+        `I may receive a referral reward if your company signs up through my link.`,
+      ...(Platform.OS === "ios" ? { url: referralLink } : {}),
     });
   } catch (error) {
     console.error(
@@ -1301,8 +1302,7 @@ const trialEndLabel = (() => {
       )}
       </View>
 
-      {Platform.OS === "web" && (
-        <>
+      <>
         <Text style={styles.sectionLabel}>
           Referral Rewards
         </Text>
@@ -1324,10 +1324,10 @@ const trialEndLabel = (() => {
           }
         />
 
-        <SettingsRow label="Referral terms — creating a code accepts them" onPress={() => router.push("/referrals")} />
-        <SettingsRow label="Rewards and payout balances" value={rewardSummary} onPress={() => { void loadRewardSummary(); }} />
+        {Platform.OS === "web" && <SettingsRow label="Referral terms — creating a code accepts them" onPress={() => router.push("/referrals")} />}
+        {Platform.OS === "web" && <SettingsRow label="Rewards and payout balances" value={rewardSummary} onPress={() => { void loadRewardSummary(); }} />}
         <Text style={{ padding: 16, color: "#555", fontSize: 13, lineHeight: 18 }}>
-          Sharing your link online? Include a simple note such as: “I may receive a referral reward if you sign up through this link.” Rewards apply to direct qualifying payments and become available after a 30-day hold. A $25 minimum applies to payouts.
+          Share honestly: your message automatically says that you may receive a referral reward. Creating a code accepts the Referral Rewards terms. Rewards apply only to direct qualifying referrals.
         </Text>
 
         <SettingsRow
@@ -1338,25 +1338,22 @@ const trialEndLabel = (() => {
               : referralCode
                 ? Platform.OS === "web"
                   ? "Copy link"
-                  : "Share"
-                : "Create link"
+                  : "Open share options"
+                : Platform.OS === "web"
+                  ? "Create link"
+                  : "Create code and share"
           }
           showDivider={false}
           onPress={
             loadingReferralCode
               ? undefined
-              : referralCode
-                ? () => {
-                    void handleShareReferralLink();
-                  }
-                : () => {
-                    void loadReferralCode();
-                  }
+              : () => {
+                  void handleShareReferralLink();
+                }
           }
         />
       </View>
         </>
-      )}
         <Text style={styles.sectionLabel}>
           Support
         </Text>

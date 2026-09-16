@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { router, useLocalSearchParams } from "expo-router";
+import Constants from "expo-constants";
 
 import { auth } from "../../lib/firebase";
 import AppStoreLink from "../../components/public/AppStoreLink";
@@ -164,7 +165,7 @@ export default function Login() {
             App access requires an active trial or subscription on your website account. Downloading the app does not create an account or activate access. If your company already has an account, use that account to sign in.
           </Text>
         )}
-        <Text style={styles.version}>v0.1.0 Beta</Text>
+        <Text style={styles.version}>v{Constants.expoConfig?.version ?? "1.0.1"}</Text>
         <AppStoreLink />
       </View>
     </ScrollView>

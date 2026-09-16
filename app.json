@@ -2,7 +2,7 @@
   "expo": {
     "name": "We Heart Paperwork",
     "slug": "weheartpaperwork",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "weheartpaperwork",
     "icon": "./assets/icon.png",
     "web": {
