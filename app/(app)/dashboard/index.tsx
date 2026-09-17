@@ -7,7 +7,7 @@
 
 import {
   View, Text, TouchableOpacity,
-StyleSheet, Platform, ActivityIndicator, Button,
+StyleSheet, Platform, ActivityIndicator, Button, AppState,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +44,22 @@ import { auth, db } from "../../../lib/firebase";
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
+  const [, setCalendarDay] = useState(() => new Date().toDateString());
+
+  useEffect(() => {
+    const refreshCalendarDay = () => {
+      setCalendarDay(new Date().toDateString());
+    };
+    const interval = setInterval(refreshCalendarDay, 60_000);
+    const subscription = AppState.addEventListener("change", state => {
+      if (state === "active") refreshCalendarDay();
+    });
+
+    return () => {
+      clearInterval(interval);
+      subscription.remove();
+    };
+  }, []);
 
   const params = useLocalSearchParams<{
   alertType?: string;

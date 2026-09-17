@@ -7,6 +7,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "staging"
       }
@@ -14,6 +15,7 @@
     "preview": {
       "developmentClient": false,
       "distribution": "internal",
+      "channel": "preview",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "staging"
       },
@@ -24,6 +26,7 @@
     "closed-test": {
       "distribution": "store",
       "autoIncrement": true,
+      "channel": "closed-test",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "staging"
       },
@@ -33,6 +36,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "production"
       }

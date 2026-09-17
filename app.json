@@ -3,6 +3,12 @@
     "name": "We Heart Paperwork",
     "slug": "weheartpaperwork",
     "version": "1.0.1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a80da581-6fc9-4032-bdb8-150154d3c72e"
+    },
     "scheme": "weheartpaperwork",
     "icon": "./assets/icon.png",
     "web": {
