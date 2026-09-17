@@ -5,7 +5,7 @@ export default function IPhoneAppCard() {
   if (Platform.OS !== "web") return null;
   return <View style={styles.card}>
     <View style={styles.copy}>
-      <Text style={styles.title}>Your iPhone companion app</Text>
+      <Text style={styles.title}>Your mobile companion app</Text>
       <Text style={styles.body}>Already set up on the website? Download the app and sign in with the same email and password to access your records and set up deadline reminders. You do not need a second account.</Text>
     </View>
     <AppStoreLink prominent existingAccount />
