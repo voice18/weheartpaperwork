@@ -177,12 +177,16 @@ useEffect(() => {
         error
       );
 
-      Alert.alert(
-        "Unable to delete account",
+      const message =
         typeof error?.details === "string"
           ? error.details
-          : "Your account could not be deleted. Please try again."
-      );
+          : "Your account could not be deleted. Please try again.";
+
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        window.alert(`Unable to delete account\n\n${message}`);
+      } else {
+        Alert.alert("Unable to delete account", message);
+      }
     } finally {
       setDeletingAccount(false);
     }
@@ -190,6 +194,28 @@ useEffect(() => {
 
   const handleDeleteAccount = () => {
     if (deletingAccount) {
+      return;
+    }
+
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      const firstConfirmed = window.confirm(
+        "Delete account?\n\n" +
+        "This permanently deletes your company account, drivers, compliance records, and history. " +
+        "Your subscription will also be canceled. This cannot be undone."
+      );
+
+      if (!firstConfirmed) {
+        return;
+      }
+
+      const finalConfirmed = window.confirm(
+        "Delete permanently?\n\n" +
+        "This is your final confirmation. Your account and company data cannot be recovered after deletion."
+      );
+
+      if (finalConfirmed) {
+        void performDeleteAccount();
+      }
       return;
     }
 
