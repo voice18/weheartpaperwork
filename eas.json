@@ -55,6 +55,11 @@
         "releaseStatus": "completed"
       }
     },
-    "production": {}
+    "production": {
+      "android": {
+        "track": "production",
+        "releaseStatus": "completed"
+      }
+    }
   }
 }
