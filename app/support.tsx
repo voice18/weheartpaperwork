@@ -10,6 +10,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE_DISPLAY,
+  SUPPORT_PHONE_E164,
+} from "../lib/contact";
 
 export default function SupportPage() {
   return (
@@ -36,11 +41,14 @@ export default function SupportPage() {
 
         <Text style={styles.paragraph}>
           For account access, subscription questions,
-          technical issues, or feedback, contact us at
-          aaron@weheartpaperwork.com.
+          technical issues, or feedback, call us at {SUPPORT_PHONE_DISPLAY}
+          {" or email us at "}{SUPPORT_EMAIL}.
         </Text>
 
-        <Link href={"mailto:aaron@weheartpaperwork.com?subject=We%20Heart%20Paperwork%20Support" as any} asChild><Pressable accessibilityRole="link" style={styles.button}><Text style={styles.buttonText}>Email support</Text></Pressable></Link>
+        <View style={styles.supportActions}>
+          <Link href={`tel:${SUPPORT_PHONE_E164}` as any} asChild><Pressable accessibilityRole="link" style={styles.button}><Text style={styles.buttonText}>Call support</Text></Pressable></Link>
+          <Link href={`mailto:${SUPPORT_EMAIL}?subject=We%20Heart%20Paperwork%20Support` as any} asChild><Pressable accessibilityRole="link" style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Email support</Text></Pressable></Link>
+        </View>
 
         <Text style={styles.sectionTitle}>
           Include these details
@@ -67,7 +75,7 @@ export default function SupportPage() {
 
         <Text style={styles.paragraph}>
           To request account deletion, data access, or
-          correction, email aaron@weheartpaperwork.com with
+          correction, email {SUPPORT_EMAIL} with
           the subject “Account or Data Request.”
         </Text>
 
@@ -159,6 +167,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#27500A",
+  },
+
+  supportActions: {
+    marginTop: 26,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
   },
 
   buttonText: {

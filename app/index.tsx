@@ -4,6 +4,8 @@ import AppStoreLink from "../components/public/AppStoreLink";
 import AuditToolCard from "../components/public/AuditToolCard";
 import { Link } from "expo-router";
 import Head from "expo-router/head";
+import JsonLd from "../components/public/JsonLd";
+import { SUPPORT_EMAIL, SUPPORT_PHONE_E164 } from "../lib/contact";
 import {
   Pressable,
   ScrollView,
@@ -23,6 +25,14 @@ export default function WebLandingPage() {
         content="A simple DOT compliance tracker for carriers who handle their own paperwork. Track company, driver, truck, and trailer deadlines from $3 a month."
       />
     </Head>
+    <JsonLd data={{
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "We Heart Paperwork",
+      url: "https://weheartpaperwork.com/",
+      email: SUPPORT_EMAIL,
+      telephone: SUPPORT_PHONE_E164,
+    }} />
 
     <ScrollView
       style={styles.page}

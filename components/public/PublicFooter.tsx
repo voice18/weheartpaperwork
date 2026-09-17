@@ -7,6 +7,11 @@ import {
 } from "react-native";
 import StaticToolLink from "./StaticToolLink";
 import AppStoreLink from "./AppStoreLink";
+import {
+  SUPPORT_EMAIL,
+  SUPPORT_PHONE_DISPLAY,
+  SUPPORT_PHONE_E164,
+} from "../../lib/contact";
 
 import { usePublicCompact } from "../../hooks/usePublicCompact";
 
@@ -29,6 +34,18 @@ export default function PublicFooter() {
           <Text style={styles.footerDescription}>
             Built by a trucking company for trucking companies.
           </Text>
+          <View style={styles.contactLinks}>
+            <Link href={`tel:${SUPPORT_PHONE_E164}` as any} asChild>
+              <Pressable accessibilityRole="link">
+                <Text style={styles.contactLink}>{SUPPORT_PHONE_DISPLAY}</Text>
+              </Pressable>
+            </Link>
+            <Link href={`mailto:${SUPPORT_EMAIL}`} asChild>
+              <Pressable accessibilityRole="link">
+                <Text style={styles.contactLink}>{SUPPORT_EMAIL}</Text>
+              </Pressable>
+            </Link>
+          </View>
           <AppStoreLink />
         </View>
 
@@ -173,6 +190,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: "#706E68",
     fontSize: 13,
+  },
+
+  contactLinks: {
+    marginTop: 12,
+    marginBottom: 12,
+    alignItems: "flex-start",
+    gap: 6,
+  },
+
+  contactLink: {
+    color: "#27500A",
+    fontSize: 13,
+    fontWeight: "700",
   },
 
   footerLinks: {
