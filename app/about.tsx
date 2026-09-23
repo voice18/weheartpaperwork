@@ -3,6 +3,7 @@ import { Link } from "expo-router";
 import Head from "expo-router/head";
 import type { ReactNode } from "react";
 import PublicHeader from "../components/public/PublicHeader";
+import FounderVideo from "../components/public/FounderVideo";
 import {
   Pressable,
   ScrollView,
@@ -35,6 +36,8 @@ export default function AboutPage() {
           <Text style={styles.heroDescription}>Four years of vocational work out of Yakima, but rarely nearby. If you&apos;ve run vocational, you know what winter does to it—the cold, the breakdowns that only happen at 5 a.m. in January, the season drying up while the payments don&apos;t. I did enough of those winters to know I wasn&apos;t doing another one.</Text>
           <Text style={styles.heroDescription}>What I didn&apos;t want was to leave the industry. I just didn&apos;t want to keep doing it from the driver&apos;s seat.</Text>
         </View>
+
+        <FounderVideo />
 
         <StorySection compact={compact} eyebrow="THE THING I BUILT WHILE I WAS STILL IN IT" title="Somewhere in those four years I stopped being able to keep the paperwork straight in my head.">
           <Text style={styles.bodyText}>You already know the job. You drive. You do the billing. You chase the next contract. You deal with the truck when it breaks, always at the worst time. And somewhere in there you&apos;re supposed to track a dozen federal deadlines that nobody reminds you about and that carry real consequences when you miss them.</Text>

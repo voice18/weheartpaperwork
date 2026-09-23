@@ -2,6 +2,7 @@ import PublicHeader from "../components/public/PublicHeader";
 import PublicFooter from "../components/public/PublicFooter";
 import AppStoreLink from "../components/public/AppStoreLink";
 import AuditToolCard from "../components/public/AuditToolCard";
+import FounderVideo from "../components/public/FounderVideo";
 import { Link } from "expo-router";
 import Head from "expo-router/head";
 import JsonLd from "../components/public/JsonLd";
@@ -136,6 +137,8 @@ export default function WebLandingPage() {
           <Link href={"/reviews" as any} asChild><Pressable style={styles.reviewsButton}><Text style={styles.reviewsButtonText}>Read customer reviews</Text></Pressable></Link>
         </View>
       </View>
+
+      <FounderVideo />
 
       <View style={styles.referralSection}>
         <View style={styles.referralInner}>
