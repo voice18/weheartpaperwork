@@ -1,9 +1,13 @@
 import { Link } from "expo-router";
+import { type ComponentType } from "react";
 import {
+  Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type PressableProps,
 } from "react-native";
 import StaticToolLink from "./StaticToolLink";
 import AppStoreLink from "./AppStoreLink";
@@ -14,6 +18,44 @@ import {
 } from "../../lib/contact";
 
 import { usePublicCompact } from "../../hooks/usePublicCompact";
+
+const WebLink = Pressable as ComponentType<PressableProps & {
+  href: string;
+  hrefAttrs: { target: string; rel: string };
+}>;
+
+const socialLinks = [
+  {
+    label: "LinkedIn",
+    accessibilityLabel: "Visit founder Aaron Attig on LinkedIn",
+    href: "https://www.linkedin.com/in/aaron-attig-37b68643/",
+    icon: require("../../public/social/LinkedIn-48x48.png"),
+  },
+  {
+    label: "Facebook",
+    accessibilityLabel: "Visit We Heart Paperwork on Facebook",
+    href: "https://www.facebook.com/profile.php?id=61594699970425",
+    icon: require("../../public/social/Facebook-48x48.png"),
+  },
+  {
+    label: "Instagram",
+    accessibilityLabel: "Visit We Heart Paperwork on Instagram",
+    href: "https://www.instagram.com/weheartpaperwork/",
+    icon: require("../../public/social/Instagram-48x48.png"),
+  },
+  {
+    label: "TikTok",
+    accessibilityLabel: "Visit Aaron Daniel Attig on TikTok",
+    href: "https://www.tiktok.com/@aarondanielatt?lang=en",
+    icon: require("../../public/social/TikTok-48x48.png"),
+  },
+  {
+    label: "YouTube",
+    accessibilityLabel: "Visit We Heart Paperwork on YouTube",
+    href: "https://www.youtube.com/@Weheartpaperwork",
+    icon: require("../../public/social/YouTube-48x48.png"),
+  },
+];
 
 export default function PublicFooter() {
   const compact = usePublicCompact();
@@ -47,6 +89,24 @@ export default function PublicFooter() {
             </Link>
           </View>
           <AppStoreLink />
+          <View style={styles.socialSection}>
+            <Text style={styles.socialHeading}>Follow along</Text>
+            <View style={styles.socialLinks}>
+              {socialLinks.map((social) => (
+                Platform.OS === "web" ? (
+                  <WebLink key={social.label} href={social.href} hrefAttrs={{ target: "_blank", rel: "noopener noreferrer" }} accessibilityRole="link" accessibilityLabel={social.accessibilityLabel} style={styles.socialLink}>
+                    <Image source={social.icon} style={styles.socialIcon} />
+                  </WebLink>
+                ) : (
+                  <Link key={social.label} href={social.href as any} asChild>
+                    <Pressable accessibilityRole="link" accessibilityLabel={social.accessibilityLabel} style={styles.socialLink}>
+                      <Image source={social.icon} style={styles.socialIcon} />
+                    </Pressable>
+                  </Link>
+                )
+              ))}
+            </View>
+          </View>
         </View>
 
         <View
@@ -203,6 +263,35 @@ const styles = StyleSheet.create({
     color: "#27500A",
     fontSize: 13,
     fontWeight: "700",
+  },
+
+  socialSection: {
+    marginTop: 20,
+  },
+
+  socialHeading: {
+    color: "#706E68",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  socialLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 8,
+  },
+
+  socialLink: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  socialIcon: {
+    width: 36,
+    height: 36,
   },
 
   footerLinks: {
