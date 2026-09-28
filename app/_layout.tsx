@@ -67,6 +67,7 @@ const webPublicRoutes = [
   "/tools",
   "/reviews",
   "/review",
+  "/demo",
   "/join",
 ];
 

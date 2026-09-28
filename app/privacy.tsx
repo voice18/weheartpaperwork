@@ -28,7 +28,7 @@ export default function PrivacyPage() {
 
       <View style={styles.article}>
         <Text style={styles.eyebrow}>
-          LAST UPDATED AUGUST 4, 2026
+          LAST UPDATED SEPTEMBER 28, 2026
         </Text>
 
         <Text style={styles.title}>Privacy Policy</Text>
@@ -48,6 +48,11 @@ export default function PrivacyPage() {
         <Section
           title="How we use information"
           text="We use information to provide and maintain the service, authenticate users, track deadlines, send requested notifications, process and verify subscription status, provide customer support, improve the product, and protect the service from misuse."
+        />
+
+        <Section
+          title="Demo requests"
+          text="If you request a demo, we collect the name, email address, company address, and optional phone number you provide so we can respond and arrange it. A demo request does not create an account or start a subscription."
         />
 
         <Section

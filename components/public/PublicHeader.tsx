@@ -1,6 +1,7 @@
 import { Link, usePathname } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -42,9 +43,14 @@ export default function PublicHeader() {
           </Pressable>
         </Link>
 
-        {compact && <Pressable accessibilityRole="button" accessibilityLabel={menuOpen ? "Close navigation menu" : "Open navigation menu"} accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen(!menuOpen)} style={styles.signInButton}>
-          <Text style={styles.signInButtonText}>{menuOpen ? "Close" : "Menu"}</Text>
-        </Pressable>}
+        {compact && <View style={styles.compactActions}>
+          {Platform.OS === "web" && <Link href={"/demo" as any} asChild>
+            <Pressable style={styles.demoButton}><Text style={styles.demoButtonText}>Request a demo</Text></Pressable>
+          </Link>}
+          <Pressable accessibilityRole="button" accessibilityLabel={menuOpen ? "Close navigation menu" : "Open navigation menu"} accessibilityState={{ expanded: menuOpen }} onPress={() => setMenuOpen(!menuOpen)} style={styles.signInButton}>
+            <Text style={styles.signInButtonText}>{menuOpen ? "Close" : "Menu"}</Text>
+          </Pressable>
+        </View>}
 
         <View
           style={[
@@ -81,6 +87,9 @@ export default function PublicHeader() {
 
           <View style={[styles.authActions, compact && styles.authActionsCompact]}>
             {compact && <AppStoreLink />}
+            {!compact && Platform.OS === "web" && <Link href={"/demo" as any} asChild>
+              <Pressable style={styles.demoButton}><Text style={styles.demoButtonText}>Request a demo</Text></Pressable>
+            </Link>}
             <Link href="/(auth)/login" asChild>
               <Pressable style={styles.signInButton}>
                 <Text style={styles.signInButtonText}>Sign in</Text>
@@ -173,6 +182,7 @@ const styles = StyleSheet.create({
   },
 
   hidden: { display: "none" },
+  compactActions: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
 
   headerLink: {
     color: "#706E68",
@@ -192,6 +202,8 @@ const styles = StyleSheet.create({
   },
 
   authActionsCompact: { flexDirection: "column", alignItems: "flex-start" },
+  demoButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#E9F2E1", borderWidth: 1, borderColor: "#B8CFA7" },
+  demoButtonText: { color: "#27500A", fontSize: 14, fontWeight: "800" },
 
   signInButton: {
     minHeight: 40,

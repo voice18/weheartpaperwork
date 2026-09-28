@@ -115,6 +115,9 @@ export default function PublicFooter() {
             compact && styles.footerLinksCompact,
           ]}
         >
+          {Platform.OS === "web" && <Link href={"/demo" as any} asChild>
+            <Pressable><Text style={styles.footerLink}>Request a demo</Text></Pressable>
+          </Link>}
           <Link href="/features" asChild>
             <Pressable>
               <Text style={styles.footerLink}>Features</Text>

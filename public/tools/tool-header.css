@@ -70,6 +70,18 @@
 
 .whp-site-links a[aria-current="page"] { font-weight: 800; }
 
+.whp-site-links .whp-demo {
+  min-height: 40px;
+  padding: 11px 14px;
+  border: 1px solid #b8cfa7;
+  border-radius: 10px;
+  background: #e9f2e1;
+  color: #27500a !important;
+  font-weight: 800;
+}
+
+.whp-site-links .whp-demo:hover { background: #dcebd1; }
+
 .whp-site-links .whp-create-account {
   min-height: 40px;
   padding: 11px 16px;

@@ -230,6 +230,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Public demo requests and abuse-control records are accepted only through
+    // the server function; visitors cannot read or write them directly.
+    match /demoRequests/{documentId} {
+      allow read, write: if false;
+    }
+    match /demoRequestRateLimits/{documentId} {
+      allow read, write: if false;
+    }
+    match /demoRequestEmailCooldowns/{documentId} {
+      allow read, write: if false;
+    }
+
     // Only a server-side moderation action can publish these sanitized documents.
     match /publicCustomerReviews/{documentId} {
       allow read: if true;

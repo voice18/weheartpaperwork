@@ -2998,4 +2998,5 @@ export {
 export { referralAdminReport, prepareReferralPayout, transitionReferralPayout, reviewReferralReward, correctReferralAttribution, reconcileReferralInvoice } from "./referralAdmin";
 export { submitCustomerReview, withdrawCustomerReview, listCustomerReviewsForModeration, moderateCustomerReview,
   submitCustomerFeedback, updateCustomerFeedbackStatus } from "./customerReviews";
+export { submitDemoRequest } from "./demoRequests";
 
