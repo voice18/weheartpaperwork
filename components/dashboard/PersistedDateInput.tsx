@@ -16,6 +16,7 @@ type Props = {
   onSave: (isoDate: string) => void | Promise<void>;
   accessibilityLabel: string;
   width?: number;
+  allowClear?: boolean;
 };
 
 export default function PersistedDateInput({
@@ -23,6 +24,7 @@ export default function PersistedDateInput({
   onSave,
   accessibilityLabel,
   width = 160,
+  allowClear = true,
 }: Props) {
   const initialDraft = isoToInput(value);
 
@@ -60,7 +62,7 @@ export default function PersistedDateInput({
   const canSave =
     hasChanges &&
     !saving &&
-    (draft === "" || Boolean(draftIso));
+    ((allowClear && draft === "") || Boolean(draftIso));
 
   const handleChangeText = (text: string) => {
     const formatted = formatDateInput(text);

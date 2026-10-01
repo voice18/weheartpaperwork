@@ -21,8 +21,10 @@ import {
 
 import { auth, db } from "../../lib/firebase";
 import PersistedDateInput from "./PersistedDateInput";
+import RequirementCardHeader from "./RequirementCardHeader";
 import DriverRenewalField from "./DriverRenewalField";
-import { daysFrom } from "../../lib/requirements";
+import { isoToInput } from "../../lib/dateUtils";
+import { deadlineStatus } from "./deadlineStatus";
 
 type Driver = {
   id: string;
@@ -116,7 +118,6 @@ function DriverEntryField({
     </View>
   );
 }
-
 export default function DriversPanel() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [newDriverName, setNewDriverName] = useState("");
@@ -609,6 +610,10 @@ export default function DriversPanel() {
                   Driver Compliance
                 </Text>
 
+                <Text style={{ color: "#706E68", fontSize: 12, lineHeight: 18, marginBottom: 14 }}>
+                  Check what is due, then open a requirement only when you need to update its date or review its record.
+                </Text>
+
                 <Text
                   style={{
                     fontSize: 11,
@@ -619,7 +624,7 @@ export default function DriversPanel() {
                     marginBottom: 10,
                   }}
                 >
-                  Ongoing driver compliance
+                  Dates and renewals
                 </Text>
 
                 <DriverDateField
@@ -631,7 +636,8 @@ export default function DriversPanel() {
                 />
 
                 <DriverRenewalField
-                  label="Medical Card - expiration date"
+                  label="Medical qualification expiration"
+                  helpText="Enter the current medical qualification expiration shown in the driver's record. Save the new expiration only after a new examination."
                   value={driver.medicalExpiration}
                   driverId={driver.id}
                   requirementId="medical"
@@ -654,7 +660,8 @@ export default function DriversPanel() {
                 />
 
                 <DriverRenewalField
-                  label="Annual MVR - date of last review"
+                  label="Annual MVR review"
+                  helpText="Enter the date you reviewed a newly obtained MVR. Keep both the MVR and your review note in the driver's qualification file."
                   value={driver.mvrDue}
                   driverId={driver.id}
                   requirementId="mvr"
@@ -677,7 +684,8 @@ export default function DriversPanel() {
                 />
 
                 <DriverRenewalField
-                  label="Clearinghouse - date of last annual query"
+                  label="Annual Clearinghouse query"
+                  helpText="Enter the date the query was completed in the Clearinghouse, after obtaining the required driver consent."
                   value={driver.clearinghouseDue}
                   driverId={driver.id}
                   requirementId="clearinghouse"
@@ -745,7 +753,7 @@ export default function DriversPanel() {
                           color: "#706E68",
                         }}
                       >
-                        {getDqConfirmedCount(driver)} of 8 DQ checks resolved
+                        {getDqConfirmedCount(driver)} of 8 checklist items marked
                       </Text>
                     </View>
 
@@ -771,6 +779,9 @@ export default function DriversPanel() {
                         borderTopColor: "#E8E6E0",
                       }}
                     >
+                      <Text style={{ marginTop: 10, color: "#706E68", fontSize: 11, lineHeight: 17 }}>
+                        Confirm what you keep in your own driver file. These checks do not upload or replace the underlying documents.
+                      </Text>
                       <Text
                         style={{
                           marginTop: 10,
@@ -1282,62 +1293,32 @@ function DriverDateField({
 }: {
   label: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string) => Promise<void> | void;
 }) {
-  const status = dateStatus(value);
+  const status = deadlineStatus(value);
+  const [editing, setEditing] = useState(!value);
 
   return (
-    <View style={{ marginBottom: 12 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          marginBottom: 4,
-          width: "100%",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 12,
-            color: "#706E68",
-            flex: 1,
-            paddingRight: 8,
-          }}
-        >
-          {label}
-        </Text>
-
-        <View
-          style={{
-            backgroundColor: status.bg,
-            borderRadius: 14,
-            paddingHorizontal: 10,
-            paddingVertical: 4,
-            flexShrink: 0,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              color: status.color,
-              fontWeight: "600",
-            }}
-          >
-            {status.text}
-          </Text>
-        </View>
-      </View>
-
-      <PersistedDateInput
-        value={value}
-        onSave={onChange}
-        accessibilityLabel={`${label} date`}
+    <View style={{ marginBottom: 10, borderWidth: 1, borderColor: editing ? "#C9D9B8" : "#E2E0D8", borderRadius: 12, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
+      <RequirementCardHeader
+        title={label}
+        badge={status.text}
+        badgeColor={status.color}
+        badgeBackground={status.bg}
+        summary={value ? `Expires ${isoToInput(value)}` : "Add the expiration date shown on the license."}
+        expanded={editing}
+        onToggle={() => setEditing(current => !current)}
       />
-
-      <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
-        Format: MM-DD-YYYY
-      </Text>
+      {editing && <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: "#E8E6E0" }}>
+        <PersistedDateInput
+          value={value}
+          onSave={onChange}
+          accessibilityLabel={`${label} date`}
+        />
+        <Text style={{ fontSize: 11, color: "#8A8880", marginTop: 4 }}>
+          Format: MM-DD-YYYY · Tap Save after entering a date.
+        </Text>
+      </View>}
     </View>
   );
 }
@@ -1453,54 +1434,4 @@ function DriverStatusToggle({
       </View>
     </TouchableOpacity>
   );
-}
-
-function dateStatus(date: string) {
-  if (!date) {
-    return {
-      text: "Needs date",
-      color: "#A32D2D",
-      bg: "#FCEBEB",
-    };
-  }
-
-  const days = daysFrom(date);
-
-  if (days === null) {
-    return {
-      text: "Needs date",
-      color: "#A32D2D",
-      bg: "#FCEBEB",
-    };
-  }
-
-  if (days < 0) {
-    return {
-      text: `${Math.abs(days)} overdue`,
-      color: "#A32D2D",
-      bg: "#FCEBEB",
-    };
-  }
-
-  if (days <= 30) {
-    return {
-      text: `${days} days`,
-      color: "#854F0B",
-      bg: "#FAEEDA",
-    };
-  }
-
-  if (days <= 90) {
-    return {
-      text: `${days} days`,
-      color: "#185FA5",
-      bg: "#E6F1FB",
-    };
-  }
-
-  return {
-    text: `${days} days`,
-    color: "#3B6D11",
-    bg: "#EAF3DE",
-  };
 }

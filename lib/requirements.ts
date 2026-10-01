@@ -210,6 +210,7 @@ export interface Requirement {
   n: string;
   f: string;
   due: string | null;
+  enteredDate?: string | null;
   de: boolean | "usdot";
   dateMode: RequirementDateMode;
   dl?: string;
@@ -354,6 +355,7 @@ const isApplicable = (
                 )
               : null
           ),
+        enteredDate: r("fmcsa-portal").enteredDate,
         de: true,
         dateMode: "rolling",
         dl: "Last Portal login date",

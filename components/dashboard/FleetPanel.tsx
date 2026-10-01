@@ -23,9 +23,11 @@ import {
 import { httpsCallable } from "firebase/functions";
 
 import { auth, db, functions } from "../../lib/firebase";
-import { addYears, daysFrom, fmtDate, localDateString } from "../../lib/requirements";
+import { addYears, fmtDate, localDateString } from "../../lib/requirements";
 import { formatDateInput, inputToIso, isoToInput } from "../../lib/dateUtils";
 import PersistedDateInput from "./PersistedDateInput";
+import RequirementCardHeader from "./RequirementCardHeader";
+import { deadlineStatus } from "./deadlineStatus";
 
 type VehicleType = "truck" | "trailer";
 type VehicleStatus = "active" | "inactive";
@@ -183,15 +185,11 @@ export default function FleetPanel() {
   const renewDeadline = async (
     vehicle: FleetVehicle,
     field: "registrationExpiration" | "inspectionExpiration",
-    completionDate?: string,
-    confirmedNextDueDate?: string
+    completionDate: string,
+    confirmedNextDueDate: string
   ) => {
     const currentDate = vehicle[field];
-    const nextDate = field === "inspectionExpiration"
-      ? confirmedNextDueDate || ""
-      : currentDate
-        ? addYears(currentDate, 1)
-        : "";
+    const nextDate = confirmedNextDueDate;
     if (!currentDate || !nextDate) return;
 
     const user = auth.currentUser;
@@ -211,7 +209,7 @@ export default function FleetPanel() {
     }, { merge: true });
     transaction.set(historyRef, {
       requirementId: field,
-      completionDate: completionDate || null,
+      completionDate,
       previousDueDate: currentDate,
       nextDueDate: nextDate,
       completedAt: serverTimestamp(),
@@ -360,7 +358,7 @@ function VehicleSection(props: {
   openVehicleId: string | null;
   setOpenVehicleId: (id: string | null) => void;
   updateVehicle: (id: string, updates: Partial<FleetVehicle>) => Promise<void>;
-  renewDeadline: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", completionDate?: string, nextDueDate?: string) => Promise<void>;
+  renewDeadline: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", completionDate: string, nextDueDate: string) => Promise<void>;
   archiveVehicle: (vehicle: FleetVehicle) => void;
 }) {
   return (
@@ -383,7 +381,7 @@ function VehicleCard(props: {
   open: boolean;
   onToggle: () => void;
   updateVehicle: (id: string, updates: Partial<FleetVehicle>) => Promise<void>;
-  renewDeadline: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", completionDate?: string, nextDueDate?: string) => Promise<void>;
+  renewDeadline: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", completionDate: string, nextDueDate: string) => Promise<void>;
   archiveVehicle: (vehicle: FleetVehicle) => void;
 }) {
   const { vehicle } = props;
@@ -504,7 +502,7 @@ function VehicleCard(props: {
             </View>
           ) : null}
           {!(vehicle.type === "trailer" && vehicle.registrationPermanent === true) ? (
-            <DeadlineEditor vehicleId={vehicle.id} field="registrationExpiration" label="Registration expiration" value={vehicle.registrationExpiration || ""} mode="anchored" onSave={registrationExpiration => props.updateVehicle(vehicle.id, { registrationExpiration })} onComplete={() => props.renewDeadline(vehicle, "registrationExpiration")} />
+            <DeadlineEditor vehicleId={vehicle.id} field="registrationExpiration" label="Registration expiration" value={vehicle.registrationExpiration || ""} mode="anchored" onSave={registrationExpiration => props.updateVehicle(vehicle.id, { registrationExpiration })} onComplete={(completionDate, nextDueDate) => props.renewDeadline(vehicle, "registrationExpiration", completionDate, nextDueDate)} />
           ) : (
             <View style={styles.permanentStatus}><Text style={styles.permanentStatusText}>Permanent — no expiration</Text></View>
           )}
@@ -523,23 +521,14 @@ function VehicleCard(props: {
 }
 
 function DeadlineSummary({ label, date, permanent = false }: { label: string; date: string; permanent?: boolean }) {
-  const days = daysFrom(date || null);
-  const status = !date || days === null
-    ? { text: "Needs date", color: "#A32D2D", bg: "#FCEBEB" }
-    : days < 0
-      ? { text: `${Math.abs(days)} overdue`, color: "#A32D2D", bg: "#FCEBEB" }
-      : days <= 30
-        ? { text: `${days} days`, color: "#854F0B", bg: "#FAEEDA" }
-        : days <= 90
-          ? { text: `${days} days`, color: "#185FA5", bg: "#E6F1FB" }
-          : { text: `${days} days`, color: "#3B6D11", bg: "#EAF3DE" };
+  const status = deadlineStatus(date);
 
   return (
     <View style={styles.summaryItem}>
       <Text style={styles.summaryLabel}>{label}</Text>
       <View style={[styles.summaryBadge, { backgroundColor: permanent ? "#EAF3DE" : status.bg }]}>
         <Text style={[styles.summaryBadgeText, { color: permanent ? "#27500A" : status.color }]}>
-          {permanent ? "Permanent" : days === 0 && date ? "Due today" : status.text}
+          {permanent ? "Permanent" : status.text}
         </Text>
       </View>
       {!permanent && date ? <Text style={styles.summaryDate}>{fmtDate(date)}</Text> : null}
@@ -554,26 +543,32 @@ function DeadlineEditor(props: {
   value: string;
   mode: "anchored" | "rolling";
   onSave: (date: string) => Promise<void>;
-  onComplete: (completionDate?: string, nextDueDate?: string) => Promise<void>;
+  onComplete: (completionDate: string, nextDueDate: string) => Promise<void>;
 }) {
   const today = localDateString();
+  const [detailsOpen, setDetailsOpen] = useState(!props.value);
   const [confirming, setConfirming] = useState(false);
+  const [savingCompletion, setSavingCompletion] = useState(false);
+  const [completionError, setCompletionError] = useState("");
   const [completionDate, setCompletionDate] = useState(isoToInput(today));
   const isoCompletionDate = inputToIso(completionDate);
   const [nextDueDate, setNextDueDate] = useState("");
   const isoNextDueDate = inputToIso(nextDueDate);
-  const nextDate = props.mode === "rolling"
-    ? isoNextDueDate
-    : props.value
-      ? addYears(props.value, 1)
-      : "";
+  const nextDate = isoNextDueDate;
+  const badge = deadlineStatus(props.value);
 
   return (
-    <View style={styles.deadlineEditor}>
-      <View style={styles.deadlineLabelRow}>
-        <Text style={styles.deadlineLabel}>{props.label}</Text>
-        <DeadlineBadge date={props.value} />
-      </View>
+    <View style={[styles.deadlineEditor, { borderWidth: 1, borderColor: detailsOpen ? "#C9D9B8" : "#E2E0D8", borderRadius: 12, overflow: "hidden" }]}>
+      <RequirementCardHeader
+        title={props.label}
+        badge={badge.text}
+        badgeColor={badge.color}
+        badgeBackground={badge.bg}
+        summary={props.value ? `Next due ${fmtDate(props.value)}` : "Add a date to start tracking this requirement."}
+        expanded={detailsOpen}
+        onToggle={() => setDetailsOpen(current => !current)}
+      />
+      {detailsOpen && <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: "#E8E6E0" }}>
       <PersistedDateInput value={props.value} onSave={props.onSave} accessibilityLabel={props.label} />
       <Text style={styles.formatHelp}>Format: MM-DD-YYYY</Text>
 
@@ -581,39 +576,39 @@ function DeadlineEditor(props: {
         <TouchableOpacity
           onPress={() => {
             setCompletionDate(isoToInput(today));
-            setNextDueDate(isoToInput(addYears(today, 1)));
+            setNextDueDate(isoToInput(props.mode === "rolling" ? addYears(today, 1) : addYears(props.value, 1)));
+            setCompletionError("");
             setConfirming(true);
           }}
           style={styles.renewButton}
         >
           <Text style={styles.renewButtonText}>
-            {props.mode === "rolling" ? "Mark Inspection Complete" : "Mark Renewed"}
+            Mark complete
           </Text>
         </TouchableOpacity>
       ) : null}
 
       {confirming ? (
         <View style={styles.confirmArea}>
-          {props.mode === "rolling" ? (
-            <>
-              <Text style={styles.fieldLabel}>Inspection completion date</Text>
+          <>
+              <Text style={styles.fieldLabel}>Completion date</Text>
               <TextInput
-                accessibilityLabel="Inspection completion date"
+                accessibilityLabel={`${props.label} completion date`}
                 placeholder="MM-DD-YYYY"
                 value={completionDate}
                 onChangeText={text => {
                   const formatted = formatDateInput(text);
                   setCompletionDate(formatted);
                   const iso = inputToIso(formatted);
-                  if (iso) setNextDueDate(isoToInput(addYears(iso, 1)));
+                  if (iso && props.mode === "rolling") setNextDueDate(isoToInput(addYears(iso, 1)));
                 }}
                 keyboardType="number-pad"
                 maxLength={10}
                 style={[styles.input, { width: 160 }]}
               />
-              <Text style={[styles.fieldLabel, { marginTop: 10 }]}>Next inspection expiration / due date</Text>
+              <Text style={[styles.fieldLabel, { marginTop: 10 }]}>{props.mode === "rolling" ? "Next inspection due date" : "New registration expiration date"}</Text>
               <TextInput
-                accessibilityLabel="Next inspection expiration or due date"
+                accessibilityLabel={props.mode === "rolling" ? "Next inspection due date" : "New registration expiration date"}
                 placeholder="MM-DD-YYYY"
                 value={nextDueDate}
                 onChangeText={text => setNextDueDate(formatDateInput(text))}
@@ -622,10 +617,9 @@ function DeadlineEditor(props: {
                 style={[styles.input, { width: 160 }]}
               />
               <Text style={styles.formatHelp}>
-                Confirm the actual next date shown by the inspection document or applicable program.
+                Confirm the next date shown by the {props.mode === "rolling" ? "inspection document" : "registration"} before saving.
               </Text>
-            </>
-          ) : null}
+          </>
 
           <Text style={styles.confirmText}>
             The next date will change from {fmtDate(props.value)} to {fmtDate(nextDate)}.
@@ -636,21 +630,27 @@ function DeadlineEditor(props: {
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              disabled={!nextDate || (props.mode === "rolling" && (!isoCompletionDate || !isoNextDueDate || isoNextDueDate <= isoCompletionDate))}
+              disabled={savingCompletion || !isoCompletionDate || !isoNextDueDate || isoNextDueDate <= isoCompletionDate}
               onPress={async () => {
-                await props.onComplete(
-                  props.mode === "rolling" ? isoCompletionDate : undefined,
-                  props.mode === "rolling" ? isoNextDueDate : undefined
-                );
-                setConfirming(false);
+                try {
+                  setSavingCompletion(true);
+                  setCompletionError("");
+                  await props.onComplete(isoCompletionDate, isoNextDueDate);
+                  setConfirming(false);
+                } catch (error) {
+                  setCompletionError(error instanceof Error ? error.message : "Could not save this completion. Try again.");
+                } finally {
+                  setSavingCompletion(false);
+                }
               }}
               style={styles.confirmButton}
             >
               <Text style={styles.confirmButtonText}>
-                {props.mode === "rolling" ? "Mark Inspection Complete" : "Mark Renewed"}
+                {savingCompletion ? "Saving..." : "Confirm completion"}
               </Text>
             </TouchableOpacity>
           </View>
+          {!!completionError && <Text style={{ marginTop: 8, fontSize: 12, color: "#A32D2D" }}>{completionError}</Text>}
         </View>
       ) : null}
 
@@ -658,6 +658,7 @@ function DeadlineEditor(props: {
         vehicleId={props.vehicleId}
         field={props.field}
       />
+      </View>}
     </View>
   );
 }
@@ -712,10 +713,6 @@ function VehicleDeadlineHistory({
       setRecords(loaded);
     });
   }, [field, vehicleId]);
-
-  if (records.length === 0) {
-    return null;
-  }
 
   const deleteRecord = (record: VehicleHistoryRecord) => {
     const performDelete = async () => {
@@ -782,12 +779,13 @@ function VehicleDeadlineHistory({
         style={styles.historyToggle}
       >
         <Text style={styles.historyToggleText}>
-          {open ? "Hide history" : `View history (${records.length})`}
+          {open ? "Hide history" : `History (${records.length})`}
         </Text>
       </TouchableOpacity>
 
       {open ? (
         <View style={styles.historyList}>
+          {records.length === 0 && <Text style={styles.historyTitle}>No completion records yet.</Text>}
           {records.map((record, index) => {
             const recordedDate =
               record.completionDate ||
@@ -828,25 +826,6 @@ function VehicleDeadlineHistory({
           })}
         </View>
       ) : null}
-    </View>
-  );
-}
-
-function DeadlineBadge({ date }: { date: string }) {
-  const days = daysFrom(date || null);
-  const status = !date || days === null
-    ? { text: "Needs date", color: "#A32D2D", bg: "#FCEBEB" }
-    : days < 0
-      ? { text: `${Math.abs(days)} overdue`, color: "#A32D2D", bg: "#FCEBEB" }
-      : days <= 30
-        ? { text: `${days} days`, color: "#854F0B", bg: "#FAEEDA" }
-        : days <= 90
-          ? { text: `${days} days`, color: "#185FA5", bg: "#E6F1FB" }
-          : { text: `${days} days`, color: "#3B6D11", bg: "#EAF3DE" };
-
-  return (
-    <View style={[styles.deadlineBadge, { backgroundColor: status.bg }]}>
-      <Text style={[styles.deadlineBadgeText, { color: status.color }]}>{status.text}</Text>
     </View>
   );
 }

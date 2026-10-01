@@ -13,26 +13,28 @@ import {
   isoToInput,
 } from "../../lib/dateUtils";
 import PersistedDateInput from "./PersistedDateInput";
+import RequirementCardHeader from "./RequirementCardHeader";
+import { deadlineStatus } from "./deadlineStatus";
 import { useComplianceHistory } from "../../store/useComplianceHistory";
 import {
   addDays,
   addYears,
-  daysFrom,
   localDateString,
 } from "../../lib/requirements";
 type Props = {
   dateRepresentsDueDate?: boolean;
   label: string;
+  helpText?: string;
   value: string;
   driverId: string;
   requirementId: "medical" | "mvr" | "clearinghouse";
   years?: number;
   days?: number;
-  onChange: (value: string) => void;
+  onChange: (value: string) => Promise<void> | void;
   onMarkComplete?: (
     completionDate: string,
     nextDueDate: string
-  ) => void;
+  ) => Promise<void> | void;
 };
 
 
@@ -51,50 +53,11 @@ function addInterval(dateStr: string, years = 0, days = 0) {
 }
 
 
-function getBadge(daysLeft: number | null) {
-  if (daysLeft === null) {
-    return {
-      text: "Needs date",
-      bg: "#FCEBEB",
-      color: "#A32D2D",
-    };
-  }
-
-  if (daysLeft < 0) {
-    return {
-      text: `${Math.abs(daysLeft)} overdue`,
-      bg: "#FCEBEB",
-      color: "#A32D2D",
-    };
-  }
-
-  if (daysLeft <= 30) {
-    return {
-      text: `${daysLeft} days`,
-      bg: "#FAEEDA",
-      color: "#854F0B",
-    };
-  }
-
-  if (daysLeft <= 90) {
-    return {
-      text: `${daysLeft} days`,
-      bg: "#E6F1FB",
-      color: "#185FA5",
-    };
-  }
-
-  return {
-    text: `${daysLeft} days`,
-    bg: "#EAF3DE",
-    color: "#3B6D11",
-  };
-}
-
    
 
 export default function DriverRenewalField({
   label,
+  helpText,
   value,
   driverId,
   requirementId,
@@ -110,10 +73,12 @@ export default function DriverRenewalField({
     ? value
     : addInterval(value, years, days)
   : "";
-  const daysLeft = nextDue ? daysFrom(nextDue) : null;
-  const badge = getBadge(daysLeft);
+  const badge = deadlineStatus(nextDue);
   const today = localDateString();
   const [confirming, setConfirming] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(!value);
+  const [savingCompletion, setSavingCompletion] = useState(false);
+  const [completionError, setCompletionError] = useState("");
 
 const [completionDate, setCompletionDate] = useState(
   isoToInput(today)
@@ -202,47 +167,24 @@ const {
 }
 
   return (
-          <View style={{ marginBottom: 14 }}>
-            <View
-            style={{
-              flexDirection: "row",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              marginBottom: 4,
-              width: "100%",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#706E68",
-                flex: 1,
-                paddingRight: 8,
-              }}
-            >
-              {label}
-            </Text>
+          <View style={{ marginBottom: 10, borderWidth: 1, borderColor: detailsOpen ? "#C9D9B8" : "#E2E0D8", borderRadius: 12, backgroundColor: "#FFFFFF", overflow: "hidden" }}>
+          <RequirementCardHeader
+            title={label}
+            badge={badge.text}
+            badgeColor={badge.color}
+            badgeBackground={badge.bg}
+            summary={nextDue
+              ? dateRepresentsDueDate
+                ? `Expires ${isoToInput(nextDue)}`
+                : `${requirementId === "mvr" ? "Last reviewed" : "Last queried"} ${isoToInput(value)} · Next due ${isoToInput(nextDue)}`
+              : "Add a date to start tracking this requirement."}
+            expanded={detailsOpen}
+            onToggle={() => setDetailsOpen(current => !current)}
+          />
 
-            <View
-              style={{
-                backgroundColor: badge.bg,
-                borderRadius: 14,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                flexShrink: 0,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: "600",
-                  color: badge.color,
-                }}
-              >
-                {badge.text}
-              </Text>
-            </View>
-          </View>
+          {detailsOpen && <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, borderTopWidth: 1, borderTopColor: "#E8E6E0" }}>
+
+          {helpText && <Text style={{ fontSize: 12, lineHeight: 18, color: "#706E68", marginBottom: 10 }}>{helpText}</Text>}
 
           <PersistedDateInput
             value={value}
@@ -265,6 +207,7 @@ const {
       isoToInput(today)
     );
   setReplacementDueDate("");
+  setCompletionError("");
   setConfirming(true);
     }}
     style={{
@@ -345,8 +288,9 @@ const {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => {
-          if (!completionDate || !onMarkComplete) {
+        disabled={savingCompletion}
+        onPress={async () => {
+          if (savingCompletion || !onMarkComplete) {
             return;
           }
 
@@ -354,6 +298,7 @@ const {
             inputToIso(completionDate);
 
           if (!isoCompletionDate) {
+            setCompletionError("Enter a valid completion date.");
             return;
           }
 
@@ -367,15 +312,22 @@ const {
                 );
 
           if (!confirmedNextDue) {
+            setCompletionError(dateRepresentsDueDate
+              ? "Enter the new medical expiration date."
+              : "Could not calculate the next due date.");
             return;
           }
 
-          onMarkComplete(
-          isoCompletionDate,
-          confirmedNextDue
-        );
-
-        setConfirming(false);
+          try {
+            setSavingCompletion(true);
+            setCompletionError("");
+            await onMarkComplete(isoCompletionDate, confirmedNextDue);
+            setConfirming(false);
+          } catch (error) {
+            setCompletionError(error instanceof Error ? error.message : "Could not save this completion. Please try again.");
+          } finally {
+            setSavingCompletion(false);
+          }
         }}
         style={{
           paddingHorizontal: 12,
@@ -387,10 +339,11 @@ const {
         }}
       >
         <Text style={{ fontSize: 11, color: "#27500A", fontWeight: "600" }}>
-          Confirm
+          {savingCompletion ? "Saving..." : "Confirm completion"}
         </Text>
       </TouchableOpacity>
     </View>
+    {!!completionError && <Text style={{ marginTop: 8, color: "#A32D2D", fontSize: 12 }}>{completionError}</Text>}
   </View>
 ) : null}
 <TouchableOpacity
@@ -418,13 +371,7 @@ const {
       color: "#27500A",
     }}
   >
-    {historyOpen
-      ? "Hide compliance record"
-      : `Compliance record${
-          historyRecords.length > 0
-            ? ` (${historyRecords.length})`
-            : ""
-        }`}
+    {historyOpen ? "Hide history" : `History (${historyRecords.length})`}
   </Text>
 </TouchableOpacity>
 
@@ -447,7 +394,7 @@ const {
         marginBottom: 10,
       }}
     >
-      Compliance record
+      Completion history
     </Text>
 
     {historyLoading && (
@@ -633,8 +580,9 @@ const {
       )}
   </View>
 )}
+    </View>}
     </View>
-    
+
   );
   
 }

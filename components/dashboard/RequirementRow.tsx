@@ -18,13 +18,15 @@ import {
   fmtDate,
   iftaQuarterEndFromDueDate,
   localDateString,
-  urgency,
 } from "../../lib/requirements";
 import {
   formatDateInput,
   inputToIso,
   isoToInput,
 } from "../../lib/dateUtils";
+import RequirementCardHeader from "./RequirementCardHeader";
+import PersistedDateInput from "./PersistedDateInput";
+import { deadlineStatus } from "./deadlineStatus";
 
 type RequirementRowProps = {
   r: any;
@@ -32,11 +34,11 @@ type RequirementRowProps = {
     requirementId: string,
     enteredDate: string,
     dueDate: string
-  ) => void;
+  ) => Promise<void> | void;
   onComplete: (
     requirementId: string,
     completionDate: string
-  ) => void;
+  ) => Promise<void> | void;
   onUndo: (
     requirementId: string
   ) => void;
@@ -58,7 +60,7 @@ export default function RequirementRow({
   onSetApplicable,
 }: RequirementRowProps) {
   const [open, setOpen] =
-    useState(false);
+    useState(!r.due && r.dateMode !== "none");
 const [
   historyOpen,
   setHistoryOpen,
@@ -115,6 +117,8 @@ const canUndoFixedCalendarCompletion =
     confirmingComplete,
     setConfirmingComplete,
   ] = useState(false);
+  const [savingCompletion, setSavingCompletion] = useState(false);
+  const [completionError, setCompletionError] = useState("");
 
   const [
   completionDate,
@@ -124,14 +128,6 @@ const canUndoFixedCalendarCompletion =
 );
 
   const [
-  enteredDate,
-  setEnteredDate,
-] = useState(
-  isoToInput(r.enteredDate || "")
-);
-  const [dateError, setDateError] = useState<string | null>(null);
-
-  const [
     usdotInput,
     setUsdotInput,
   ] = useState("");
@@ -139,25 +135,7 @@ const canUndoFixedCalendarCompletion =
   const isApplicable =
     r.applicable !== false;
 
-  const urg = urgency(r);
-
-  const badgeColor =
-    urg === "od"
-      ? "#A32D2D"
-      : urg === "sn"
-        ? "#854F0B"
-        : urg === "up"
-          ? "#185FA5"
-          : "#3B6D11";
-
-  const badgeBg =
-    urg === "od"
-      ? "#FCEBEB"
-      : urg === "sn"
-        ? "#FAEEDA"
-        : urg === "up"
-          ? "#E6F1FB"
-          : "#EAF3DE";
+  const deadlineBadge = deadlineStatus(r.due);
 
   const rawDays =
     daysFrom(r.due);
@@ -169,13 +147,6 @@ const canUndoFixedCalendarCompletion =
       : null);
   const periodDays = daysFrom(filingPeriodEnd);
 
-  const days =
-    rawDays === null
-      ? null
-      : rawDays < 0
-        ? Math.abs(rawDays)
-        : rawDays;
-
   const isReadyToFile =
     (r.periodBased === true && rawDays !== null && rawDays < 0) ||
     (filingPeriodEnd &&
@@ -185,19 +156,13 @@ const canUndoFixedCalendarCompletion =
       rawDays > 0);
 
   const badgeText =
-    filingPeriodEnd && periodDays === 0
+    r.completed
+      ? "Complete"
+      : filingPeriodEnd && periodDays === 0
       ? "Quarter ends today"
       : isReadyToFile
       ? "Ready to file"
-      : urg === "done"
-      ? "✓ Done"
-      : !r.due || days === null
-        ? "Needs Date"
-        : rawDays === 0
-          ? "Due Today"
-          : urg === "od"
-            ? `${days} overdue`
-            : `${days} days`;
+      : deadlineBadge.text;
 
   const isBoc3Unfiled =
     r.id === "boc3" &&
@@ -206,20 +171,24 @@ const canUndoFixedCalendarCompletion =
   const finalBadgeColor =
     !isApplicable
       ? "#706E68"
+      : r.completed
+        ? "#3B6D11"
       : isReadyToFile
         ? "#27500A"
       : isBoc3Unfiled
         ? "#A32D2D"
-        : badgeColor;
+        : deadlineBadge.color;
 
   const finalBadgeBg =
     !isApplicable
       ? "#E8E8E5"
+      : r.completed
+        ? "#EAF3DE"
       : isReadyToFile
         ? "#EAF3DE"
       : isBoc3Unfiled
         ? "#FCEBEB"
-        : badgeBg;
+        : deadlineBadge.bg;
 
   const finalBadgeText =
     !isApplicable
@@ -263,25 +232,16 @@ const canUndoFixedCalendarCompletion =
   );
 }
 
-  function handleSaveDate() {
-  const isoDate = inputToIso(enteredDate);
-
-  if (!isoDate) {
-    setDateError("Enter a real date in MM-DD-YYYY format.");
-    return;
-  }
-
+  async function handleSaveDate(isoDate: string) {
   const nextDue = r.isCustom
     ? isoDate
     : calculateNextDue(r.id, isoDate);
 
   if (!nextDue) {
-    setDateError("Enter a real date in MM-DD-YYYY format.");
-    return;
+    throw new Error("Enter a valid date.");
   }
 
-  setDateError(null);
-  onSave(
+  await onSave(
     r.id,
     isoDate,
     nextDue
@@ -399,7 +359,7 @@ async function handleUndoFixedCalendarCompletion() {
   );
 }
 
-  function handleConfirmCompletion() {
+  async function handleConfirmCompletion() {
   const isoDate = inputToIso(completionDate);
 
   if (!isoDate) {
@@ -416,12 +376,16 @@ async function handleUndoFixedCalendarCompletion() {
     return;
   }
 
-  onComplete(
-    r.id,
-    isoDate
-  );
-
-  setConfirmingComplete(false);
+  try {
+    setSavingCompletion(true);
+    setCompletionError("");
+    await onComplete(r.id, isoDate);
+    setConfirmingComplete(false);
+  } catch (error) {
+    setCompletionError(error instanceof Error ? error.message : "Could not save this completion. Try again.");
+  } finally {
+    setSavingCompletion(false);
+  }
 }
 async function handleHistoryRecordMenu(
   recordId: string,
@@ -522,122 +486,28 @@ async function handleHistoryRecordMenu(
         overflow: "hidden",
       }}
     >
-      <TouchableOpacity
-        onPress={() =>
-          setOpen(
-            current =>
-              !current
-          )
+      <RequirementCardHeader
+        title={r.n}
+        badge={finalBadgeText}
+        badgeColor={finalBadgeColor}
+        badgeBackground={finalBadgeBg}
+        summary={
+          !isApplicable
+            ? "Reminders paused · Saved information kept"
+            : r.id === "boc3"
+              ? "One-time filing · Maintain a valid designation"
+              : r.periodBased
+                ? `Reporting period ends ${fmtDate(r.due)} · Record filing after it closes`
+              : filingPeriodEnd
+                ? `Reporting period ends ${fmtDate(filingPeriodEnd)} · Due ${fmtDate(r.due)}`
+                : r.due
+                  ? `Next due ${fmtDate(r.due)} · ${r.f}`
+                  : `Add a date to start tracking · ${r.f}`
         }
-        activeOpacity={0.8}
-        style={{
-          paddingHorizontal: 14,
-          paddingVertical: 13,
-          backgroundColor:
-            !isApplicable
-              ? "#F1F1EF"
-              : open
-                ? "#F8FAF5"
-                : "#FFFFFF",
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent:
-              "space-between",
-          }}
-        >
-          <View
-            style={{
-              flex: 1,
-              paddingRight: 10,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: "700",
-                color:
-                  isApplicable
-                    ? "#1A1915"
-                    : "#77756F",
-                lineHeight: 20,
-              }}
-            >
-              {r.n}
-            </Text>
-
-            <Text
-              style={{
-                fontSize: 12,
-                color: "#706E68",
-                marginTop: 3,
-              }}
-            >
-              {r.f}
-            </Text>
-
-            {isApplicable &&
-            r.due ? (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#706E68",
-                  marginTop: 2,
-                }}
-              >
-                {r.periodBased ? "Period ends" : "Next due"}:{" "}
-                {fmtDate(
-                  r.due
-                )}
-              </Text>
-            ) : null}
-          </View>
-
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <View
-              style={{
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 14,
-                backgroundColor:
-                  finalBadgeBg,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: "600",
-                  color:
-                    finalBadgeColor,
-                }}
-              >
-                {finalBadgeText}
-              </Text>
-            </View>
-
-            <Text
-              style={{
-                fontSize: 16,
-                color: "#706E68",
-                fontWeight: "600",
-              }}
-            >
-              {open
-                ? "⌃"
-                : "⌄"}
-            </Text>
-          </View>
-        </View>
-      </TouchableOpacity>
+        expanded={open}
+        onToggle={() => setOpen(current => !current)}
+        muted={!isApplicable}
+      />
 
       {open && (
         <View
@@ -907,49 +777,12 @@ async function handleHistoryRecordMenu(
                           "Date of last completion"}
                     </Text>
 
-                    <TextInput
-                      placeholder="MM-DD-YYYY"
-                      placeholderTextColor="#706E68"
+                    <PersistedDateInput
+                      value={r.dateMode === "rolling" ? r.enteredDate || "" : r.due || ""}
+                      onSave={handleSaveDate}
                       accessibilityLabel={r.dl || "Due date"}
-                      value={
-                        enteredDate
-                      }
-                      onChangeText={text => {
-                        setEnteredDate(
-                          formatDateInput(
-                            text
-                          )
-                        );
-                        setDateError(null);
-                      }}
-                      onBlur={() => {
-                        if (enteredDate && !inputToIso(enteredDate)) {
-                          setDateError("Enter a real date in MM-DD-YYYY format.");
-                        }
-                      }}
-                      keyboardType="number-pad"
-                      maxLength={10}
-                      selectionColor="#27500A"
-                      cursorColor="#27500A"
-                      style={{
-                        width: 160,
-                        backgroundColor:
-                          "#FFFFFF",
-                        borderWidth: 1,
-                        borderColor: dateError
-                          ? "#A32D2D"
-                          : "#D3D1C7",
-                        borderRadius: 8,
-                        paddingHorizontal: 10,
-                        paddingVertical: 8,
-                      }}
+                      allowClear={false}
                     />
-
-                    {dateError ? (
-                      <Text style={{ fontSize: 11, color: "#A32D2D", marginTop: 4 }}>
-                        {dateError}
-                      </Text>
-                    ) : null}
 
                     <Text
                       style={{
@@ -962,36 +795,6 @@ async function handleHistoryRecordMenu(
                       MM-DD-YYYY
                     </Text>
 
-                    <TouchableOpacity
-                      onPress={
-                        handleSaveDate
-                      }
-                      activeOpacity={0.8}
-                      style={{
-                        alignSelf:
-                          "flex-start",
-                        marginTop: 8,
-                        backgroundColor:
-                          "#EAF3DE",
-                        borderRadius: 6,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderWidth: 1,
-                        borderColor:
-                          "#C0DD97",
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          color: "#27500A",
-                          fontWeight:
-                            "500",
-                        }}
-                      >
-                        Save date
-                      </Text>
-                    </TouchableOpacity>
                   </View>
                 )}
 
@@ -1117,9 +920,8 @@ async function handleHistoryRecordMenu(
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={
-                        handleConfirmCompletion
-                      }
+                      onPress={() => void handleConfirmCompletion()}
+                      disabled={savingCompletion}
                       activeOpacity={0.8}
                       style={{
                         paddingHorizontal: 14,
@@ -1141,11 +943,11 @@ async function handleHistoryRecordMenu(
                             "700",
                         }}
                       >
-                        Confirm
-                        completion
+                        {savingCompletion ? "Saving..." : "Confirm completion"}
                       </Text>
                     </TouchableOpacity>
                   </View>
+                  {!!completionError && <Text style={{ marginTop: 8, fontSize: 12, color: "#A32D2D" }}>{completionError}</Text>}
                 </View>
               )}
 
@@ -1299,13 +1101,7 @@ async function handleHistoryRecordMenu(
       color: "#27500A",
     }}
   >
-    {historyOpen
-      ? "Hide compliance record"
-      : `Compliance record${
-          historyRecords.length > 0
-            ? ` (${historyRecords.length})`
-            : ""
-        }`}
+    {historyOpen ? "Hide history" : `History (${historyRecords.length})`}
   </Text>
 </TouchableOpacity>
 
@@ -1328,7 +1124,7 @@ async function handleHistoryRecordMenu(
         marginBottom: 10,
       }}
     >
-      Compliance record
+      Completion history
     </Text>
 
     {historyLoading && (
