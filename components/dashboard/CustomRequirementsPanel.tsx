@@ -173,11 +173,17 @@ export default function CustomRequirementsPanel({ onItemsChange }: Props) {
 
   async function saveDate(id: string, _enteredDate: string, nextDueDate: string) {
     const carrierId = auth.currentUser?.uid;
-    if (!carrierId) return;
-    await setDoc(doc(db, "carriers", carrierId, "customRequirements", id), {
-      dueDate: nextDueDate, completed: false, completedAt: null,
-      notified30: false, notified90: false, updatedAt: serverTimestamp(),
-    }, { merge: true });
+    const expected = items.find(candidate => candidate.id === id);
+    if (!carrierId || !expected) return;
+    const ref = doc(db, "carriers", carrierId, "customRequirements", id);
+    await runTransaction(db, async transaction => {
+      const live = await transaction.get(ref);
+      if (!live.exists()) throw new Error("This requirement no longer exists.");
+      if (live.data().dueDate !== expected.dueDate)
+        throw new Error("This date changed on another device. Review the new date and try again.");
+      transaction.set(ref, { dueDate: nextDueDate, completed: false, completedAt: null,
+        notified30: false, notified90: false, updatedAt: serverTimestamp() }, { merge: true });
+    });
   }
 
   async function setActive(id: string, active: boolean) {

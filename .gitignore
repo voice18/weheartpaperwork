@@ -16,6 +16,7 @@ node_modules/
 
 # Generated web build
 dist/
+/preview-dist/
 
 # Firebase local deployment cache
 .firebase/

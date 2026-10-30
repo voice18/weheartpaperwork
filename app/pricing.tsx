@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { usePublicCompact } from "../hooks/usePublicCompact";
+import { MANAGED_COMPANY_SETUP_TOTAL, MANAGED_PRICING } from "../lib/managedPricing";
 
 export default function PricingPage() {
   const compact = usePublicCompact();
@@ -23,12 +24,12 @@ export default function PricingPage() {
     <>
       <Head>
         <title>
-          Pricing — $2/Month Plus $1 Per Driver | No Contracts
+          App and Managed Support Pricing | We Heart Paperwork
         </title>
 
         <meta
           name="description"
-          content="Simple trucking compliance pricing: $2 per month plus $1 per active driver. One driver costs $3 a month. No contracts or setup fees."
+          content="App tracking is $2 per month plus $1 per active driver. Optional managed support starts at $37 per month for Company in year one, then $29 per month, plus selected Driver and Fleet coverage."
         />
 
         <link
@@ -38,12 +39,12 @@ export default function PricingPage() {
 
         <meta
           property="og:title"
-          content="Pricing — $2/Month Plus $1 Per Driver | No Contracts"
+          content="App and Managed Support Pricing | We Heart Paperwork"
         />
 
         <meta
           property="og:description"
-          content="Simple trucking compliance pricing: $2 per month plus $1 per active driver. One driver costs $3 a month. No contracts or setup fees."
+          content="App tracking is $2 per month plus $1 per active driver. Optional managed support starts at $37 per month for Company in year one, then $29 per month, plus selected Driver and Fleet coverage."
         />
 
         <meta
@@ -72,7 +73,7 @@ export default function PricingPage() {
         >
           <View style={styles.heroCopy}>
             <Text style={styles.eyebrow}>
-              SIMPLE, STRAIGHTFORWARD PRICING
+              APP SUBSCRIPTION PRICING
             </Text>
 
             <Text
@@ -270,7 +271,7 @@ export default function PricingPage() {
         {/* What's included */}
         <View style={styles.section}>
           <Text style={styles.eyebrow}>
-            ONE SUBSCRIPTION. THE IMPORTANT STUFF.
+              THE APP SUBSCRIPTION
           </Text>
 
           <Text
@@ -406,6 +407,29 @@ export default function PricingPage() {
           </View>
         </View>
 
+        {/* Optional managed support is priced separately from app access. */}
+        <View style={styles.section}>
+          <Text style={styles.eyebrow}>OPTIONAL MANAGED SUPPORT</Text>
+          <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>
+            We help watch the deadlines. You stay in control.
+          </Text>
+          <Text style={styles.sectionDescription}>
+            Choose Company, Driver, Fleet, or a combination. We monitor the selected areas,
+            give you instructions, and follow up. Your company still completes filings,
+            payments, driver actions, and inspections.
+          </Text>
+          <View style={styles.exampleTable}>
+            <PriceExample drivers="Company · first 12 months" description={`Includes $${MANAGED_COMPANY_SETUP_TOTAL} of setup spread over year one`} price={`$${MANAGED_PRICING.companyFirstYearMonthly}/mo`} />
+            <PriceExample drivers="Company · after 12 months" description="First-year setup portion is finished" price={`$${MANAGED_PRICING.companyRenewalMonthly}/mo`} />
+            <PriceExample drivers="Each managed driver" description="Added to the existing app's $1 per active driver" price={`$${MANAGED_PRICING.driverMonthly}/mo`} />
+            <PriceExample drivers="Each managed truck" description="Registration and annual DOT inspection dates" price={`$${MANAGED_PRICING.truckMonthly}/mo`} />
+            <PriceExample drivers="Each managed trailer" description="Applicable registration and inspection dates" price={`$${MANAGED_PRICING.trailerMonthly}/mo`} last />
+          </View>
+          <Text style={styles.sectionDescription}>
+            {`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge for the initial registration and inspection review. Building a driver qualification file, when requested, is a separate $${MANAGED_PRICING.dqFileOneTime} one-time charge per file. Managed support is added to your app subscription ($2/month plus $1 per active driver). We confirm the exact scope and total before you agree or pay. Requesting help does not start service or billing.`}
+          </Text>
+        </View>
+
         {/* Philosophy */}
         <View style={styles.philosophySection}>
           <View
@@ -475,12 +499,12 @@ export default function PricingPage() {
 
             <FaqItem
               question="Does We Heart Paperwork file forms for me?"
-              answer="No—and that is intentional. You handle the filings and compliance decisions; We Heart Paperwork gives you one organized system for deadlines, reminders, setup records, and completion history."
+              answer="No. The app organizes your deadlines and records. Optional managed support adds monitoring, instructions, and follow-up for the areas you choose. Your company still completes filings, payments, driver actions, and inspections."
             />
 
             <FaqItem
               question="Is there a free trial?"
-              answer="Yes. Every new subscription starts with a 14-day free trial before monthly billing begins."
+              answer="The app subscription starts with a 14-day free trial before app billing begins. Managed support is separate and starts only after we confirm the scope, price, payment, and start date with you."
             />
 
             <FaqItem

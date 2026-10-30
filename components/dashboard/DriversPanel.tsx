@@ -167,6 +167,20 @@ export default function DriversPanel() {
       { merge: true }
     );
   };
+  const updateDriverDate = async (driver: Driver,
+    field: "cdlExpiration" | "medicalExpiration" | "mvrDue" | "clearinghouseDue",
+    value: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const ref = doc(db, "carriers", user.uid, "drivers", driver.id);
+    await runTransaction(db, async transaction => {
+      const live = await transaction.get(ref);
+      if (!live.exists()) throw new Error("This driver no longer exists.");
+      if ((live.data()?.[field] || "") !== (driver[field] || ""))
+        throw new Error("This date changed on another device. Review the new date and try again.");
+      transaction.set(ref, { [field]: value, lastUpdated: serverTimestamp() }, { merge: true });
+    });
+  };
     const getDqConfirmedCount = (
   driver: Driver
 ) => {
@@ -631,7 +645,7 @@ export default function DriversPanel() {
                   label="CDL Expiration"
                   value={driver.cdlExpiration}
                   onChange={(value: string) =>
-                    updateDriver(driver.id, { cdlExpiration: value })
+                    updateDriverDate(driver, "cdlExpiration", value)
                   }
                 />
 
@@ -643,7 +657,7 @@ export default function DriversPanel() {
                   requirementId="medical"
                   dateRepresentsDueDate
                   onChange={(value: string) =>
-                    updateDriver(driver.id, { medicalExpiration: value })
+                    updateDriverDate(driver, "medicalExpiration", value)
                   }
                   onMarkComplete={(
                   completionDate: string,
@@ -667,7 +681,7 @@ export default function DriversPanel() {
                   requirementId="mvr"
                   years={1}
                   onChange={(value: string) =>
-                    updateDriver(driver.id, { mvrDue: value })
+                    updateDriverDate(driver, "mvrDue", value)
                   }
                   onMarkComplete={(
                     completionDate: string,
@@ -691,7 +705,7 @@ export default function DriversPanel() {
                   requirementId="clearinghouse"
                   days={365}
                   onChange={(value: string) =>
-                    updateDriver(driver.id, { clearinghouseDue: value })
+                    updateDriverDate(driver, "clearinghouseDue", value)
                   }
                   onMarkComplete={(
                     completionDate: string,

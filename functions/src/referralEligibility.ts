@@ -1,11 +1,13 @@
 import * as admin from "firebase-admin";
 import Stripe from "stripe";
+import { isManagedSubscription } from "./subscriptionKinds";
 
 /** Append Stripe's event-time state, even when events arrive out of order.
  * Current billing state is not evidence of eligibility for an older payment. */
 export async function recordReferralParticipation(db: FirebaseFirestore.Firestore, event: Stripe.Event): Promise<void> {
   if (!event.type.startsWith("customer.subscription.")) return;
   const subscription = event.data.object as Stripe.Subscription;
+  if (isManagedSubscription(subscription)) return;
   let carrierId = subscription.metadata?.carrierId;
   if (!carrierId) {
     const matches = await db.collection("carriers").where("billing.stripeSubscriptionId", "==", subscription.id).limit(2).get();

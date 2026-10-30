@@ -1364,11 +1364,23 @@ const trialEndLabel = (() => {
             value="Send feedback directly to Aaron"
             onPress={() => router.push("/(app)/feedback" as any)}
           />
+          {Platform.OS === "web" && <SettingsRow
+            label="Managed support options"
+            value="Choose areas or check your request"
+            onPress={() => router.push("/(app)/managed-tracking" as any)}
+          />}
 
           {auth.currentUser?.email?.toLowerCase() === "aaron@weheartpaperwork.com" ? (
             <SettingsRow
               label="Owner review inbox"
               onPress={() => router.push("/(app)/owner-reviews" as any)}
+            />
+          ) : null}
+
+          {auth.currentUser?.email?.toLowerCase() === "aaron@weheartpaperwork.com" ? (
+            <SettingsRow
+              label="Managed tracking workspace"
+              onPress={() => router.push("/(app)/owner-managed" as any)}
             />
           ) : null}
 

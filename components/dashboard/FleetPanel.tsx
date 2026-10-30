@@ -128,6 +128,19 @@ export default function FleetPanel() {
     );
   };
 
+  const updateVehicleDate = async (vehicle: FleetVehicle,
+    field: "registrationExpiration" | "inspectionExpiration", value: string) => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const ref = doc(db, "carriers", user.uid, "vehicles", vehicle.id);
+    await runTransaction(db, async transaction => {
+      const live = await transaction.get(ref);
+      if (!live.exists()) throw new Error("This vehicle no longer exists.");
+      if ((live.data()?.[field] || "") !== (vehicle[field] || ""))
+        throw new Error("This date changed on another device. Review the new date and try again.");
+      transaction.set(ref, { [field]: value, lastUpdated: serverTimestamp() }, { merge: true });
+    });
+  };
   const addVehicle = async () => {
     const user = auth.currentUser;
     if (!user || adding) return;
@@ -271,7 +284,7 @@ export default function FleetPanel() {
         vehicles={trucks}
         openVehicleId={openVehicleId}
         setOpenVehicleId={setOpenVehicleId}
-        updateVehicle={updateVehicle}
+        updateVehicle={updateVehicle} updateVehicleDate={updateVehicleDate}
         renewDeadline={renewDeadline}
         archiveVehicle={archiveVehicle}
       />
@@ -283,7 +296,7 @@ export default function FleetPanel() {
         vehicles={trailers}
         openVehicleId={openVehicleId}
         setOpenVehicleId={setOpenVehicleId}
-        updateVehicle={updateVehicle}
+        updateVehicle={updateVehicle} updateVehicleDate={updateVehicleDate}
         renewDeadline={renewDeadline}
         archiveVehicle={archiveVehicle}
       />
@@ -358,6 +371,7 @@ function VehicleSection(props: {
   openVehicleId: string | null;
   setOpenVehicleId: (id: string | null) => void;
   updateVehicle: (id: string, updates: Partial<FleetVehicle>) => Promise<void>;
+  updateVehicleDate: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", value: string) => Promise<void>;
   renewDeadline: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", completionDate: string, nextDueDate: string) => Promise<void>;
   archiveVehicle: (vehicle: FleetVehicle) => void;
 }) {
@@ -370,7 +384,7 @@ function VehicleSection(props: {
       {props.vehicles.length === 0 ? (
         <Text style={styles.emptyText}>{props.emptyText}</Text>
       ) : props.vehicles.map(vehicle => (
-        <VehicleCard key={vehicle.id} vehicle={vehicle} open={props.openVehicleId === vehicle.id} onToggle={() => props.setOpenVehicleId(props.openVehicleId === vehicle.id ? null : vehicle.id)} updateVehicle={props.updateVehicle} renewDeadline={props.renewDeadline} archiveVehicle={props.archiveVehicle} />
+        <VehicleCard key={vehicle.id} vehicle={vehicle} open={props.openVehicleId === vehicle.id} onToggle={() => props.setOpenVehicleId(props.openVehicleId === vehicle.id ? null : vehicle.id)} updateVehicle={props.updateVehicle} updateVehicleDate={props.updateVehicleDate} renewDeadline={props.renewDeadline} archiveVehicle={props.archiveVehicle} />
       ))}
     </View>
   );
@@ -381,6 +395,7 @@ function VehicleCard(props: {
   open: boolean;
   onToggle: () => void;
   updateVehicle: (id: string, updates: Partial<FleetVehicle>) => Promise<void>;
+  updateVehicleDate: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", value: string) => Promise<void>;
   renewDeadline: (vehicle: FleetVehicle, field: "registrationExpiration" | "inspectionExpiration", completionDate: string, nextDueDate: string) => Promise<void>;
   archiveVehicle: (vehicle: FleetVehicle) => void;
 }) {
@@ -502,11 +517,11 @@ function VehicleCard(props: {
             </View>
           ) : null}
           {!(vehicle.type === "trailer" && vehicle.registrationPermanent === true) ? (
-            <DeadlineEditor vehicleId={vehicle.id} field="registrationExpiration" label="Registration expiration" value={vehicle.registrationExpiration || ""} mode="anchored" onSave={registrationExpiration => props.updateVehicle(vehicle.id, { registrationExpiration })} onComplete={(completionDate, nextDueDate) => props.renewDeadline(vehicle, "registrationExpiration", completionDate, nextDueDate)} />
+            <DeadlineEditor vehicleId={vehicle.id} field="registrationExpiration" label="Registration expiration" value={vehicle.registrationExpiration || ""} mode="anchored" onSave={registrationExpiration => props.updateVehicleDate(vehicle, "registrationExpiration", registrationExpiration)} onComplete={(completionDate, nextDueDate) => props.renewDeadline(vehicle, "registrationExpiration", completionDate, nextDueDate)} />
           ) : (
             <View style={styles.permanentStatus}><Text style={styles.permanentStatusText}>Permanent — no expiration</Text></View>
           )}
-          <DeadlineEditor vehicleId={vehicle.id} field="inspectionExpiration" label="Annual DOT inspection expiration / next due date" value={vehicle.inspectionExpiration || ""} mode="rolling" onSave={inspectionExpiration => props.updateVehicle(vehicle.id, { inspectionExpiration })} onComplete={(completionDate, nextDueDate) => props.renewDeadline(vehicle, "inspectionExpiration", completionDate, nextDueDate)} />
+          <DeadlineEditor vehicleId={vehicle.id} field="inspectionExpiration" label="Annual DOT inspection expiration / next due date" value={vehicle.inspectionExpiration || ""} mode="rolling" onSave={inspectionExpiration => props.updateVehicleDate(vehicle, "inspectionExpiration", inspectionExpiration)} onComplete={(completionDate, nextDueDate) => props.renewDeadline(vehicle, "inspectionExpiration", completionDate, nextDueDate)} />
 
           <View style={styles.removeArea}>
             <TouchableOpacity onPress={() => props.archiveVehicle(vehicle)} style={styles.removeButton}>

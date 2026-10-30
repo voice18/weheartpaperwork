@@ -258,7 +258,7 @@ const carrierRef = doc(
 
             appReady.current = true;
 
-            if (pathname === "/settings" || pathname === "/review" || pathname === "/feedback" || pathname === "/owner-reviews") {
+            if (pathname === "/settings" || pathname === "/review" || pathname === "/feedback" || pathname === "/owner-reviews" || pathname === "/owner-managed" || pathname === "/managed-tracking") {
                return;
               }
 

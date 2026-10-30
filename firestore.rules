@@ -126,6 +126,41 @@ service cloud.firestore {
       }
     }
 
+    match /managedServiceCoverage/{carrierId} {
+      allow read: if ownsCarrier(carrierId);
+      allow write: if false;
+      match /events/{eventId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /managedServiceRequests/{carrierId} {
+      allow read: if ownsCarrier(carrierId);
+      allow write: if false;
+      match /events/{eventId} {
+        allow read, write: if false;
+      }
+    }
+
+    match /managedServiceActivity/{carrierId} {
+      allow read, write: if false;
+      match /events/{eventId} {
+        allow read: if ownsCarrier(carrierId);
+        allow write: if false;
+      }
+    }
+
+    match /managedServiceSignals/{carrierId} {
+      allow read: if signedIn() && request.auth.token.ownerAdmin == true;
+      allow write: if false;
+    }
+
+    match /managedServiceWork/{carrierId} {
+      allow read, write: if false;
+      match /items/{itemId} {
+        allow read, write: if false;
+      }
+    }
     match /users/{userId} {
   allow read: if signedIn()
     && request.auth.uid == userId;

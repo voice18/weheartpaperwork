@@ -210,15 +210,18 @@ export const useComplianceStore = create<StoreState>((set, get) => ({
     const { carrierId } = get();
     if (!carrierId) return;
     const ref = doc(db, "carriers", carrierId, "compliance", reqId);
-    await setDoc(ref, {
-      enteredDate,
-      dueDate,
-      completed:   false,
-      completedAt: null,
-      lastUpdated: serverTimestamp(),
-      notified30:  false,   // reset alerts when date changes
-      notified90:  false,
-    }, { merge: true });
+    const expected = get().compliance[reqId];
+    await runTransaction(db, async transaction => {
+      const live = await transaction.get(ref);
+      if ((live.data()?.enteredDate || null) !== (expected?.enteredDate || null)
+        || (live.data()?.dueDate || null) !== (expected?.dueDate || null)) {
+        throw new Error("This date changed on another device. Review the new date and try again.");
+      }
+      transaction.set(ref, {
+        enteredDate, dueDate, completed: false, completedAt: null,
+        lastUpdated: serverTimestamp(), notified30: false, notified90: false,
+      }, { merge: true });
+    });
   },
 
       // ── setApplicable ────────────────────────────────────────────────────────────

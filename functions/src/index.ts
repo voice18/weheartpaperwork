@@ -23,6 +23,8 @@ import Stripe from "stripe";
 import { randomUUID } from "node:crypto";
 import { queueOwnerEmail } from "./ownerNotifications";
 import { recordReferralParticipation } from "./referralEligibility";
+import { isLiveAppSubscription, isManagedSubscription } from "./subscriptionKinds";
+import { handleManagedCheckout, syncManagedSubscription } from "./managedQuotes";
 import {
   handleCheckoutCompleted,
   syncSubscriptionToCarrier,
@@ -1692,10 +1694,11 @@ export const refreshBillingStatus = onCall(
       });
 
       const accessSubscription = subscriptions.data.find(
-        (item) => item.status === "active" || item.status === "trialing"
+        (item) => !isManagedSubscription(item) &&
+          (item.status === "active" || item.status === "trialing")
       );
 
-      subscription = accessSubscription ?? subscriptions.data[0] ?? null;
+      subscription = accessSubscription ?? subscriptions.data.find(item => !isManagedSubscription(item)) ?? null;
     }
 
     if (!subscription) {
@@ -2027,13 +2030,7 @@ console.log(
         limit: 100,
       });
       const liveSubscription = customerSubscriptions.data.find(
-        subscription =>
-          subscription.status === "active" ||
-          subscription.status === "trialing" ||
-          subscription.status === "past_due" ||
-          subscription.status === "unpaid" ||
-          subscription.status === "incomplete" ||
-          subscription.status === "paused"
+        subscription => isLiveAppSubscription(subscription)
       );
 
       if (liveSubscription) {
@@ -2063,6 +2060,7 @@ console.log(
       const reusableCheckoutSession = openCheckoutSessions.data.find(
         session =>
           session.mode === "subscription" &&
+          session.metadata?.serviceKind !== "managed" &&
           session.metadata?.carrierId === carrierId &&
           session.success_url?.startsWith(`${checkoutBaseUrl}/`) &&
           typeof session.url === "string"
@@ -2751,6 +2749,11 @@ if (eventClaimed === "busy") {
         const session =
           event.data.object as Stripe.Checkout.Session;
 
+        if (session.metadata?.serviceKind === "managed") {
+          await handleManagedCheckout(db, stripe, session);
+          break;
+        }
+
         await handleCheckoutCompleted(
           db,
           stripe,
@@ -2779,6 +2782,11 @@ if (eventClaimed === "busy") {
           await stripe.subscriptions.retrieve(
             eventSubscription.id
           );
+
+        if (latestSubscription.metadata.serviceKind === "managed") {
+          await syncManagedSubscription(db, latestSubscription);
+          break;
+        }
 
         console.log(
           "Latest created subscription retrieved",
@@ -2825,6 +2833,11 @@ if (eventClaimed === "busy") {
           eventSubscription.id
         );
 
+      if (latestSubscription.metadata.serviceKind === "managed") {
+        await syncManagedSubscription(db, latestSubscription);
+        break;
+      }
+
       console.log(
         "Latest Stripe subscription retrieved",
         {
@@ -2850,6 +2863,11 @@ if (eventClaimed === "busy") {
       case "customer.subscription.deleted": {
         const subscription =
           event.data.object as Stripe.Subscription;
+
+        if (subscription.metadata.serviceKind === "managed") {
+          await syncManagedSubscription(db, subscription);
+          break;
+        }
 
         console.log(
           "Processing customer.subscription.deleted",
@@ -3000,3 +3018,9 @@ export { submitCustomerReview, withdrawCustomerReview, listCustomerReviewsForMod
   submitCustomerFeedback, updateCustomerFeedbackStatus } from "./customerReviews";
 export { submitDemoRequest } from "./demoRequests";
 
+export { findManagedServiceCandidate, listManagedServiceCandidates, saveManagedServiceCoverage, listManagedServiceAccounts, getManagedServiceAccount, updateManagedServiceWork, acceptManagedCustomRequirement, saveManagedServiceDeadline, removeManagedServiceOnCarrierDeletion,
+  signalManagedCarrierChange, signalManagedItemChange, signalManagedCoverageChange, signalManagedWorkChange } from "./managedService";
+export { submitManagedServiceRequest, listManagedServiceRequests, updateManagedServiceRequestStatus } from "./managedServiceRequests";
+export { getManagedServiceQuote, prepareManagedServiceQuote, acceptManagedServiceQuote, createManagedCheckoutSession,
+  withdrawManagedServiceQuote,
+  scheduleManagedServiceEnd } from "./managedQuotes";

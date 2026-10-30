@@ -21,9 +21,10 @@ import {
   addYears,
 } from "../../../lib/requirements";
 import { useEffect, useState  }                      from "react";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
 import IPhoneAppCard from "../../../components/IPhoneAppCard";
+import ManagedCoverageNotice, { ManagedCoverage } from "../../../components/dashboard/ManagedCoverageNotice";
 import SignalCards from "../../../components/dashboard/SignalCards";
 import RequirementRow from "../../../components/dashboard/RequirementRow";
 import CompanyRequirements from "../../../components/dashboard/CompanyRequirements";
@@ -37,6 +38,7 @@ import {
   collection,
   onSnapshot,
   doc,
+  query, orderBy, limit,
 } from "firebase/firestore";
 import { auth, db } from "../../../lib/firebase";
 
@@ -90,6 +92,8 @@ export default function DashboardScreen() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [companyName, setCompanyName] = useState("");
+  const [managedCoverage, setManagedCoverage] = useState<ManagedCoverage | null>(null);
+  const [managedActivity, setManagedActivity] = useState<{ id: string; type: string; itemLabel: string; nextDueDate?: string; createdAt?: any }[]>([]);
   const [customReqs, setCustomReqs] = useState<any[]>([]);
 
 
@@ -105,6 +109,13 @@ export default function DashboardScreen() {
     setCompanyName(data?.companyName || "");
   });
 
+  const unsubManaged = onSnapshot(doc(db, "managedServiceCoverage", user.uid),
+    snapshot => setManagedCoverage(snapshot.exists() ? snapshot.data() as ManagedCoverage : null),
+    () => setManagedCoverage(null));
+  const unsubActivity = onSnapshot(query(collection(db, "managedServiceActivity", user.uid, "events"),
+    orderBy("createdAt", "desc"), limit(5)), snapshot => setManagedActivity(snapshot.docs.map(row => ({
+      id: row.id, ...row.data(),
+    })) as typeof managedActivity), () => setManagedActivity([]));
   const unsubCompliance =
     useComplianceStore.getState().init(user.uid);
 
@@ -141,6 +152,8 @@ export default function DashboardScreen() {
     unsubDrivers();
     unsubVehicles();
     unsubCarrier();
+    unsubManaged();
+    unsubActivity();
   };
 }, []);
 
@@ -236,6 +249,29 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
       usdotNumber={usdotNumber}
     />
       <IPhoneAppCard />
+      <ManagedCoverageNotice coverage={managedCoverage} />
+      {managedCoverage?.status === "active" && managedActivity.length > 0 &&
+        <View style={{ backgroundColor: "#F5F7F0", borderRadius: 12, padding: 14, marginBottom: 15 }}>
+          <Text style={{ color: "#27500A", fontWeight: "800", fontSize: 16 }}>Updates from We Heart Paperwork</Text>
+          {managedActivity.map(row => <Text key={row.id} style={{ color: "#4F5149", marginTop: 8, lineHeight: 20 }}>
+            {row.type === "date_updated" ? "Verified date updated" : row.type === "instructions_sent"
+              ? "Instructions sent" : row.type === "waiting_on_customer" ? "Waiting on your action"
+              : "Follow-up planned"} · {row.itemLabel}
+            {row.type === "date_updated" && row.nextDueDate ? " · Next due " + row.nextDueDate : ""}
+          </Text>)}
+        </View>}
+      {Platform.OS === "web" && tab === "overview" && <TouchableOpacity
+        onPress={() => router.push("/(app)/managed-tracking" as any)}
+        style={{ backgroundColor: "#F2F7EB", borderColor: "#B8CBA7", borderWidth: 1,
+          borderRadius: 12, padding: 15, marginBottom: 16 }}>
+        <Text style={{ color: "#27500A", fontWeight: "800", fontSize: 16 }}>
+          {managedCoverage?.status === "active" ? "Review your managed support" : "Want help managing your deadlines?"}
+        </Text>
+        <Text style={{ color: "#4F5149", marginTop: 5, lineHeight: 20 }}>
+          Choose Company, Driver, or Fleet help after your app is set up. Your current tracking keeps working.
+        </Text>
+        <Text style={{ color: "#27500A", fontWeight: "800", marginTop: 8 }}>See support options ›</Text>
+      </TouchableOpacity>}
 
       <View style={{ flexDirection: "row", gap: 8, marginBottom: 16 }}>
  
@@ -505,6 +541,7 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
   </>
 ) : tab === "company" ? (
   <>
+      <ManagedCoverageNotice coverage={managedCoverage} area="company" />
       <CompanyRequirements
       items={reqs}
       onSave={saveDate}
@@ -516,9 +553,15 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
     <CustomRequirementsPanel onItemsChange={setCustomReqs} />
   </>
 ) : tab === "drivers" ? (
-  <DriversPanel />
+  <>
+    <ManagedCoverageNotice coverage={managedCoverage} area="drivers" />
+    <DriversPanel />
+  </>
 ) : (
-  <FleetPanel />
+  <>
+    <ManagedCoverageNotice coverage={managedCoverage} area="fleet" />
+    <FleetPanel />
+  </>
 )}
  </KeyboardAwareScrollView>
 
