@@ -35,7 +35,8 @@ export function calculateManagedPrice(areas: ManagedAreas, counts: ManagedCounts
     trailerMonthly: counts.trailers * MANAGED_PRICING.trailerMonthly,
     firstYearMonthly: (areas.company ? MANAGED_PRICING.companyFirstYearMonthly : 0) + recurringUnits,
     renewalMonthly: (areas.company ? MANAGED_PRICING.companyRenewalMonthly : 0) + recurringUnits,
-    fleetOnlyOnboardingOneTime: areas.fleet && !areas.company && !areas.drivers
+    fleetOnlyOnboardingOneTime: areas.fleet && !areas.company && !areas.drivers &&
+      counts.trucks + counts.trailers > 0
       ? MANAGED_PRICING.fleetOnlyOnboardingOneTime : 0,
     dqFileOneTime: counts.dqFiles * MANAGED_PRICING.dqFileOneTime,
   };

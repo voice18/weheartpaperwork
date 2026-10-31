@@ -33,3 +33,19 @@ test('unselected areas cannot be billed and DQ files cannot exceed drivers', () 
     { company: true, drivers: true, fleet: false },
     { drivers: 1, trucks: 0, trailers: 0, dqFiles: 2 }));
 });
+
+test('empty selected Driver and Fleet areas do not add unit charges', () => {
+  const price = calculateManagedPrice(
+    { company: true, drivers: true, fleet: true },
+    { drivers: 0, trucks: 0, trailers: 0, dqFiles: 0 });
+  assert.equal(price.firstYearMonthly, 37);
+  assert.equal(price.renewalMonthly, 29);
+  assert.equal(price.driverMonthly, 0);
+  assert.equal(price.truckMonthly, 0);
+  assert.equal(price.trailerMonthly, 0);
+  const emptyFleet = calculateManagedPrice(
+    { company: false, drivers: false, fleet: true },
+    { drivers: 0, trucks: 0, trailers: 0, dqFiles: 0 });
+  assert.equal(emptyFleet.firstYearMonthly, 0);
+  assert.equal(emptyFleet.fleetOnlyOnboardingOneTime, 0);
+});

@@ -43,7 +43,7 @@ function managedItems(row: Record<string, any>, renewal = false): Stripe.Checkou
   }
   if (!renewal) {
     once("Fleet-only onboarding", MANAGED_PRICING.fleetOnlyOnboardingOneTime,
-      selected.fleet && !selected.company && !selected.drivers ? 1 : 0);
+      selected.fleet && !selected.company && !selected.drivers && counts.trucks + counts.trailers > 0 ? 1 : 0);
     once("Driver qualification file setup", MANAGED_PRICING.dqFileOneTime, counts.dqFiles);
   }
   return items;
@@ -128,13 +128,11 @@ export const prepareManagedServiceQuote = onCall({ region: "us-central1" }, asyn
     driverIds: selected.drivers ? driverRows.docs.filter(row => row.data().status !== "inactive").map(row => row.id) : [],
     vehicleIds: selected.fleet ? activeVehicles.map(row => row.id) : [],
   };
-  if (selected.drivers && !drivers)
-    throw new HttpsError("failed-precondition", "Add an active driver before quoting Driver management.");
-  if (selected.fleet && !activeVehicles.length)
-    throw new HttpsError("failed-precondition", "Add an active truck or trailer before quoting Fleet management.");
   let price;
   try { price = calculateManagedPrice(selected, counts); }
   catch { throw new HttpsError("invalid-argument", "The requested quantities do not match the service areas."); }
+  if (price.firstYearMonthly === 0)
+    throw new HttpsError("failed-precondition", "There are no active units to manage yet. Enter at least one active driver, truck, or trailer before quoting this request.");
   const quoteId = randomUUID();
   const now = admin.firestore.Timestamp.now();
   const expiresAt = admin.firestore.Timestamp.fromMillis(now.toMillis() + 14 * 86400000);

@@ -3020,7 +3020,7 @@ export { submitDemoRequest } from "./demoRequests";
 
 export { findManagedServiceCandidate, listManagedServiceCandidates, saveManagedServiceCoverage, listManagedServiceAccounts, getManagedServiceAccount, updateManagedServiceWork, acceptManagedCustomRequirement, saveManagedServiceDeadline, removeManagedServiceOnCarrierDeletion,
   signalManagedCarrierChange, signalManagedItemChange, signalManagedCoverageChange, signalManagedWorkChange } from "./managedService";
-export { submitManagedServiceRequest, listManagedServiceRequests, updateManagedServiceRequestStatus } from "./managedServiceRequests";
+export { submitManagedServiceRequest, listManagedServiceRequests, enterManagedIntakeUnits, updateManagedServiceRequestStatus } from "./managedServiceRequests";
 export { getManagedServiceQuote, prepareManagedServiceQuote, acceptManagedServiceQuote, createManagedCheckoutSession,
   withdrawManagedServiceQuote,
   scheduleManagedServiceEnd } from "./managedQuotes";

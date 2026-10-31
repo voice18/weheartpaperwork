@@ -28,6 +28,10 @@ type Detail = Omit<Summary, "itemCount" | "pendingCustomCount"> & {
 type ServiceRequest = { carrierId: string; companyName: string; accountEmail: string;
   preferredEmail: string; preferredPhone: string; accountPhone: string; textPermission: boolean | null;
   billingStatus: string | null; areas: Areas; status: string; updatedAtMillis: number | null;
+  intake?: { drivers: { name: string; cdlNumber: string; cdlClass: string; cdlState: string;
+    cdlExpiration: string; medicalExpiration: string }[];
+    vehicles: { type: string; unitNumber: string; vin: string;
+      registrationExpiration: string; inspectionExpiration: string }[] };
   quote?: { status: string; scope: string; price: { firstYearMonthly: number;
     renewalMonthly: number; fleetOnlyOnboardingOneTime: number; dqFileOneTime: number };
     counts: { drivers: number; trucks: number; trailers: number; dqFiles: number } } | null };
@@ -318,6 +322,23 @@ export default function OwnerManaged() {
     } catch (error) { setMessage(errorText(error)); }
     finally { setWorking(false); }
   };
+  const enterIntake = async (row: ServiceRequest) => {
+    const drivers = row.intake?.drivers?.length || 0;
+    const vehicles = row.intake?.vehicles?.length || 0;
+    if (!drivers && !vehicles) return;
+    if (typeof window !== "undefined" && !window.confirm(
+      `Add the listed ${drivers} driver(s) and ${vehicles} vehicle(s) as active in ${row.companyName}? ` +
+      `New active drivers add $1 each per month to the customer's existing app subscription. ` +
+      "Check the intake and existing account first.")) return;
+    setWorking(true);
+    try {
+      const result = await call<{ driversAdded: number; vehiclesAdded: number }>(
+        "enterManagedIntakeUnits", { carrierId: row.carrierId });
+      await loadRequests();
+      setMessage(`Entered ${result.driversAdded} new drivers and ${result.vehiclesAdded} new vehicles. Verify their dates and account billing before preparing the quote.`);
+    } catch (error) { setMessage(errorText(error)); }
+    finally { setWorking(false); }
+  };
   const scheduleEnd = async (row: ServiceRequest) => {
     setWorking(true);
     try {
@@ -460,6 +481,22 @@ export default function OwnerManaged() {
         <ContactDetails contact={{ accountEmail: row.accountEmail,
           preferredEmail: row.preferredEmail, preferredPhone: row.preferredPhone,
           accountPhone: row.accountPhone, textPermission: row.textPermission }} />
+        {(row.areas.drivers || row.areas.fleet) && <View style={styles.contactBox}>
+          <Text style={styles.small}>Customer intake · {row.intake?.drivers?.length || 0} drivers · {row.intake?.vehicles?.length || 0} units</Text>
+          {(row.intake?.drivers || []).map((driver, index) => <Text key={`d${index}`} style={styles.small}>
+            Driver: {driver.name} · {driver.cdlState} CDL {driver.cdlNumber} · Class {driver.cdlClass}
+            {driver.cdlExpiration ? ` · CDL expires ${driver.cdlExpiration}` : ""}
+            {driver.medicalExpiration ? ` · Medical expires ${driver.medicalExpiration}` : ""}
+          </Text>)}
+          {(row.intake?.vehicles || []).map((vehicle, index) => <Text key={`v${index}`} style={styles.small}>
+            {vehicle.type === "trailer" ? "Trailer" : "Truck"} {vehicle.unitNumber} · VIN/serial {vehicle.vin}
+            {vehicle.registrationExpiration ? ` · Registration expires ${vehicle.registrationExpiration}` : ""}
+            {vehicle.inspectionExpiration ? ` · Inspection expires ${vehicle.inspectionExpiration}` : ""}
+          </Text>)}
+          <Text style={styles.small}>Verify these details before entering active units. Adding an active driver also changes the customer's app subscription by $1 per driver per month. Quote managed support only after the units are entered.</Text>
+          {(row.intake?.drivers?.length || row.intake?.vehicles?.length) ? <Button
+            label="Enter listed active units" subtle onPress={() => void enterIntake(row)} disabled={working || !["requested", "contacted"].includes(row.status)} /> : null}
+        </View>}
         {row.quote && <View style={styles.contactBox}>
           <Text style={styles.small}>Quote: {row.quote.status} · ${row.quote.price.firstYearMonthly}/month in year one,
             then ${row.quote.price.renewalMonthly}/month · ${row.quote.price.fleetOnlyOnboardingOneTime + row.quote.price.dqFileOneTime} one-time</Text>

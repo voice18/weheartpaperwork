@@ -11,7 +11,13 @@ type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
 type Coverage = { status?: string; areas?: Areas; effectiveDate?: string | null };
 type ServiceRequest = { status?: string; areas?: Areas; updatedAt?: unknown;
-  preferredEmail?: string; preferredPhone?: string; textPermission?: boolean };
+  preferredEmail?: string; preferredPhone?: string; textPermission?: boolean;
+  intake?: Intake };
+type IntakeDriver = { name: string; cdlNumber: string; cdlClass: string; cdlState: string;
+  cdlExpiration: string; medicalExpiration: string };
+type IntakeVehicle = { type: "truck" | "trailer"; unitNumber: string; vin: string;
+  registrationExpiration: string; inspectionExpiration: string };
+type Intake = { drivers: IntakeDriver[]; vehicles: IntakeVehicle[] };
 type ManagedQuote = { quoteId: string; status: string; scope: string; expiresAtMillis: number;
   areas: Areas; counts: { drivers: number; trucks: number; trailers: number; dqFiles: number };
   price: { firstYearMonthly: number; renewalMonthly: number;
@@ -25,6 +31,7 @@ const AREA: { key: Area; title: string; description: string; examples: string }[
     examples: "Registration and annual DOT inspection dates." },
 ];
 const NONE: Areas = { company: false, drivers: false, fleet: false };
+const ALL: Areas = { company: true, drivers: true, fleet: true };
 const PENDING = new Set(["requested", "change_requested", "end_requested", "contacted", "quoted", "accepted", "paid_awaiting_start"]);
 function same(a: Areas, b: Areas): boolean {
   return a.company === b.company && a.drivers === b.drivers && a.fleet === b.fleet;
@@ -38,6 +45,8 @@ export default function ManagedTrackingChoices() {
   const [serviceRequest, setServiceRequest] = useState<ServiceRequest | null>(null);
   const [quote, setQuote] = useState<ManagedQuote | null>(null);
   const [areas, setAreas] = useState<Areas>(NONE);
+  const [step, setStep] = useState(1);
+  const [intake, setIntake] = useState<Intake>({ drivers: [], vehicles: [] });
   const [preferredEmail, setPreferredEmail] = useState(auth.currentUser?.email || "");
   const [preferredPhone, setPreferredPhone] = useState("");
   const [textPermission, setTextPermission] = useState<boolean | null>(null);
@@ -60,9 +69,11 @@ export default function ManagedTrackingChoices() {
       setPreferredPhone(currentRequest?.preferredPhone || "");
       setTextPermission(typeof currentRequest?.textPermission === "boolean"
         ? currentRequest.textPermission : null);
+      setIntake(currentRequest?.intake || { drivers: [], vehicles: [] });
       setAreas(PENDING.has(currentRequest?.status || "")
         ? { ...NONE, ...currentRequest?.areas }
         : currentCoverage?.status === "active" ? { ...NONE, ...currentCoverage.areas } : NONE);
+      if (currentCoverage?.status === "active" || PENDING.has(currentRequest?.status || "")) setStep(2);
       setLoading(false);
     }).catch(() => { if (active) { setMessage("We could not load your support choices. Try again later."); setLoading(false); } });
     const unsubscribeCoverage = onSnapshot(coverageRef,
@@ -89,6 +100,15 @@ export default function ManagedTrackingChoices() {
   const matchesRequest = pending && same(areas, { ...NONE, ...serviceRequest?.areas });
   const matchesCoverage = activeCoverage && same(areas, currentAreas);
   const selected = areas.company || areas.drivers || areas.fleet;
+  const intakeMatchesRequest = JSON.stringify({ drivers: areas.drivers ? intake.drivers : [],
+    vehicles: areas.fleet ? intake.vehicles : [] }) === JSON.stringify(
+    serviceRequest?.intake || { drivers: [], vehicles: [] });
+  const updateDriver = (index: number, key: keyof IntakeDriver, value: string) =>
+    setIntake(previous => ({ ...previous, drivers: previous.drivers.map((row, i) =>
+      i === index ? { ...row, [key]: value } : row) }));
+  const updateVehicle = (index: number, key: keyof IntakeVehicle, value: string) =>
+    setIntake(previous => ({ ...previous, vehicles: previous.vehicles.map((row, i) =>
+      i === index ? { ...row, [key]: value } : row) }));
   const action = useMemo(() => {
     if (!selected && !activeCoverage) return pending
       ? { label: "Withdraw request and keep managing myself", operation: "withdraw", disabled: false }
@@ -105,6 +125,15 @@ export default function ManagedTrackingChoices() {
     if (!override && action.operation === "back") { router.replace("/(app)/dashboard"); return; }
     if ((!override && action.disabled) || saving) return;
     const operation = override || action.operation;
+    if (!override && operation === "request" && selected) {
+      if (areas.drivers && intake.drivers.some(row => !row.name.trim() || !row.cdlNumber.trim() ||
+        !/^[ABC]$/i.test(row.cdlClass.trim()) || !/^[A-Z]{2}$/i.test(row.cdlState.trim()))) {
+        setMessage("For each listed driver, enter the name, CDL number, class, and issuing state."); return;
+      }
+      if (areas.fleet && intake.vehicles.some(row => !row.unitNumber.trim() || row.vin.trim().length < 5)) {
+        setMessage("For each listed truck or trailer, enter a unit number and VIN or serial number."); return;
+      }
+    }
     if (operation === "request" || operation === "contact") {
       if (!preferredEmail.trim() || !preferredPhone.trim()) {
         setMessage("Enter the best email and phone number for managed-support updates."); return;
@@ -118,6 +147,8 @@ export default function ManagedTrackingChoices() {
     try {
       const callable = httpsCallable(functions, "submitManagedServiceRequest");
       const result = await callable({ action: operation, areas,
+        intake: { drivers: areas.drivers ? intake.drivers : [],
+          vehicles: areas.fleet ? intake.vehicles : [] },
         preferredEmail, preferredPhone, textPermission });
       const status = (result.data as { status?: string })?.status;
       setMessage(status === "withdrawn" || status === "already-active"
@@ -179,16 +210,78 @@ export default function ManagedTrackingChoices() {
           {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then.</Text></View>}
           {pending && <View style={styles.notice}><Text style={styles.noticeText}>Your request is {serviceRequest?.status?.replaceAll("_", " ")}. We will use the contact details below. You may change or withdraw the request.</Text></View>}
           {!!message && <View style={styles.notice}><Text style={styles.noticeText}>{message}</Text></View>}
+          {step === 1 && <View style={styles.card}>
+            <Text style={styles.section}>How would you like to start?</Text>
+            <Text style={styles.body}>Your app already tracks Company, Driver, and Fleet. Managed support is optional.</Text>
+            <Pressable accessibilityRole="button" style={styles.button} onPress={() => { setAreas(ALL); setStep(2); }}>
+              <Text style={styles.buttonText}>Ask us to manage deadlines</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" style={styles.contactButton} onPress={() => router.replace("/(app)/dashboard")}>
+              <Text style={styles.contactButtonText}>Keep managing them myself</Text>
+            </Pressable>
+            <Text style={styles.small}>Choosing help starts a request. You can remove any of the three areas on the next screen. We send an exact quote before any managed charge.</Text>
+          </View>}
+          {step >= 2 && <><Text style={styles.section}>1. Choose your managed areas</Text>
+          <Text style={styles.body}>Each area is optional. All three start selected when you ask for help. Tap any area to remove it. Your app still tracks areas you manage yourself.</Text>
           <View style={styles.grid}>{AREA.map(row => <View key={row.key} style={[styles.card, areas[row.key] && styles.selected]}>
             <Text style={styles.section}>{row.title}</Text>
             <Text style={styles.body}>{row.description}</Text>
             <Text style={styles.small}>{row.examples}</Text>
+            <Text style={styles.small}>{row.key === "company" ? `$${MANAGED_PRICING.companyFirstYearMonthly}/month in year one; $${MANAGED_PRICING.companyRenewalMonthly}/month after.`
+              : row.key === "drivers" ? `$${MANAGED_PRICING.driverMonthly}/month per active driver; $0 when there are none.`
+              : `$1/month per active truck and $1/month per active trailer; $0 when there are none.`}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={`${areas[row.key] ? "Manage" : "Self-manage"} ${row.title}`}
               disabled={lockedQuote} onPress={() => setAreas(previous => ({ ...previous, [row.key]: !previous[row.key] }))}
               style={[styles.choice, areas[row.key] && styles.choiceSelected, lockedQuote && styles.disabled]}>
-              <Text style={[styles.choiceText, areas[row.key] && styles.choiceSelectedText]}>{areas[row.key] ? "✓ Ask us to manage" : "Self-managed · choose help"}</Text>
+              <Text style={[styles.choiceText, areas[row.key] && styles.choiceSelectedText]}>{areas[row.key] ? "✓ Included · tap to remove" : "Not included · tap to add"}</Text>
             </Pressable>
           </View>)}</View>
+          {step === 2 && <View style={styles.card}>
+            <Text style={styles.summary}>Selected: {chosen(areas)}</Text>
+            <Text style={styles.small}>You can change this before sending your request. Listing drivers and vehicles next does not start billing.</Text>
+            <Pressable accessibilityRole="button" style={styles.button} onPress={() => setStep(3)}>
+              <Text style={styles.buttonText}>Continue to details</Text>
+            </Pressable>
+          </View>}</>}
+          {step === 3 && <><Text style={styles.section}>2. Tell us who and what to set up</Text>
+          {areas.drivers && <View style={styles.card}>
+            <Text style={styles.section}>Drivers · {intake.drivers.length} listed</Text>
+            <Text style={styles.body}>List your active drivers. If you have none, leave this empty. We only quote managed Driver charges for active drivers entered in your account.</Text>
+            {intake.drivers.map((row, index) => <View key={index} style={styles.contact}>
+              <Text style={styles.label}>Driver {index + 1}</Text>
+              {([ ["name", "Full name"], ["cdlNumber", "CDL number"], ["cdlClass", "CDL class (A, B, or C)"], ["cdlState", "Issuing state (2 letters)"],
+                ["cdlExpiration", "CDL expiration (YYYY-MM-DD, if known)"], ["medicalExpiration", "Medical expiration (YYYY-MM-DD, if known)"] ] as [keyof IntakeDriver, string][])
+                .map(([key, label]) => <TextInput key={key} style={styles.input} value={row[key]}
+                  onChangeText={value => updateDriver(index, key, value)} placeholder={label} accessibilityLabel={`Driver ${index + 1} ${label}`} />)}
+              <Pressable accessibilityRole="button" onPress={() => setIntake(previous => ({ ...previous,
+                drivers: previous.drivers.filter((_, i) => i !== index) }))}><Text style={styles.link}>Remove driver</Text></Pressable>
+            </View>)}
+            <Pressable accessibilityRole="button" style={styles.contactButton} onPress={() => setIntake(previous => ({ ...previous,
+              drivers: [...previous.drivers, { name: "", cdlNumber: "", cdlClass: "", cdlState: "",
+                cdlExpiration: "", medicalExpiration: "" }] }))}><Text style={styles.contactButtonText}>+ Add a driver</Text></Pressable>
+          </View>}
+          {areas.fleet && <View style={styles.card}>
+            <Text style={styles.section}>Trucks and trailers · {intake.vehicles.length} listed</Text>
+            <Text style={styles.body}>List active equipment. If you have none, leave this empty. Managed Fleet charges begin only for active units entered in your account.</Text>
+            {intake.vehicles.map((row, index) => <View key={index} style={styles.contact}>
+              <Text style={styles.label}>Equipment {index + 1}</Text>
+              <View style={styles.contactOptions}>{(["truck", "trailer"] as const).map(type => <Pressable key={type}
+                accessibilityRole="button" accessibilityState={{ selected: row.type === type }}
+                onPress={() => updateVehicle(index, "type", type)} style={[styles.choice, row.type === type && styles.choiceSelected]}>
+                <Text style={[styles.choiceText, row.type === type && styles.choiceSelectedText]}>{type === "truck" ? "Truck" : "Trailer"}</Text>
+              </Pressable>)}</View>
+              {([ ["unitNumber", "Unit number"], ["vin", "VIN or serial number"],
+                ["registrationExpiration", "Registration expiration (YYYY-MM-DD, if known)"],
+                ["inspectionExpiration", "Inspection expiration (YYYY-MM-DD, if known)"] ] as [keyof IntakeVehicle, string][])
+                .map(([key, label]) => <TextInput key={key} style={styles.input} value={row[key]}
+                  onChangeText={value => updateVehicle(index, key, value)} placeholder={label} accessibilityLabel={`Equipment ${index + 1} ${label}`} />)}
+              <Pressable accessibilityRole="button" onPress={() => setIntake(previous => ({ ...previous,
+                vehicles: previous.vehicles.filter((_, i) => i !== index) }))}><Text style={styles.link}>Remove equipment</Text></Pressable>
+            </View>)}
+            <Pressable accessibilityRole="button" style={styles.contactButton} onPress={() => setIntake(previous => ({ ...previous,
+              vehicles: [...previous.vehicles, { type: "truck", unitNumber: "", vin: "",
+                registrationExpiration: "", inspectionExpiration: "" }] }))}><Text style={styles.contactButtonText}>+ Add a truck or trailer</Text></Pressable>
+          </View>}
           <View style={styles.card}>
             <Text style={styles.section}>Your choices</Text>
             <Text style={styles.summary}>{selected ? "Request help for: " + chosen(areas) : activeCoverage ? "Request to end managed support" : "Self-managed in all areas"}</Text>
@@ -197,9 +290,9 @@ export default function ManagedTrackingChoices() {
               <Text style={styles.section}>Managed support prices</Text>
               <Text style={styles.body}>{`Company: $${MANAGED_PRICING.companyFirstYearMonthly}/month for the first 12 months, then $${MANAGED_PRICING.companyRenewalMonthly}/month. The first-year rate includes $${MANAGED_COMPANY_SETUP_TOTAL} of setup spread across those 12 months.`}</Text>
               <Text style={styles.body}>{`Driver: $${MANAGED_PRICING.driverMonthly}/month per managed driver. Truck: $${MANAGED_PRICING.truckMonthly}/month each. Trailer: $${MANAGED_PRICING.trailerMonthly}/month each.`}</Text>
-              <Text style={styles.body}>{`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge for the initial registration and inspection review.`}</Text>
+              <Text style={styles.body}>{`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge when at least one active truck or trailer is added.`}</Text>
               <Text style={styles.body}>{`Building a driver qualification file, when requested, is a separate $${MANAGED_PRICING.dqFileOneTime} one-time charge per file.`}</Text>
-              <Text style={styles.small}>These managed support charges are in addition to your app subscription ($2/month plus $1 per active driver). We will confirm your exact scope, quantities, and total before you agree or pay. Requesting help does not start billing or service.</Text>
+              <Text style={styles.small}>These managed support charges are in addition to your app subscription ($2/month plus $1 per active driver). When your listed drivers are entered as active in the app, the app's $1-per-driver charge applies even before managed support starts. We confirm the managed scope and exact total before you agree or pay. Your request itself starts no managed charge or service.</Text>
             </View>}
             {(selected || activeCoverage || pending) && <View style={styles.contact}>
               <Text style={styles.section}>How should we reach you?</Text>
@@ -237,7 +330,11 @@ export default function ManagedTrackingChoices() {
               <Text style={styles.buttonText}>{saving ? "Saving…" : lockedQuote ? "Quote in progress · contact us to change" : action.label}</Text>
             </Pressable>
           </View>
-          {quote && <View style={styles.card}>
+          </>}
+          {quote && (!same(areas, quote.areas) || !intakeMatchesRequest) && <View style={styles.notice}>
+            <Text style={styles.noticeText}>Your existing quote covers the previously submitted areas and units. Submit your revised request for a new quote before accepting or paying.</Text>
+          </View>}
+          {quote && same(areas, quote.areas) && intakeMatchesRequest && <View style={styles.card}>
             <Text style={styles.section}>Your managed-support quote</Text>
             <Text style={styles.body}>{quote.scope}</Text>
             <Text style={styles.body}>Company: {quote.areas.company ? "included" : "self-managed"} · Driver: {quote.areas.drivers ? `${quote.counts.drivers} managed` : "self-managed"} · Fleet: {quote.areas.fleet ? `${quote.counts.trucks} trucks and ${quote.counts.trailers} trailers managed` : "self-managed"}</Text>

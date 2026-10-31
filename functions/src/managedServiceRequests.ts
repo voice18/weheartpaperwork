@@ -1,7 +1,9 @@
 import * as admin from "firebase-admin";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { createHash } from "node:crypto";
 import { OWNER_EMAIL } from "./ownerNotifications";
 import { contactChanged, managedContact } from "./managedContact";
+import { managedIntake } from "./managedIntake";
 
 type Areas = { company: boolean; drivers: boolean; fleet: boolean };
 const PENDING = new Set(["requested", "change_requested", "end_requested", "contacted", "quoted", "accepted"]);
@@ -100,18 +102,23 @@ export const submitManagedServiceRequest = onCall({ region: "us-central1" }, asy
     if (!["trialing", "active"].includes(String(carrier.data()?.billing?.status)))
       throw new HttpsError("failed-precondition", "Complete app checkout before requesting managed support.");
     const contact = managedContact(request.data ?? {});
+    let intake;
+    try { intake = managedIntake(request.data?.intake, selected); }
+    catch (error) { throw new HttpsError("invalid-argument", error instanceof Error ? error.message : "Invalid intake details."); }
     const nextStatus = activeCoverage
       ? any(selected) ? "change_requested" : "end_requested"
       : "requested";
+    const intakeChanged = JSON.stringify(before.intake || { drivers: [], vehicles: [] }) !== JSON.stringify(intake);
     if (PENDING.has(String(before.status)) && same(selected, previousAreas)
-      && !contactChanged(before, contact))
+      && !contactChanged(before, contact) && !intakeChanged)
       return { status: "already-pending" };
     const revision = Number(before.revision || 0) + 1;
     const now = admin.firestore.FieldValue.serverTimestamp();
     const companyName = String(carrier.data()?.companyName || "Unnamed company").slice(0, 150);
     const accountEmail = String(request.auth?.token.email || "").slice(0, 254);
-    const contactOnly = PENDING.has(String(before.status)) && same(selected, previousAreas);
+    const contactOnly = PENDING.has(String(before.status)) && same(selected, previousAreas) && !intakeChanged;
     tx.set(requestRef, { carrierId: uid, companyName, accountEmail, ...contact,
+      intake,
       textConsentAt: contact.textPermission ? now : null,
       billingStatus: carrier.data()?.billing?.status ?? null, areas: selected,
       status: contactOnly ? before.status : nextStatus, revision,
@@ -126,7 +133,7 @@ export const submitManagedServiceRequest = onCall({ region: "us-central1" }, asy
     tx.create(db.collection("mail").doc(`managed_request_${uid}_${revision}`), {
       to: [OWNER_EMAIL], category: "managed_service_request", managedServiceCarrierId: uid,
       message: { subject: `${contactOnly ? "Managed support contact updated" : "Managed support request"}: ${companyName}`,
-        text: `A customer ${contactOnly ? "updated contact preferences for" : "requested"} managed tracking.\n\nCompany: ${companyName}\nAccount email: ${accountEmail}\nBest email: ${contact.preferredEmail}\nBest phone: ${contact.preferredPhone}\nService-related texts permitted: ${contact.textPermission ? "Yes" : "No"}\nRequest: ${description(selected)}\nRequest type: ${contactOnly ? before.status : nextStatus}\n\nReview the owner workspace. No quote, payment, or coverage change happened automatically.` },
+        text: `A customer ${contactOnly ? "updated contact preferences for" : "requested"} managed tracking.\n\nCompany: ${companyName}\nAccount email: ${accountEmail}\nBest email: ${contact.preferredEmail}\nBest phone: ${contact.preferredPhone}\nService-related texts permitted: ${contact.textPermission ? "Yes" : "No"}\nRequest: ${description(selected)}\nIntake: ${intake.drivers.length} drivers, ${intake.vehicles.length} trucks/trailers.\nRequest type: ${contactOnly ? before.status : nextStatus}\n\nReview the owner workspace. No quote, payment, or coverage change happened automatically.` },
       createdAt: now,
     });
     return { status: contactOnly ? "contact-updated" : nextStatus };
@@ -153,11 +160,65 @@ export const listManagedServiceRequests = onCall({ region: "us-central1" }, asyn
         ? { status: quote.data()?.status ?? null, scope: quote.data()?.scope ?? "",
           price: quote.data()?.price ?? null, counts: quote.data()?.counts ?? null } : null,
       billingStatus: value.billingStatus ?? null,
+      intake: value.intake || { drivers: [], vehicles: [] },
       areas: areas(value.areas), status: String(value.status || "requested"),
       updatedAtMillis: value.updatedAt?.toMillis?.() ?? null };
   }));
   requests.sort((a, b) => (b.updatedAtMillis || 0) - (a.updatedAtMillis || 0));
   return { requests };
+});
+export const enterManagedIntakeUnits = onCall({ region: "us-central1" }, async request => {
+  owner(request);
+  const uid = request.data?.carrierId;
+  if (typeof uid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(uid))
+    throw new HttpsError("invalid-argument", "Choose a valid company.");
+  const db = admin.firestore();
+  const carrierRef = db.collection("carriers").doc(uid);
+  const requestRef = db.collection("managedServiceRequests").doc(uid);
+  const [carrier, currentRequest, existingDrivers, existingVehicles] = await Promise.all([
+    carrierRef.get(), requestRef.get(), carrierRef.collection("drivers").get(), carrierRef.collection("vehicles").get(),
+  ]);
+  if (!carrier.exists || carrier.data()?.deletingAccount === true ||
+      !["active", "trialing"].includes(String(carrier.data()?.billing?.status)))
+    throw new HttpsError("failed-precondition", "The customer needs an active app subscription.");
+  if (!["requested", "contacted"].includes(String(currentRequest.data()?.status)))
+    throw new HttpsError("failed-precondition", "Review a current, unquoted request first.");
+  const selected = areas(currentRequest.data()?.areas);
+  let intake;
+  try { intake = managedIntake(currentRequest.data()?.intake, selected); }
+  catch (error) { throw new HttpsError("failed-precondition", error instanceof Error ? error.message : "Invalid intake."); }
+  const driverKeys = new Set(existingDrivers.docs.map(row =>
+    `${String(row.data().cdlState || "").toUpperCase()}:${String(row.data().cdlNumber || "").replace(/[^A-Z0-9]/gi, "").toUpperCase()}`));
+  const vehicleKeys = new Set(existingVehicles.docs.map(row => String(row.data().vin || "").toUpperCase()));
+  const newDrivers = intake.drivers.filter(row => !driverKeys.has(`${row.cdlState}:${row.cdlNumber.replace(/[^A-Z0-9]/gi, "")}`));
+  const newVehicles = intake.vehicles.filter(row => !vehicleKeys.has(row.vin));
+  if (!newDrivers.length && !newVehicles.length) return { driversAdded: 0, vehiclesAdded: 0 };
+  const batch = db.batch();
+  for (const row of newDrivers) {
+    const id = "intake-" + createHash("sha256").update(uid + ":driver:" + row.cdlState + ":" + row.cdlNumber).digest("hex").slice(0, 24);
+    batch.create(carrierRef.collection("drivers").doc(id), {
+      ...row, status: "active", inactiveAt: null, rehiredAt: null, mvrDue: "", clearinghouseDue: "",
+      roadTestOnFile: false, employmentApplicationOnFile: false, initialMvrOnFile: false,
+      preEmploymentClearinghouseQueryComplete: false, preEmploymentDrugTestComplete: false,
+      speStatus: "missing", lcvStatus: "missing", previousEmployerInvestigationComplete: false,
+      source: "managed_intake", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+  for (const row of newVehicles) {
+    const id = "intake-" + createHash("sha256").update(uid + ":vehicle:" + row.vin).digest("hex").slice(0, 24);
+    batch.create(carrierRef.collection("vehicles").doc(id), {
+      ...row, year: "", make: "", model: "", plateNumber: "", registrationState: "",
+      registrationPermanent: false, status: "active", source: "managed_intake",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  }
+  batch.create(requestRef.collection("events").doc(), { type: "intake_units_entered",
+    driversAdded: newDrivers.length, vehiclesAdded: newVehicles.length,
+    actor: request.auth!.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  try { await batch.commit(); }
+  catch (error) { throw new HttpsError("aborted", "The intake or account changed while adding units. Refresh and check the customer account before retrying."); }
+  return { driversAdded: newDrivers.length, vehiclesAdded: newVehicles.length };
 });
 export const updateManagedServiceRequestStatus = onCall({ region: "us-central1" }, async request => {
   owner(request);
