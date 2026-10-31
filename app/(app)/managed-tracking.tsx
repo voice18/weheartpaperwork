@@ -23,11 +23,11 @@ type ManagedQuote = { quoteId: string; status: string; scope: string; expiresAtM
   price: { firstYearMonthly: number; renewalMonthly: number;
     fleetOnlyOnboardingOneTime: number; dqFileOneTime: number } };
 const AREA: { key: Area; title: string; description: string; examples: string }[] = [
-  { key: "company", title: "Company", description: "Carrier-wide deadlines and requirements.",
+  { key: "company", title: "Company", description: "A clear action plan for carrier-wide requirements.",
     examples: "USDOT updates, UCR, IFTA, IRP, 2290, insurance and other applicable company items." },
-  { key: "drivers", title: "Driver", description: "Deadlines for the active drivers you add.",
+  { key: "drivers", title: "Driver", description: "Set up each active driver's records and keep their next steps clear.",
     examples: "CDL and medical dates, annual MVR and Clearinghouse reviews, and DQ setup checks." },
-  { key: "fleet", title: "Fleet", description: "Deadlines for the active trucks and trailers you add.",
+  { key: "fleet", title: "Fleet", description: "Organize each active unit's registration and inspection dates.",
     examples: "Registration and annual DOT inspection dates." },
 ];
 const NONE: Areas = { company: false, drivers: false, fleet: false };
@@ -204,7 +204,7 @@ export default function ManagedTrackingChoices() {
       </View> : <>
         <Text style={styles.eyebrow}>OPTIONAL SUPPORT</Text>
         <Text style={styles.title}>Choose how much help you want</Text>
-        <Text style={styles.body}>Your app tracks deadlines in every area. Keep managing them yourself, or ask us to monitor and follow up on whole areas of your account.</Text>
+        <Text style={styles.body}>We help turn your deadlines into a plan. For the areas you choose, we set up the information you give us, identify what is due or missing, tell you what to prepare and where to go, and follow up until you confirm the task is done. You complete the filing or other required action and pay any outside fees.</Text>
         {loading ? <ActivityIndicator color="#27500A" /> : <>
           {activeCoverage && <View style={styles.notice}><Text style={styles.noticeText}>Currently managed: {chosen(currentAreas)}. Your current coverage continues until an agreed change takes effect.</Text></View>}
           {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then.</Text></View>}
@@ -212,7 +212,7 @@ export default function ManagedTrackingChoices() {
           {!!message && <View style={styles.notice}><Text style={styles.noticeText}>{message}</Text></View>}
           {step === 1 && <View style={styles.card}>
             <Text style={styles.section}>How would you like to start?</Text>
-            <Text style={styles.body}>Your app already tracks Company, Driver, and Fleet. Managed support is optional.</Text>
+            <Text style={styles.body}>Your app tracks Company, Driver, and Fleet. With optional managed support, we help organize the work and guide you through each deadline. You take the final action.</Text>
             <Pressable accessibilityRole="button" style={styles.button} onPress={() => { setAreas(ALL); setStep(2); }}>
               <Text style={styles.buttonText}>Ask us to manage deadlines</Text>
             </Pressable>
@@ -356,9 +356,9 @@ export default function ManagedTrackingChoices() {
             {quote.status === "paid_awaiting_start" && <Text style={styles.body}>Payment received. We are confirming the start of your selected managed coverage.</Text>}
           </View>}
           <View style={styles.card}>
-            <Text style={styles.section}>Who does what?</Text>
-            <Text style={styles.body}><Text style={styles.bold}>We Heart Paperwork:</Text> monitors selected deadlines, flags missing dates, sends instructions, and follows up.</Text>
-            <Text style={styles.body}><Text style={styles.bold}>Your company:</Text> completes filings, payments, MVR orders, driver actions, and inspections; then confirms completion.</Text>
+            <Text style={styles.section}>We get the work ready. You take the final step.</Text>
+            <Text style={styles.body}><Text style={styles.bold}>We Heart Paperwork:</Text> sets up the selected areas from the information you provide, reviews upcoming deadlines and missing details, gives you specific next steps and links where available, follows up, and updates your tracking when you confirm completion.</Text>
+            <Text style={styles.body}><Text style={styles.bold}>Your company:</Text> provides accurate information, submits filings, orders records such as MVRs, coordinates driver actions and inspections, pays agency or third-party fees, and tells us when each task is complete.</Text>
             <Text style={styles.small}>Custom Company items are included only after we verify and accept their due dates. Unselected areas keep the app's regular tracking.</Text>
           </View>
           <View style={styles.card}>

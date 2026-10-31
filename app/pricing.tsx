@@ -411,12 +411,13 @@ export default function PricingPage() {
         <View style={styles.section}>
           <Text style={styles.eyebrow}>OPTIONAL MANAGED SUPPORT</Text>
           <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>
-            We help watch the deadlines. You stay in control.
+            We prepare the next steps. You take the final action.
           </Text>
           <Text style={styles.sectionDescription}>
-            Choose Company, Driver, Fleet, or a combination. We monitor the selected areas,
-            give you instructions, and follow up. Your company still completes filings,
-            payments, driver actions, and inspections.
+            Choose Company, Driver, Fleet, or a combination. We organize the information you
+            provide, identify upcoming deadlines and missing details, give you clear steps and
+            links where available, and follow up. Your company submits filings, orders records,
+            completes driver actions and inspections, and pays outside fees.
           </Text>
           <View style={styles.exampleTable}>
             <PriceExample drivers="Company · first 12 months" description={`Includes $${MANAGED_COMPANY_SETUP_TOTAL} of setup spread over year one`} price={`$${MANAGED_PRICING.companyFirstYearMonthly}/mo`} />
@@ -499,7 +500,7 @@ export default function PricingPage() {
 
             <FaqItem
               question="Does We Heart Paperwork file forms for me?"
-              answer="No. The app organizes your deadlines and records. Optional managed support adds monitoring, instructions, and follow-up for the areas you choose. Your company still completes filings, payments, driver actions, and inspections."
+              answer="No. With optional managed support, we organize the information you provide, review deadlines and missing details, give you specific next steps and links where available, and follow up. Your company submits filings, orders records, completes driver actions and inspections, and pays outside fees."
             />
 
             <FaqItem

@@ -509,7 +509,7 @@ export default function OwnerManaged() {
           <Text style={styles.small}>Prepare the exact price and written scope. Active driver and vehicle counts come from this customer's account.</Text>
           <TextInput style={styles.input} value={quoteScopes[row.carrierId] || ""}
             onChangeText={value => setQuoteScopes(previous => ({ ...previous, [row.carrierId]: value }))}
-            placeholder="What we will monitor and what the customer must complete" multiline />
+            placeholder="What we will set up, review, guide, and follow up on; what the customer submits and pays" multiline />
           {row.areas.drivers && <TextInput style={styles.input} value={quoteDqFiles[row.carrierId] || "0"}
             onChangeText={value => setQuoteDqFiles(previous => ({ ...previous, [row.carrierId]: value }))}
             keyboardType="number-pad" placeholder="Number of DQ files to build separately" />}
