@@ -80,6 +80,14 @@ const REQUEST_STAGE: Record<string, string> = {
   change_requested: "Coverage change requested · review before changing billing",
   end_requested: "Support end requested · review billing end date",
 };
+function suggestedQuoteScope(areas: Areas): string {
+  const work = [
+    areas.company && "review company deadlines and provide filing instructions and follow-up",
+    areas.drivers && "organize the quoted drivers' dates and qualification-file checks",
+    areas.fleet && "organize registration and inspection dates for the quoted equipment",
+  ].filter(Boolean).join("; ");
+  return `We will ${work}. We will update the shared dashboard from verified information. Your company provides accurate records, completes and pays for filings, inspections, and third-party orders, and confirms when each task is done. Driver qualification file preparation is included only for the number separately shown in this quote.`;
+}
 
 async function call<T>(name: string, data: Record<string, unknown>): Promise<T> {
   const result = await httpsCallable<Record<string, unknown>, T>(functions, name)(data);
@@ -154,6 +162,7 @@ export default function OwnerManaged() {
   const [requestNotes, setRequestNotes] = useState<Record<string, string>>({});
   const [quoteScopes, setQuoteScopes] = useState<Record<string, string>>({});
   const [quoteDqFiles, setQuoteDqFiles] = useState<Record<string, string>>({});
+  const [quoteFeedback, setQuoteFeedback] = useState<Record<string, string>>({});
   const [confirmIntakeId, setConfirmIntakeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -320,18 +329,23 @@ export default function OwnerManaged() {
     finally { setWorking(false); }
   };
   const prepareQuote = async (row: ServiceRequest) => {
-    const scope = (quoteScopes[row.carrierId] || "").trim();
+    const scope = (quoteScopes[row.carrierId] ?? row.quote?.scope ?? suggestedQuoteScope(row.areas)).trim();
     const dqFiles = Number(quoteDqFiles[row.carrierId] || "0");
     if (scope.length < 20 || !Number.isSafeInteger(dqFiles) || dqFiles < 0) {
-      setMessage("Describe the included work in at least 20 characters and enter a valid DQ-file count.");
+      setQuoteFeedback(previous => ({ ...previous, [row.carrierId]:
+        "Add a scope of at least 20 characters and a valid DQ-file count before preparing the quote." }));
       return;
     }
+    setQuoteFeedback(previous => ({ ...previous, [row.carrierId]: "Preparing the customer quote…" }));
     setWorking(true);
     try {
       await call("prepareManagedServiceQuote", { carrierId: row.carrierId, scope, dqFiles });
       await loadRequests();
-      setMessage("Quote prepared for the customer's managed-tracking page. No payment or coverage change occurred.");
-    } catch (error) { setMessage(errorText(error)); }
+      setQuoteFeedback(previous => ({ ...previous, [row.carrierId]:
+        "Quote ready on the customer's Managed tracking page. No payment or coverage change occurred." }));
+    } catch (error) {
+      setQuoteFeedback(previous => ({ ...previous, [row.carrierId]: errorText(error) }));
+    }
     finally { setWorking(false); }
   };
   const enterIntake = async (row: ServiceRequest) => {
@@ -522,14 +536,17 @@ export default function OwnerManaged() {
           ? new Date(row.updatedAtMillis).toLocaleString() : "Recently"}</Text>
         {["requested", "contacted", "quoted"].includes(row.status) && !!(row.areas.company || row.areas.drivers || row.areas.fleet) && <View style={styles.contactBox}>
           <Text style={styles.small}>Prepare the written scope and exact price from active account units plus the listed intake. Matching units count once. No unit or charge is added when you prepare a quote.</Text>
-          <TextInput style={styles.input} value={quoteScopes[row.carrierId] || ""}
+          <Text style={styles.small}>Written scope shown to the customer · Review and edit this draft before sending the quote.</Text>
+          <TextInput style={styles.input} value={quoteScopes[row.carrierId] ?? row.quote?.scope ?? suggestedQuoteScope(row.areas)}
             onChangeText={value => setQuoteScopes(previous => ({ ...previous, [row.carrierId]: value }))}
             placeholder="What we will set up, review, guide, and follow up on; what the customer submits and pays" multiline />
-          {row.areas.drivers && <TextInput style={styles.input} value={quoteDqFiles[row.carrierId] || "0"}
+          {row.areas.drivers && <><Text style={styles.small}>Driver qualification files to prepare separately · $99 each. Enter 0 if none.</Text>
+          <TextInput style={styles.input} value={quoteDqFiles[row.carrierId] || "0"}
             onChangeText={value => setQuoteDqFiles(previous => ({ ...previous, [row.carrierId]: value }))}
-            keyboardType="number-pad" placeholder="Number of DQ files to build separately" />}
+            keyboardType="number-pad" placeholder="Number of DQ files to build separately" /></>}
           <Button label={row.status === "quoted" ? "Replace unaccepted quote" : "Prepare exact customer quote"}
             onPress={() => void prepareQuote(row)} disabled={working} />
+          {!!quoteFeedback[row.carrierId] && <Text style={styles.small} accessibilityRole="alert">{quoteFeedback[row.carrierId]}</Text>}
         </View>}
         {row.status === "change_requested" && <View style={styles.contactBox}>
           <Text style={styles.small}>Existing managed coverage and billing remain active. Contact the customer to confirm the requested scope. This preview cannot revise an active managed subscription or activate a changed scope. Do not promise a new price or coverage until the billing change is ready.</Text>
