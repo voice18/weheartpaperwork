@@ -541,7 +541,8 @@ export default function OwnerManaged() {
             <Button label="Close without changing coverage" subtle onPress={() => void recordRequest(row, "closed")} disabled={working} />
           </View>
         </View>}
-        {row.status !== "change_requested" && <Button label="Open company setup" subtle onPress={() => void chooseRequest(row)} disabled={working} />}
+        {row.status === "paid_awaiting_start" && <Button label="Finish paid company setup" subtle onPress={() => void chooseRequest(row)} disabled={working} />}
+        {row.status === "end_requested" && <Button label="Review current coverage" subtle onPress={() => void chooseRequest(row)} disabled={working} />}
         {row.status === "end_requested" && <Button label="End managed billing at period end"
           onPress={() => void scheduleEnd(row)} disabled={working} />}
         {["requested", "contacted"].includes(row.status) && <><TextInput style={styles.input} value={requestNotes[row.carrierId] || ""}
@@ -704,7 +705,7 @@ export default function OwnerManaged() {
         <Button label={showDirectory ? "Hide directory" : "Show directory"} subtle
           onPress={() => { if (!showDirectory && companies.length === 0) void loadCompanies();
             setShowDirectory(value => !value); }} /></View>
-      <Text style={styles.help}>Use this only to start or change managed coverage. Daily deadline work is in the queue above.</Text>
+      <Text style={styles.help}>Use this directory to review a company's current setup. Start new coverage only after payment is confirmed. Daily deadline work is in the queue above.</Text>
       {showDirectory && <>
       <Text style={styles.help}>Select a company by name to set up or change managed service. No email address is needed.</Text>
       <TextInput style={styles.input} value={companyFilter} onChangeText={setCompanyFilter}
