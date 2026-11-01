@@ -231,9 +231,9 @@ export default function ManagedTrackingChoices() {
         <Text style={styles.title}>Your support options</Text>
         <Text style={styles.body}>Managed tracking choices are available after signing in on the We Heart Paperwork website.</Text>
       </View> : <>
-        <Text style={styles.eyebrow}>OPTIONAL SUPPORT</Text>
-        <Text style={styles.title}>Choose how much help you want</Text>
-        <Text style={styles.body}>We help turn your deadlines into a plan. For the areas you choose, we set up the information you give us, identify what is due or missing, tell you what to prepare and where to go, and follow up until you confirm the task is done. You complete the filing or other required action and pay any outside fees.</Text>
+        <Text style={styles.eyebrow}>{paymentConfirmed ? "MANAGED SUPPORT" : "OPTIONAL SUPPORT"}</Text>
+        <Text style={styles.title}>{paymentConfirmed ? "Your setup is in progress" : "Choose how much help you want"}</Text>
+        {!paymentConfirmed && <Text style={styles.body}>We help turn your deadlines into a plan. For the areas you choose, we set up the information you give us, identify what is due or missing, tell you what to prepare and where to go, and follow up until you confirm the task is done. You complete the filing or other required action and pay any outside fees.</Text>}
         {loading ? <ActivityIndicator color="#27500A" /> : <>
           {activeCoverage && <View style={styles.notice}><Text style={styles.noticeText}>Currently managed: {chosen(currentAreas)}. Your current coverage continues until an agreed change takes effect.</Text></View>}
           {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then.</Text></View>}
@@ -380,7 +380,7 @@ export default function ManagedTrackingChoices() {
             {quote.areas.fleet && quote.counts.trucks + quote.counts.trailers === 0 && <Text style={styles.small}>Fleet support has no enrolled vehicles and no Fleet charge in this quote. Ask us for an updated quote before adding managed equipment later.</Text>}
             <Text style={styles.summary}>${quote.price.firstYearMonthly}/month in year one</Text>
             <Text style={styles.body}>${quote.price.renewalMonthly}/month from year two. {quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime > 0 ? `$${quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime} in one-time charges at checkout.` : "No one-time charges."}</Text>
-            <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} Quote expires {new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.</Text>
+            <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} {paymentConfirmed ? "Service starts after we confirm setup." : `Quote expires ${new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.`}</Text>
             {quote.appDriverIncrease == null && <Pressable accessibilityRole="link"
               onPress={() => void Linking.openURL("mailto:aaron@weheartpaperwork.com?subject=Updated%20managed%20support%20quote")}>
               <Text style={styles.link}>Ask for an updated quote ›</Text>
@@ -397,7 +397,7 @@ export default function ManagedTrackingChoices() {
               onPress={() => void withdrawQuote()} style={[styles.contactButton, saving && styles.disabled]}>
               <Text style={styles.contactButtonText}>Withdraw accepted quote</Text>
             </Pressable>}
-            {quote.status === "paid_awaiting_start" && <Text style={styles.body}>Payment received. We are confirming the start of your selected managed coverage.</Text>}
+            {quote.status === "paid_awaiting_start" && !paymentConfirmed && <Text style={styles.body}>Payment received. We are confirming the start of your selected managed coverage.</Text>}
           </View>}
           <View style={styles.card}>
             <Text style={styles.section}>We get the work ready. You take the final step.</Text>
