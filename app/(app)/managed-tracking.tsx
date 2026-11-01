@@ -124,6 +124,7 @@ export default function ManagedTrackingChoices() {
     return () => { active = false; };
   }, [serviceRequest?.status, serviceRequest?.updatedAt]);
   const activeCoverage = coverage?.status === "active";
+  const paymentConfirmed = serviceRequest?.status === "paid_awaiting_start";
   const lockedQuote = ["accepted", "paid_awaiting_start"].includes(serviceRequest?.status || "");
   const currentAreas = { ...NONE, ...coverage?.areas };
   const pending = PENDING.has(serviceRequest?.status || "");
@@ -236,9 +237,18 @@ export default function ManagedTrackingChoices() {
         {loading ? <ActivityIndicator color="#27500A" /> : <>
           {activeCoverage && <View style={styles.notice}><Text style={styles.noticeText}>Currently managed: {chosen(currentAreas)}. Your current coverage continues until an agreed change takes effect.</Text></View>}
           {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then.</Text></View>}
-          {pending && <View style={styles.notice}><Text style={styles.noticeText}>{requestProgress(serviceRequest?.status)}</Text></View>}
+          {pending && !paymentConfirmed && <View style={styles.notice}><Text style={styles.noticeText}>{requestProgress(serviceRequest?.status)}</Text></View>}
           {!!message && <View style={styles.notice}><Text style={styles.noticeText}>{message}</Text></View>}
-          {step === 1 && <View style={styles.card}>
+          {paymentConfirmed && <View style={styles.card}>
+            <Text style={styles.title}>Payment received</Text>
+            <Text style={styles.body}>Your managed-support checkout is complete. You do not need to choose areas or pay again.</Text>
+            <Text style={styles.body}>Next, we will verify the quoted records and dates, finish setup, and confirm when your selected support starts. Your existing app subscription remains separate.</Text>
+            <Pressable accessibilityRole="button" style={styles.contactButton}
+              onPress={() => router.replace("/(app)/dashboard")}>
+              <Text style={styles.contactButtonText}>Return to dashboard</Text>
+            </Pressable>
+          </View>}
+          {!paymentConfirmed && step === 1 && <View style={styles.card}>
             <Text style={styles.section}>How would you like to start?</Text>
             <Text style={styles.body}>Your app tracks Company, Driver, and Fleet. With optional managed support, we help organize the work and guide you through each deadline. You take the final action.</Text>
             <Pressable accessibilityRole="button" style={styles.button} onPress={() => { setAreas(ALL); setStep(2); }}>
@@ -249,7 +259,7 @@ export default function ManagedTrackingChoices() {
             </Pressable>
             <Text style={styles.small}>Choosing help starts a request. You can remove any of the three areas on the next screen. We send an exact quote before any managed charge.</Text>
           </View>}
-          {step >= 2 && <><Text style={styles.section}>1. Choose your managed areas</Text>
+          {!paymentConfirmed && step >= 2 && <><Text style={styles.section}>1. Choose your managed areas</Text>
           <Text style={styles.body}>Each area is optional. All three start selected when you ask for help. Tap any area to remove it. Your app still tracks areas you manage yourself.</Text>
           <View style={styles.grid}>{AREA.map(row => <View key={row.key} style={[styles.card, areas[row.key] && styles.selected]}>
             <Text style={styles.section}>{row.title}</Text>
@@ -271,7 +281,7 @@ export default function ManagedTrackingChoices() {
               <Text style={styles.buttonText}>Continue to details</Text>
             </Pressable>
           </View>}</>}
-          {step === 3 && <><Text style={styles.section}>2. Tell us who and what to set up</Text>
+          {!paymentConfirmed && step === 3 && <><Text style={styles.section}>2. Tell us who and what to set up</Text>
           {areas.drivers && <View style={styles.card}>
             <Text style={styles.section}>Drivers · {intake.drivers.length} listed</Text>
             <Text style={styles.body}>List drivers you want us to set up. Leave this empty if you have none. We check this list against your existing dashboard before quoting. Listing a driver does not add them or change billing.</Text>
@@ -359,11 +369,11 @@ export default function ManagedTrackingChoices() {
             </Pressable>
           </View>
           </>}
-          {quote && (!same(areas, quote.areas) || !intakeMatchesRequest) && <View style={styles.notice}>
+          {quote && !paymentConfirmed && (!same(areas, quote.areas) || !intakeMatchesRequest) && <View style={styles.notice}>
             <Text style={styles.noticeText}>Your existing quote covers the previously submitted areas and units. Submit your revised request for a new quote before accepting or paying.</Text>
           </View>}
-          {quote && same(areas, quote.areas) && intakeMatchesRequest && <View style={styles.card}>
-            <Text style={styles.section}>Your managed-support quote</Text>
+          {quote && (paymentConfirmed || (same(areas, quote.areas) && intakeMatchesRequest)) && <View style={styles.card}>
+            <Text style={styles.section}>{paymentConfirmed ? "Your paid managed-support plan" : "Your managed-support quote"}</Text>
             <Text style={styles.body}>{quote.scope}</Text>
             <Text style={styles.body}>Company: {quote.areas.company ? "included" : "self-managed"} · Driver: {quote.areas.drivers ? `${quote.counts.drivers} managed` : "self-managed"} · Fleet: {quote.areas.fleet ? `${quote.counts.trucks} trucks and ${quote.counts.trailers} trailers managed` : "self-managed"}</Text>
             {quote.areas.drivers && quote.counts.drivers === 0 && <Text style={styles.small}>Driver support has no enrolled drivers and no Driver charge in this quote. Ask us for an updated quote before adding managed drivers later.</Text>}
@@ -395,13 +405,13 @@ export default function ManagedTrackingChoices() {
             <Text style={styles.body}><Text style={styles.bold}>Your company:</Text> provides accurate information, submits filings, orders records such as MVRs, coordinates driver actions and inspections, pays agency or third-party fees, and tells us when each task is complete.</Text>
             <Text style={styles.small}>Custom Company items are included only after we verify and accept their due dates. Unselected areas keep the app's regular tracking.</Text>
           </View>
-          <View style={styles.card}>
+          {!paymentConfirmed && <View style={styles.card}>
             <Text style={styles.section}>Before service starts</Text>
             <Text style={styles.body}>1. We review your request and send a written scope and exact first-year and ongoing price by email.</Text>
             <Text style={styles.body}>2. You accept the exact quote and complete secure Stripe checkout on this page.</Text>
             <Text style={styles.body}>3. After payment is confirmed, we add any quoted missing units, verify their dates and app billing, then activate the selected areas. Your dashboard shows the start date and who manages each area.</Text>
             <Text style={styles.small}>Your current app subscription and checkout continue unchanged. For help, email aaron@weheartpaperwork.com.</Text>
-          </View>
+          </View>}
         </>}
       </>}
     </ScrollView></>;
