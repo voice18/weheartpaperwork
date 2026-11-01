@@ -238,14 +238,27 @@ export const updateManagedServiceRequestStatus = onCall({ region: "us-central1" 
   if (note.length < 3) throw new HttpsError("invalid-argument", "Add a short action note.");
   const db = admin.firestore();
   const ref = db.collection("managedServiceRequests").doc(carrierId);
+  const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
   await db.runTransaction(async tx => {
-    const snapshot = await tx.get(ref);
-    if (!snapshot.exists || !["requested", "contacted"].includes(String(snapshot.data()?.status)))
+    const [snapshot, coverage] = await Promise.all([tx.get(ref), tx.get(coverageRef)]);
+    const priorStatus = String(snapshot.data()?.status);
+    const changingActiveCoverage = priorStatus === "change_requested" && coverage.data()?.status === "active";
+    if (!snapshot.exists || (!["requested", "contacted"].includes(priorStatus) && !changingActiveCoverage))
       throw new HttpsError("failed-precondition", "This request is no longer waiting for review.");
     const now = admin.firestore.FieldValue.serverTimestamp();
-    tx.update(ref, { status, updatedAt: now });
+    if (changingActiveCoverage) {
+      if (status === "closed") {
+        tx.update(ref, { status: "active", areas: coverage.data()?.areas,
+          intake: { drivers: [], vehicles: [] }, updatedAt: now });
+      } else {
+        tx.update(ref, { lastContactedAt: now, updatedAt: now });
+      }
+    } else {
+      tx.update(ref, { status, updatedAt: now });
+    }
     tx.create(ref.collection("events").doc(), {
-      type: status, note, actor: request.auth!.uid, createdAt: now,
+      type: changingActiveCoverage ? `change_${status}` : status,
+      note, actor: request.auth!.uid, createdAt: now,
     });
   });
   return { status };

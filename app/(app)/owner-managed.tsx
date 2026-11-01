@@ -313,7 +313,9 @@ export default function OwnerManaged() {
       await call("updateManagedServiceRequestStatus", { carrierId: row.carrierId, status, note });
       setRequestNotes(previous => ({ ...previous, [row.carrierId]: "" }));
       await loadRequests();
-      setMessage(status === "contacted" ? "Contact logged. No email was sent by this button." : "Request closed without a quote.");
+      setMessage(status === "contacted" ? "Contact logged. No email was sent by this button."
+        : row.status === "change_requested" ? "Change request closed. Existing coverage and billing remain in place."
+        : "Request closed without a quote.");
     } catch (error) { setMessage(errorText(error)); }
     finally { setWorking(false); }
   };
@@ -529,7 +531,17 @@ export default function OwnerManaged() {
           <Button label={row.status === "quoted" ? "Replace unaccepted quote" : "Prepare exact customer quote"}
             onPress={() => void prepareQuote(row)} disabled={working} />
         </View>}
-        <Button label="Open company setup" subtle onPress={() => void chooseRequest(row)} disabled={working} />
+        {row.status === "change_requested" && <View style={styles.contactBox}>
+          <Text style={styles.small}>Existing managed coverage and billing remain active. Contact the customer to confirm the requested scope. This preview cannot revise an active managed subscription or activate a changed scope. Do not promise a new price or coverage until the billing change is ready.</Text>
+          <TextInput style={styles.input} value={requestNotes[row.carrierId] || ""}
+            onChangeText={value => setRequestNotes(previous => ({ ...previous, [row.carrierId]: value }))}
+            placeholder="Note your follow-up or why the change will not proceed" multiline />
+          <View style={styles.row}>
+            <Button label="Log customer follow-up" subtle onPress={() => void recordRequest(row, "contacted")} disabled={working} />
+            <Button label="Close without changing coverage" subtle onPress={() => void recordRequest(row, "closed")} disabled={working} />
+          </View>
+        </View>}
+        {row.status !== "change_requested" && <Button label="Open company setup" subtle onPress={() => void chooseRequest(row)} disabled={working} />}
         {row.status === "end_requested" && <Button label="End managed billing at period end"
           onPress={() => void scheduleEnd(row)} disabled={working} />}
         {["requested", "contacted"].includes(row.status) && <><TextInput style={styles.input} value={requestNotes[row.carrierId] || ""}
