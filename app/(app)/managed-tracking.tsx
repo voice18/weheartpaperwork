@@ -37,6 +37,23 @@ const PENDING = new Set(["requested", "change_requested", "end_requested", "cont
 function same(a: Areas, b: Areas): boolean {
   return a.company === b.company && a.drivers === b.drivers && a.fleet === b.fleet;
 }
+function sameIntake(current: Intake, submitted: Intake | undefined, areas: Areas): boolean {
+  const saved = submitted || { drivers: [], vehicles: [] };
+  const driverFields: (keyof IntakeDriver)[] = ["name", "cdlNumber", "cdlClass", "cdlState",
+    "cdlExpiration", "medicalExpiration"];
+  const vehicleFields: (keyof IntakeVehicle)[] = ["type", "unitNumber", "vin",
+    "registrationExpiration", "inspectionExpiration"];
+  const currentDrivers = areas.drivers ? current.drivers : [];
+  const savedDrivers = areas.drivers ? saved.drivers || [] : [];
+  const currentVehicles = areas.fleet ? current.vehicles : [];
+  const savedVehicles = areas.fleet ? saved.vehicles || [] : [];
+  const equalRows = <T extends Record<string, string>>(left: T[], right: T[], fields: (keyof T)[]) =>
+    left.length === right.length && left.every((row, index) => fields.every(field =>
+      String(row[field] || "").trim().toUpperCase() ===
+        String(right[index][field] || "").trim().toUpperCase()));
+  return equalRows(currentDrivers, savedDrivers, driverFields) &&
+    equalRows(currentVehicles, savedVehicles, vehicleFields);
+}
 function chosen(value: Areas): string {
   return AREA.filter(row => value[row.key]).map(row => row.title).join(", ") || "None";
 }
@@ -110,12 +127,10 @@ export default function ManagedTrackingChoices() {
   const lockedQuote = ["accepted", "paid_awaiting_start"].includes(serviceRequest?.status || "");
   const currentAreas = { ...NONE, ...coverage?.areas };
   const pending = PENDING.has(serviceRequest?.status || "");
-  const matchesRequest = pending && same(areas, { ...NONE, ...serviceRequest?.areas });
+  const intakeMatchesRequest = sameIntake(intake, serviceRequest?.intake, areas);
+  const matchesRequest = pending && same(areas, { ...NONE, ...serviceRequest?.areas }) && intakeMatchesRequest;
   const matchesCoverage = activeCoverage && same(areas, currentAreas);
   const selected = areas.company || areas.drivers || areas.fleet;
-  const intakeMatchesRequest = JSON.stringify({ drivers: areas.drivers ? intake.drivers : [],
-    vehicles: areas.fleet ? intake.vehicles : [] }) === JSON.stringify(
-    serviceRequest?.intake || { drivers: [], vehicles: [] });
   const updateDriver = (index: number, key: keyof IntakeDriver, value: string) =>
     setIntake(previous => ({ ...previous, drivers: previous.drivers.map((row, i) =>
       i === index ? { ...row, [key]: value } : row) }));
