@@ -3023,4 +3023,4 @@ export { findManagedServiceCandidate, listManagedServiceCandidates, saveManagedS
 export { submitManagedServiceRequest, listManagedServiceRequests, enterManagedIntakeUnits, updateManagedServiceRequestStatus } from "./managedServiceRequests";
 export { getManagedServiceQuote, prepareManagedServiceQuote, acceptManagedServiceQuote, createManagedCheckoutSession,
   withdrawManagedServiceQuote,
-  scheduleManagedServiceEnd } from "./managedQuotes";
+  scheduleManagedServiceEnd, endMyManagedSupport } from "./managedQuotes";

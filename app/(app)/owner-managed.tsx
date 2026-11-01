@@ -79,6 +79,7 @@ const REQUEST_STAGE: Record<string, string> = {
   paid_awaiting_start: "Payment confirmed · finish setup and start coverage",
   change_requested: "Coverage change requested · review before changing billing",
   end_requested: "Support end requested · review billing end date",
+  end_scheduled: "Managed billing ending at paid period end · app access continues",
 };
 function suggestedQuoteScope(areas: Areas): string {
   const work = [

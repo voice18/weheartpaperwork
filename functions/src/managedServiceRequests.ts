@@ -143,7 +143,7 @@ export const listManagedServiceRequests = onCall({ region: "us-central1" }, asyn
   owner(request);
   const db = admin.firestore();
   const snapshot = await db.collection("managedServiceRequests")
-    .where("status", "in", ["requested", "change_requested", "end_requested", "contacted", "quoted", "accepted", "paid_awaiting_start"]).get();
+    .where("status", "in", ["requested", "change_requested", "end_requested", "end_scheduled", "contacted", "quoted", "accepted", "paid_awaiting_start"]).get();
   const requests = await Promise.all(snapshot.docs.map(async row => {
     const value = row.data();
     const [carrier, quote] = await Promise.all([

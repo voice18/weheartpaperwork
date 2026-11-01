@@ -427,7 +427,7 @@ export default function PricingPage() {
             <PriceExample drivers="Each managed trailer" description="Applicable registration and inspection dates" price={`$${MANAGED_PRICING.trailerMonthly}/mo`} last />
           </View>
           <Text style={styles.sectionDescription}>
-            {`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge for the initial registration and inspection review. Building a driver qualification file, when requested, is a separate $${MANAGED_PRICING.dqFileOneTime} one-time charge per file. Managed support is added to your app subscription ($2/month plus $1 per active driver). We confirm the exact scope and total before you agree or pay. Requesting help does not start service or billing.`}
+            {`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge for the initial registration and inspection review. Building a driver qualification file, when requested, is a separate $${MANAGED_PRICING.dqFileOneTime} one-time charge per file. Managed support is added to your app subscription ($2/month plus $1 per active driver). We confirm the exact scope and total before you agree or pay. Requesting help does not start service or billing. You can end managed support in Settings at the end of a paid period, without an early termination charge. Your app subscription, records, and reminders continue.`}
           </Text>
         </View>
 

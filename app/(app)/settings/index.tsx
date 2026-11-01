@@ -54,6 +54,11 @@ export default function SettingsScreen() {
 
   const [billingLoaded, setBillingLoaded] =
   useState(false);
+  const [managedBilling, setManagedBilling] = useState<{
+    status?: string; monthlyAmountCents?: number; cancelAtPeriodEnd?: boolean; cancelAt?: { toDate?: () => Date };
+  } | null>(null);
+  const [managedQuotedMonthly, setManagedQuotedMonthly] = useState<number | null>(null);
+  const [endingManaged, setEndingManaged] = useState(false);
 
   const [activeDriverCount, setActiveDriverCount] =
   useState(0);
@@ -153,6 +158,15 @@ export default function SettingsScreen() {
     }
   );
 
+  const unsubscribeManagedBilling = onSnapshot(doc(db, "managedServiceBilling", userId),
+    snapshot => setManagedBilling(snapshot.exists() ? snapshot.data() : null),
+    error => console.error("Unable to load managed billing:", error));
+  void httpsCallable<Record<string, never>, { quote: { price?: { firstYearMonthly?: number } } | null }>(
+    functions, "getManagedServiceQuote")({}).then(result => {
+      const value = result.data.quote?.price?.firstYearMonthly;
+      setManagedQuotedMonthly(typeof value === "number" ? value : null);
+    }).catch(() => setManagedQuotedMonthly(null));
+
   const unsubscribeDrivers = onSnapshot(
      driversRef,
     (snapshot) => {
@@ -174,6 +188,7 @@ export default function SettingsScreen() {
   );
 
   return () => {
+    unsubscribeManagedBilling();
     unsubscribeCarrier();
     unsubscribeDrivers();
   };
@@ -776,6 +791,31 @@ const handleChangePassword = () => {
   }
 }
 
+  async function endManagedSupport() {
+    if (endingManaged || managedBilling?.cancelAtPeriodEnd) return;
+    const title = "End managed support?";
+    const detail = "Only hands-on managed support and its separate charge will end at the close of the current paid period. Your app subscription, dashboard, records, and reminders will continue.";
+    const confirmed = Platform.OS === "web"
+      ? window.confirm(`${title}\n\n${detail}`)
+      : await new Promise<boolean>(resolve => Alert.alert(title, detail, [
+          { text: "Keep managed support", style: "cancel", onPress: () => resolve(false) },
+          { text: "End managed support", style: "destructive", onPress: () => resolve(true) },
+        ], { cancelable: true, onDismiss: () => resolve(false) }));
+    if (!confirmed) return;
+    setEndingManaged(true);
+    try {
+      const result = await httpsCallable<Record<string, never>, { cancelAtMillis: number }>(
+        functions, "endMyManagedSupport")({});
+      const date = new Date(result.data.cancelAtMillis).toLocaleDateString();
+      if (Platform.OS === "web") window.alert(`Managed support ends ${date}. Your app subscription, records, and reminders continue.`);
+      else Alert.alert("Managed support ending", `Managed support ends ${date}. Your app subscription, records, and reminders continue.`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "Please try again.";
+      if (Platform.OS === "web") window.alert(`Could not end managed support: ${detail}`);
+      else Alert.alert("Could not end managed support", detail);
+    } finally { setEndingManaged(false); }
+  }
+
 const loadReferralCode =
   async (): Promise<string | null> => {
     if (referralCode) {
@@ -1236,13 +1276,13 @@ const trialEndLabel = (() => {
 
 
         <Text style={styles.sectionLabel}>
-        Subscription
+        App subscription
       </Text>
 
       <View style={styles.card}>
         <SettingsRow
           label="Current plan"
-          value="Dashboard subscription"
+          value="Self-managed app access"
         />
 
         <SettingsRow
@@ -1284,8 +1324,11 @@ const trialEndLabel = (() => {
           value={`$2 company + $1 x ${activeDriverCount}`}
         />
 
+        <Text style={{ padding: 16, color: "#555", fontSize: 13, lineHeight: 19 }}>
+          Stripe billing may list both your app and managed-support subscriptions. Check the subscription name before making a change there. To end only managed support, use the separate button below.
+        </Text>
         <SettingsRow
-        label="Manage billing"
+        label="Open Stripe billing for both subscriptions"
         value={
           openingBillingPortal
             ? "Opening..."
@@ -1300,6 +1343,31 @@ const trialEndLabel = (() => {
       />
         </>
       )}
+      </View>
+
+      <Text style={styles.sectionLabel}>Managed support · separate subscription</Text>
+      <View style={styles.card}>
+        <SettingsRow label="Managed support" value={managedBilling?.status === "active" || managedBilling?.status === "trialing"
+          ? managedBilling.cancelAtPeriodEnd ? "Ending at period end" : "Active"
+          : managedBilling?.status === "past_due" ? "Payment needs attention"
+          : "Not active"} />
+        {managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
+          Number.isFinite(managedBilling.monthlyAmountCents) && <SettingsRow
+          label="Managed monthly charge" value={`$${((managedBilling.monthlyAmountCents || 0) / 100).toFixed(2)}`} />}
+        {managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
+          !Number.isFinite(managedBilling.monthlyAmountCents) && managedQuotedMonthly !== null &&
+          <SettingsRow label="Quoted first-year managed price" value={`$${managedQuotedMonthly}/month`} />}
+        <Text style={{ padding: 16, color: "#555", fontSize: 13, lineHeight: 19 }}>
+          Managed support is optional hands-on help and has its own charge. Your app subscription keeps your dashboard, records, and reminders available even if managed support ends.
+        </Text>
+        {managedBilling?.cancelAtPeriodEnd && <SettingsRow label="Managed support ends"
+          value={managedBilling.cancelAt?.toDate?.()?.toLocaleDateString() || "At the end of your paid period"} />}
+        {Platform.OS === "web" && <SettingsRow label="View managed scope and pricing"
+          onPress={() => router.push("/(app)/managed-tracking" as any)} />}
+        {!!managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
+          !managedBilling.cancelAtPeriodEnd && <SettingsRow label="End managed support only"
+            value={endingManaged ? "Scheduling…" : "Keep app access"} showDivider={false}
+            onPress={endingManaged ? undefined : () => { void endManagedSupport(); }} />}
       </View>
 
       <>

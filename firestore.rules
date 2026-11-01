@@ -142,6 +142,11 @@ service cloud.firestore {
       }
     }
 
+    match /managedServiceBilling/{carrierId} {
+      allow read: if ownsCarrier(carrierId);
+      allow write: if false;
+    }
+
     match /managedServiceActivity/{carrierId} {
       allow read, write: if false;
       match /events/{eventId} {

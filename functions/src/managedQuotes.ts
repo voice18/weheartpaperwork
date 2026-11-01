@@ -381,7 +381,8 @@ export async function handleManagedCheckout(db: FirebaseFirestore.Firestore, str
     }
     tx.set(db.collection("managedServiceBilling").doc(id), {
       quoteId, stripeSubscriptionId: subscription.id, stripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
-      status: subscription.status, updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      status: subscription.status, monthlyAmountCents: managedMonthlyAmountCents(subscription),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   });
 }
@@ -425,8 +426,9 @@ export async function syncManagedSubscription(db: FirebaseFirestore.Firestore, s
   const existing = await ref.get();
   if (existing.exists && existing.data()?.stripeSubscriptionId !== subscription.id) return;
   await ref.set({ quoteId: subscription.metadata.quoteId, stripeSubscriptionId: subscription.id,
-    status: subscription.status, cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    cancelAt: subscription.cancel_at ? admin.firestore.Timestamp.fromMillis(subscription.cancel_at * 1000) : null,
+    status: subscription.status, monthlyAmountCents: managedMonthlyAmountCents(subscription),
+    cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    cancelAt: subscription.cancel_at_period_end ? admin.firestore.Timestamp.fromMillis(managedPeriodEnd(subscription) * 1000) : null,
     updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
   if (["canceled", "unpaid", "incomplete_expired"].includes(subscription.status)) {
     const coverageRef = db.collection("managedServiceCoverage").doc(id);
@@ -435,10 +437,70 @@ export async function syncManagedSubscription(db: FirebaseFirestore.Firestore, s
       pauseReason: "Managed subscription is no longer payable", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     const requestRef = db.collection("managedServiceRequests").doc(id);
     const serviceRequest = await requestRef.get();
-    if (serviceRequest.data()?.status === "end_scheduled") await requestRef.update({ status: "ended",
+    if (serviceRequest.data()?.status === "end_scheduled" || serviceRequest.data()?.endScheduledAt) await requestRef.update({ status: "ended",
       updatedAt: admin.firestore.FieldValue.serverTimestamp() });
   }
 }
+
+function managedMonthlyAmountCents(subscription: Stripe.Subscription): number {
+  return subscription.items.data.reduce((total, item) =>
+    total + (item.price.unit_amount ?? 0) * (item.quantity ?? 1), 0);
+}
+
+function managedPeriodEnd(subscription: Stripe.Subscription): number {
+  const current = subscription as Stripe.Subscription & { current_period_end?: number };
+  const periods = subscription.items.data.map(item =>
+    (item as Stripe.SubscriptionItem & { current_period_end?: number }).current_period_end)
+    .filter((value): value is number => typeof value === "number");
+  const end = current.current_period_end || Math.max(0, ...periods) || subscription.cancel_at || 0;
+  if (!Number.isSafeInteger(end) || end <= Math.floor(Date.now() / 1000))
+    throw new HttpsError("failed-precondition", "The managed billing end date is unavailable. Please contact support.");
+  return end;
+}
+
+export const endMyManagedSupport = onCall({ region: "us-central1", secrets: [stripeSecretKey] }, async request => {
+  const id = request.auth?.uid;
+  if (!id) throw new HttpsError("unauthenticated", "Sign in to continue.");
+  const db = admin.firestore();
+  const [carrier, billing, coverage, serviceRequest] = await Promise.all([
+    db.collection("carriers").doc(id).get(), db.collection("managedServiceBilling").doc(id).get(),
+    db.collection("managedServiceCoverage").doc(id).get(), db.collection("managedServiceRequests").doc(id).get(),
+  ]);
+  if (!carrier.exists || carrier.data()?.deletingAccount === true)
+    throw new HttpsError("failed-precondition", "Your company account is unavailable.");
+  const subscriptionId = billing.data()?.stripeSubscriptionId;
+  if (typeof subscriptionId !== "string")
+    throw new HttpsError("failed-precondition", "There is no managed subscription to end.");
+  const stripe = new Stripe(stripeSecretKey.value());
+  const current = await stripe.subscriptions.retrieve(subscriptionId);
+  if (current.metadata.serviceKind !== "managed" || current.metadata.carrierId !== id ||
+      (billing.data()?.quoteId && current.metadata.quoteId !== billing.data()?.quoteId))
+    throw new HttpsError("failed-precondition", "Managed billing does not match this company.");
+  if (!(["active", "trialing", "past_due"].includes(current.status)))
+    throw new HttpsError("failed-precondition", "This managed subscription is not currently active.");
+  const periodEndMillis = managedPeriodEnd(current) * 1000;
+  const updated = current.cancel_at_period_end ? current : await stripe.subscriptions.update(subscriptionId,
+    { cancel_at_period_end: true }, { idempotencyKey: `managed_customer_end_${id}_${subscriptionId}` });
+  await syncManagedSubscription(db, updated);
+  const requestRef = db.collection("managedServiceRequests").doc(id);
+  const mailRef = db.collection("mail").doc(`managed_customer_end_${subscriptionId}`);
+  await db.runTransaction(async tx => {
+    const mail = await tx.get(mailRef);
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    tx.set(requestRef, { endScheduledAt: admin.firestore.Timestamp.fromMillis(periodEndMillis),
+      ...(coverage.data()?.status === "active" ? { status: "end_scheduled" } : {}), updatedAt: now }, { merge: true });
+    if (mail.exists) return;
+    tx.create(requestRef.collection("events").doc(), { type: "end_scheduled_by_customer", actor: id,
+      cancelAt: admin.firestore.Timestamp.fromMillis(periodEndMillis), createdAt: now });
+    tx.create(mailRef, {
+      to: ["aaron@weheartpaperwork.com"], category: "managed_service_cancellation", managedServiceCarrierId: id,
+      message: { subject: `Managed support ending: ${String(carrier.data()?.companyName || "Company")}`,
+        text: `The customer ended managed support effective ${new Date(periodEndMillis).toISOString()}. Their app subscription remains active.\n\nCompany ID: ${id}\nAccount email: ${String(request.auth?.token.email || "Unavailable")}\nStripe subscription: ${subscriptionId}\nCurrent request: ${String(serviceRequest.data()?.status || "Unavailable")}` },
+      createdAt: now,
+    });
+  });
+  return { status: "end_scheduled", cancelAtMillis: periodEndMillis };
+});
 
 export const scheduleManagedServiceEnd = onCall({ region: "us-central1", secrets: [stripeSecretKey] }, async request => {
   requireOwner(request.auth);

@@ -65,7 +65,7 @@ function requestProgress(status?: string): string {
     case "accepted": return "You accepted the quote. Complete secure checkout below to proceed; service has not started.";
     case "paid_awaiting_start": return "Managed payment is confirmed. We are setting up the quoted records and will confirm when support starts.";
     case "change_requested": return "Your change request is under review. Your current managed coverage remains in place.";
-    case "end_requested": return "We received your request to end support. Current coverage continues until we confirm the end date.";
+    case "end_requested": return "Your earlier request to end support is being processed. You can end managed billing directly in Settings.";
     default: return "Your managed-support request is being reviewed.";
   }
 }
@@ -146,7 +146,7 @@ export default function ManagedTrackingChoices() {
       label: "Keep current coverage and withdraw change request", operation: "request", disabled: false };
     if (matchesCoverage) return { label: "These are already your active areas", operation: "none", disabled: true };
     if (matchesRequest) return { label: "Request already received", operation: "none", disabled: true };
-    if (!selected) return { label: "Request to end managed support", operation: "request", disabled: false };
+    if (!selected) return { label: "Choose an area, or end managed support in Settings", operation: "none", disabled: true };
     return { label: activeCoverage ? "Request a scope change" : "Request a written quote",
       operation: "request", disabled: false };
   }, [activeCoverage, matchesCoverage, matchesRequest, pending, selected]);
@@ -236,13 +236,26 @@ export default function ManagedTrackingChoices() {
         {!paymentConfirmed && <Text style={styles.body}>We help turn your deadlines into a plan. For the areas you choose, we set up the information you give us, identify what is due or missing, tell you what to prepare and where to go, and follow up until you confirm the task is done. You complete the filing or other required action and pay any outside fees.</Text>}
         {loading ? <ActivityIndicator color="#27500A" /> : <>
           {activeCoverage && <View style={styles.notice}><Text style={styles.noticeText}>Currently managed: {chosen(currentAreas)}. Your current coverage continues until an agreed change takes effect.</Text></View>}
-          {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then.</Text></View>}
+          {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then. Your app subscription and records continue.</Text></View>}
+          {activeCoverage && <View style={styles.card}>
+            <Text style={styles.section}>Your two services are separate</Text>
+            <Text style={styles.body}>Your app subscription keeps the dashboard, records, and reminders available. Managed support is the optional work we do for you.</Text>
+            <Pressable accessibilityRole="button" style={styles.contactButton}
+              onPress={() => router.push("/(app)/settings" as any)}>
+              <Text style={styles.contactButtonText}>Manage or end managed support in Settings</Text>
+            </Pressable>
+          </View>}
           {pending && !paymentConfirmed && <View style={styles.notice}><Text style={styles.noticeText}>{requestProgress(serviceRequest?.status)}</Text></View>}
           {!!message && <View style={styles.notice}><Text style={styles.noticeText}>{message}</Text></View>}
           {paymentConfirmed && <View style={styles.card}>
             <Text style={styles.title}>Payment received</Text>
             <Text style={styles.body}>Your managed-support checkout is complete. You do not need to choose areas or pay again.</Text>
             <Text style={styles.body}>Next, we will verify the quoted records and dates, finish setup, and confirm when your selected support starts. Your existing app subscription remains separate.</Text>
+            <Text style={styles.small}>You can end the separate managed-support subscription in Settings. Your app subscription, records, and reminders continue.</Text>
+            <Pressable accessibilityRole="button" style={styles.contactButton}
+              onPress={() => router.push("/(app)/settings" as any)}>
+              <Text style={styles.contactButtonText}>Manage managed support billing</Text>
+            </Pressable>
             <Pressable accessibilityRole="button" style={styles.contactButton}
               onPress={() => router.replace("/(app)/dashboard")}>
               <Text style={styles.contactButtonText}>Return to dashboard</Text>
@@ -322,8 +335,8 @@ export default function ManagedTrackingChoices() {
           </View>}
           <View style={styles.card}>
             <Text style={styles.section}>Your choices</Text>
-            <Text style={styles.summary}>{selected ? "Request help for: " + chosen(areas) : activeCoverage ? "Request to end managed support" : "Self-managed in all areas"}</Text>
-            <Text style={styles.body}>{!selected && activeCoverage ? "Your current managed support continues until we confirm an end date with you. This request does not cancel or change a charge automatically." : "We confirm what applies and the number of drivers and vehicles before giving you an exact total. Nothing changes or charges automatically."}</Text>
+            <Text style={styles.summary}>{selected ? "Request help for: " + chosen(areas) : "Self-managed in all areas"}</Text>
+            <Text style={styles.body}>{!selected && activeCoverage ? "To end your separate managed-support charge, use End managed support in Settings. Your app access and records continue." : "We confirm what applies and the number of drivers and vehicles before giving you an exact total. Nothing changes or charges automatically."}</Text>
             {(selected || activeCoverage) && <View style={styles.contact}>
               <Text style={styles.section}>Managed support prices</Text>
               <Text style={styles.body}>{`Company: $${MANAGED_PRICING.companyFirstYearMonthly}/month for the first 12 months, then $${MANAGED_PRICING.companyRenewalMonthly}/month. The first-year rate includes $${MANAGED_COMPANY_SETUP_TOTAL} of setup spread across those 12 months.`}</Text>
@@ -380,7 +393,7 @@ export default function ManagedTrackingChoices() {
             {quote.areas.fleet && quote.counts.trucks + quote.counts.trailers === 0 && <Text style={styles.small}>Fleet support has no enrolled vehicles and no Fleet charge in this quote. Ask us for an updated quote before adding managed equipment later.</Text>}
             <Text style={styles.summary}>${quote.price.firstYearMonthly}/month in year one</Text>
             <Text style={styles.body}>${quote.price.renewalMonthly}/month from year two. {quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime > 0 ? `$${quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime} in one-time charges at checkout.` : "No one-time charges."}</Text>
-            <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} {paymentConfirmed ? "Service starts after we confirm setup." : `Quote expires ${new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.`}</Text>
+            <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} {paymentConfirmed ? "Service starts after we confirm setup." : `Quote expires ${new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.`} You can end managed support in Settings at the end of a paid period; your app access and records continue. There is no early termination charge.</Text>
             {quote.appDriverIncrease == null && <Pressable accessibilityRole="link"
               onPress={() => void Linking.openURL("mailto:aaron@weheartpaperwork.com?subject=Updated%20managed%20support%20quote")}>
               <Text style={styles.link}>Ask for an updated quote ›</Text>
