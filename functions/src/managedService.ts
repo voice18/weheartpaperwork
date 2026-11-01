@@ -307,6 +307,22 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
           billing.data()?.status !== "active" ||
           !["company", "drivers", "fleet"].every(key => (agreed[key] === true) === areas[key as Area]))
         throw new HttpsError("failed-precondition", "A matching paid managed quote is required before starting this coverage.");
+      if (!continuing) {
+        const unitIds = quote.data()?.units ?? {};
+        const driverIds: string[] = Array.isArray(unitIds.driverIds) ? unitIds.driverIds : [];
+        const vehicleIds: string[] = Array.isArray(unitIds.vehicleIds) ? unitIds.vehicleIds : [];
+        const counts = quote.data()?.counts ?? {};
+        if (driverIds.length !== counts.drivers || vehicleIds.length !== (counts.trucks || 0) + (counts.trailers || 0))
+          throw new HttpsError("failed-precondition", "Quoted unit counts do not match the setup list.");
+        const [driverDocs, vehicleDocs] = await Promise.all([
+          Promise.all(driverIds.map(id => tx.get(db.collection("carriers").doc(carrierId).collection("drivers").doc(id)))),
+          Promise.all(vehicleIds.map(id => tx.get(db.collection("carriers").doc(carrierId).collection("vehicles").doc(id)))),
+        ]);
+        if (driverDocs.some(row => !row.exists || row.data()?.status === "inactive") ||
+            vehicleDocs.some(row => !row.exists || row.data()?.status === "inactive") ||
+            vehicleDocs.filter(row => row.data()?.type === "trailer").length !== counts.trailers)
+          throw new HttpsError("failed-precondition", "Add and verify every quoted active unit before starting managed coverage.");
+      }
     }
     if (status === "paused" && billing.data()?.status === "active")
       throw new HttpsError("failed-precondition", "Managed billing is still active. Arrange cancellation before pausing coverage.");

@@ -1,9 +1,9 @@
 import * as admin from "firebase-admin";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { createHash } from "node:crypto";
 import { OWNER_EMAIL } from "./ownerNotifications";
 import { contactChanged, managedContact } from "./managedContact";
 import { managedIntake } from "./managedIntake";
+import { managedRoster } from "./managedRoster";
 
 type Areas = { company: boolean; drivers: boolean; fleet: boolean };
 const PENDING = new Set(["requested", "change_requested", "end_requested", "contacted", "quoted", "accepted"]);
@@ -175,27 +175,34 @@ export const enterManagedIntakeUnits = onCall({ region: "us-central1" }, async r
   const db = admin.firestore();
   const carrierRef = db.collection("carriers").doc(uid);
   const requestRef = db.collection("managedServiceRequests").doc(uid);
-  const [carrier, currentRequest, existingDrivers, existingVehicles] = await Promise.all([
-    carrierRef.get(), requestRef.get(), carrierRef.collection("drivers").get(), carrierRef.collection("vehicles").get(),
+  const quoteRef = db.collection("managedServiceQuotes").doc(uid);
+  const [carrier, currentRequest, quote, existingDrivers, existingVehicles] = await Promise.all([
+    carrierRef.get(), requestRef.get(), quoteRef.get(), carrierRef.collection("drivers").get(), carrierRef.collection("vehicles").get(),
   ]);
   if (!carrier.exists || carrier.data()?.deletingAccount === true ||
       !["active", "trialing"].includes(String(carrier.data()?.billing?.status)))
     throw new HttpsError("failed-precondition", "The customer needs an active app subscription.");
-  if (!["requested", "contacted"].includes(String(currentRequest.data()?.status)))
-    throw new HttpsError("failed-precondition", "Review a current, unquoted request first.");
+  if (currentRequest.data()?.status !== "paid_awaiting_start" ||
+      quote.data()?.status !== "paid_awaiting_start" ||
+      quote.data()?.requestRevision !== currentRequest.data()?.revision)
+    throw new HttpsError("failed-precondition", "Confirm the customer's managed payment before adding listed units.");
   const selected = areas(currentRequest.data()?.areas);
-  let intake;
-  try { intake = managedIntake(currentRequest.data()?.intake, selected); }
-  catch (error) { throw new HttpsError("failed-precondition", error instanceof Error ? error.message : "Invalid intake."); }
-  const driverKeys = new Set(existingDrivers.docs.map(row =>
-    `${String(row.data().cdlState || "").toUpperCase()}:${String(row.data().cdlNumber || "").replace(/[^A-Z0-9]/gi, "").toUpperCase()}`));
-  const vehicleKeys = new Set(existingVehicles.docs.map(row => String(row.data().vin || "").toUpperCase()));
-  const newDrivers = intake.drivers.filter(row => !driverKeys.has(`${row.cdlState}:${row.cdlNumber.replace(/[^A-Z0-9]/gi, "")}`));
-  const newVehicles = intake.vehicles.filter(row => !vehicleKeys.has(row.vin));
-  if (!newDrivers.length && !newVehicles.length) return { driversAdded: 0, vehiclesAdded: 0 };
+  let roster;
+  try {
+    const intake = managedIntake(currentRequest.data()?.intake, selected);
+    roster = managedRoster(uid, selected, intake,
+      existingDrivers.docs.map(row => ({ id: row.id, data: row.data() })),
+      existingVehicles.docs.map(row => ({ id: row.id, data: row.data() })));
+  } catch (error) {
+    throw new HttpsError("failed-precondition", error instanceof Error ? error.message : "Review the listed units.");
+  }
+  const quotedUnits = quote.data()?.units ?? {};
+  if (JSON.stringify(roster.driverIds) !== JSON.stringify(quotedUnits.driverIds) ||
+      JSON.stringify(roster.vehicleIds) !== JSON.stringify(quotedUnits.vehicleIds))
+    throw new HttpsError("failed-precondition", "The active roster changed after the quote. Review billing before adding units.");
+  if (!roster.newDrivers.length && !roster.newVehicles.length) return { driversAdded: 0, vehiclesAdded: 0 };
   const batch = db.batch();
-  for (const row of newDrivers) {
-    const id = "intake-" + createHash("sha256").update(uid + ":driver:" + row.cdlState + ":" + row.cdlNumber).digest("hex").slice(0, 24);
+  for (const { id, row } of roster.newDrivers) {
     batch.create(carrierRef.collection("drivers").doc(id), {
       ...row, status: "active", inactiveAt: null, rehiredAt: null, mvrDue: "", clearinghouseDue: "",
       roadTestOnFile: false, employmentApplicationOnFile: false, initialMvrOnFile: false,
@@ -204,8 +211,7 @@ export const enterManagedIntakeUnits = onCall({ region: "us-central1" }, async r
       source: "managed_intake", createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   }
-  for (const row of newVehicles) {
-    const id = "intake-" + createHash("sha256").update(uid + ":vehicle:" + row.vin).digest("hex").slice(0, 24);
+  for (const { id, row } of roster.newVehicles) {
     batch.create(carrierRef.collection("vehicles").doc(id), {
       ...row, year: "", make: "", model: "", plateNumber: "", registrationState: "",
       registrationPermanent: false, status: "active", source: "managed_intake",
@@ -214,11 +220,11 @@ export const enterManagedIntakeUnits = onCall({ region: "us-central1" }, async r
     });
   }
   batch.create(requestRef.collection("events").doc(), { type: "intake_units_entered",
-    driversAdded: newDrivers.length, vehiclesAdded: newVehicles.length,
+    driversAdded: roster.newDrivers.length, vehiclesAdded: roster.newVehicles.length,
     actor: request.auth!.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() });
   try { await batch.commit(); }
   catch (error) { throw new HttpsError("aborted", "The intake or account changed while adding units. Refresh and check the customer account before retrying."); }
-  return { driversAdded: newDrivers.length, vehiclesAdded: newVehicles.length };
+  return { driversAdded: roster.newDrivers.length, vehiclesAdded: roster.newVehicles.length };
 });
 export const updateManagedServiceRequestStatus = onCall({ region: "us-central1" }, async request => {
   owner(request);

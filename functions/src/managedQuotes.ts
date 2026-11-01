@@ -4,6 +4,8 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import Stripe from "stripe";
 import { calculateManagedPrice, ManagedAreas, ManagedCounts, MANAGED_PRICING } from "./managedPricing";
+import { managedIntake } from "./managedIntake";
+import { managedRoster } from "./managedRoster";
 
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const activeStripeStatuses = new Set(["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]);
@@ -72,6 +74,7 @@ function safeQuote(snapshot: FirebaseFirestore.DocumentSnapshot) {
   return {
     quoteId: row.quoteId ?? null, status: row.status ?? null,
     areas: areas(row.areas), counts: row.counts ?? null, price: row.price ?? null,
+    appDriverIncrease: Number.isSafeInteger(row.appDriverIncrease) ? row.appDriverIncrease : null,
     scope: row.scope ?? "", requestRevision: row.requestRevision ?? null,
     expiresAtMillis: row.expiresAt?.toMillis?.() ?? null,
     acceptedAtMillis: row.acceptedAt?.toMillis?.() ?? null,
@@ -118,16 +121,18 @@ export const prepareManagedServiceQuote = onCall({ region: "us-central1" }, asyn
   const selected = areas(currentRequest.data()?.areas);
   if (!selected.company && !selected.drivers && !selected.fleet)
     throw new HttpsError("failed-precondition", "The request has no managed areas.");
-  const drivers = driverRows.docs.filter(row => row.data().status !== "inactive").length;
-  const activeVehicles = vehicleRows.docs.filter(row => row.data().status !== "inactive");
-  const trucks = activeVehicles.filter(row => row.data().type !== "trailer").length;
-  const trailers = activeVehicles.length - trucks;
-  const counts: ManagedCounts = { drivers: selected.drivers ? drivers : 0,
-    trucks: selected.fleet ? trucks : 0, trailers: selected.fleet ? trailers : 0, dqFiles };
-  const units = {
-    driverIds: selected.drivers ? driverRows.docs.filter(row => row.data().status !== "inactive").map(row => row.id) : [],
-    vehicleIds: selected.fleet ? activeVehicles.map(row => row.id) : [],
-  };
+  let roster;
+  try {
+    const intake = managedIntake(currentRequest.data()?.intake, selected);
+    roster = managedRoster(id, selected, intake,
+      driverRows.docs.map(row => ({ id: row.id, data: row.data() })),
+      vehicleRows.docs.map(row => ({ id: row.id, data: row.data() })));
+  } catch (error) {
+    throw new HttpsError("failed-precondition", error instanceof Error ? error.message : "Review the listed units before quoting.");
+  }
+  const counts: ManagedCounts = { drivers: roster.drivers,
+    trucks: roster.trucks, trailers: roster.trailers, dqFiles };
+  const units = { driverIds: roster.driverIds, vehicleIds: roster.vehicleIds };
   let price;
   try { price = calculateManagedPrice(selected, counts); }
   catch { throw new HttpsError("invalid-argument", "The requested quantities do not match the service areas."); }
@@ -147,7 +152,8 @@ export const prepareManagedServiceQuote = onCall({ region: "us-central1" }, asyn
         (oldQuote.data()?.status === "accepted" && oldQuote.data()?.expiresAt?.toMillis?.() > Date.now()))
       throw new HttpsError("failed-precondition", "An accepted or paid quote cannot be replaced.");
     tx.set(quoteRef, { quoteId, carrierId: id, companyName: carrier.data()?.companyName ?? "Company",
-      areas: selected, counts, units, price, scope, status: "quoted",
+      areas: selected, counts, units, appDriverIncrease: roster.newDrivers.length,
+      price, scope, status: "quoted",
       requestRevision: latestRequest.data()?.revision ?? 0,
       expiresAt, createdAt: now, createdBy: request.auth!.uid });
     tx.update(requestRef, { status: "quoted", updatedAt: now });
@@ -180,6 +186,8 @@ export const acceptManagedServiceQuote = onCall({ region: "us-central1" }, async
     if (row.quoteId !== quoteId || row.requestRevision !== serviceRequest.data()?.revision ||
       serviceRequest.data()?.status !== "quoted" || row.status !== "quoted")
       throw new HttpsError("failed-precondition", "This quote is no longer available. Ask us for an updated quote.");
+    if (!Number.isSafeInteger(row.appDriverIncrease))
+      throw new HttpsError("failed-precondition", "Ask us for an updated quote that shows any app Driver charge change.");
     if (!row.expiresAt || row.expiresAt.toMillis() <= Date.now())
       throw new HttpsError("failed-precondition", "This quote has expired. Ask us for an updated quote.");
     const now = admin.firestore.FieldValue.serverTimestamp();
@@ -206,11 +214,29 @@ export const createManagedCheckoutSession = onCall({ region: "us-central1", secr
       serviceRequest.data()?.status !== "accepted" || row.requestRevision !== serviceRequest.data()?.revision ||
       row.expiresAt?.toMillis?.() <= Date.now())
     throw new HttpsError("failed-precondition", "This quote is no longer ready for checkout.");
+  if (!Number.isSafeInteger(row.appDriverIncrease))
+    throw new HttpsError("failed-precondition", "Ask us for an updated quote that shows any app Driver charge change.");
   if (row.expiresAt.toMillis() - Date.now() < 31 * 60 * 1000)
     throw new HttpsError("failed-precondition", "This quote is about to expire. Ask us for a new quote.");
   if (!carrier.exists || carrier.data()?.deletingAccount === true ||
       !["active", "trialing"].includes(String(carrier.data()?.billing?.status)))
     throw new HttpsError("failed-precondition", "An active app subscription is required first.");
+  const [driverRows, vehicleRows] = await Promise.all([
+    carrierRef.collection("drivers").get(), carrierRef.collection("vehicles").get(),
+  ]);
+  try {
+    const selected = areas(row.areas);
+    const intake = managedIntake(serviceRequest.data()?.intake, selected);
+    const currentRoster = managedRoster(id, selected, intake,
+      driverRows.docs.map(doc => ({ id: doc.id, data: doc.data() })),
+      vehicleRows.docs.map(doc => ({ id: doc.id, data: doc.data() })));
+    if (JSON.stringify(currentRoster.driverIds) !== JSON.stringify(row.units?.driverIds) ||
+        JSON.stringify(currentRoster.vehicleIds) !== JSON.stringify(row.units?.vehicleIds))
+      throw new Error("The driver or equipment list changed since the quote.");
+  } catch (error) {
+    throw new HttpsError("failed-precondition",
+      `${error instanceof Error ? error.message : "The quoted roster changed."} Ask us to update the quote before checkout.`);
+  }
   const customerId = carrier.data()?.billing?.stripeCustomerId;
   if (typeof customerId !== "string" || !customerId.startsWith("cus_"))
     throw new HttpsError("failed-precondition", "Your app billing account is unavailable. Contact support.");

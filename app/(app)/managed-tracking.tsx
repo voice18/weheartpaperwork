@@ -19,6 +19,7 @@ type IntakeVehicle = { type: "truck" | "trailer"; unitNumber: string; vin: strin
   registrationExpiration: string; inspectionExpiration: string };
 type Intake = { drivers: IntakeDriver[]; vehicles: IntakeVehicle[] };
 type ManagedQuote = { quoteId: string; status: string; scope: string; expiresAtMillis: number;
+  appDriverIncrease?: number | null;
   areas: Areas; counts: { drivers: number; trucks: number; trailers: number; dqFiles: number };
   price: { firstYearMonthly: number; renewalMonthly: number;
     fleetOnlyOnboardingOneTime: number; dqFileOneTime: number } };
@@ -38,6 +39,18 @@ function same(a: Areas, b: Areas): boolean {
 }
 function chosen(value: Areas): string {
   return AREA.filter(row => value[row.key]).map(row => row.title).join(", ") || "None";
+}
+function requestProgress(status?: string): string {
+  switch (status) {
+    case "requested": return "Request received. We are reviewing your details and preparing an exact quote. Nothing has been charged or added to your dashboard.";
+    case "contacted": return "We are reviewing your request with you. Nothing has been charged or added to your dashboard.";
+    case "quoted": return "Your exact quote is ready below. Review the scope and price before accepting.";
+    case "accepted": return "You accepted the quote. Complete secure checkout below to proceed; service has not started.";
+    case "paid_awaiting_start": return "Managed payment is confirmed. We are setting up the quoted records and will confirm when support starts.";
+    case "change_requested": return "Your change request is under review. Your current managed coverage remains in place.";
+    case "end_requested": return "We received your request to end support. Current coverage continues until we confirm the end date.";
+    default: return "Your managed-support request is being reviewed.";
+  }
 }
 export default function ManagedTrackingChoices() {
   const router = useRouter();
@@ -208,7 +221,7 @@ export default function ManagedTrackingChoices() {
         {loading ? <ActivityIndicator color="#27500A" /> : <>
           {activeCoverage && <View style={styles.notice}><Text style={styles.noticeText}>Currently managed: {chosen(currentAreas)}. Your current coverage continues until an agreed change takes effect.</Text></View>}
           {serviceRequest?.status === "end_scheduled" && <View style={styles.notice}><Text style={styles.noticeText}>Managed billing is set to end at the current paid period. Your covered areas remain supported until then.</Text></View>}
-          {pending && <View style={styles.notice}><Text style={styles.noticeText}>Your request is {serviceRequest?.status?.replaceAll("_", " ")}. We will use the contact details below. You may change or withdraw the request.</Text></View>}
+          {pending && <View style={styles.notice}><Text style={styles.noticeText}>{requestProgress(serviceRequest?.status)}</Text></View>}
           {!!message && <View style={styles.notice}><Text style={styles.noticeText}>{message}</Text></View>}
           {step === 1 && <View style={styles.card}>
             <Text style={styles.section}>How would you like to start?</Text>
@@ -246,7 +259,7 @@ export default function ManagedTrackingChoices() {
           {step === 3 && <><Text style={styles.section}>2. Tell us who and what to set up</Text>
           {areas.drivers && <View style={styles.card}>
             <Text style={styles.section}>Drivers · {intake.drivers.length} listed</Text>
-            <Text style={styles.body}>List your active drivers. If you have none, leave this empty. We only quote managed Driver charges for active drivers entered in your account.</Text>
+            <Text style={styles.body}>List drivers you want us to set up. Leave this empty if you have none. We check this list against your existing dashboard before quoting. Listing a driver does not add them or change billing.</Text>
             {intake.drivers.map((row, index) => <View key={index} style={styles.contact}>
               <Text style={styles.label}>Driver {index + 1}</Text>
               {([ ["name", "Full name"], ["cdlNumber", "CDL number"], ["cdlClass", "CDL class (A, B, or C)"], ["cdlState", "Issuing state (2 letters)"],
@@ -262,7 +275,7 @@ export default function ManagedTrackingChoices() {
           </View>}
           {areas.fleet && <View style={styles.card}>
             <Text style={styles.section}>Trucks and trailers · {intake.vehicles.length} listed</Text>
-            <Text style={styles.body}>List active equipment. If you have none, leave this empty. Managed Fleet charges begin only for active units entered in your account.</Text>
+            <Text style={styles.body}>List trucks and trailers you want us to set up. Leave this empty if you have none. We check this list against your existing dashboard before quoting. Listing equipment does not add it or change billing.</Text>
             {intake.vehicles.map((row, index) => <View key={index} style={styles.contact}>
               <Text style={styles.label}>Equipment {index + 1}</Text>
               <View style={styles.contactOptions}>{(["truck", "trailer"] as const).map(type => <Pressable key={type}
@@ -292,7 +305,7 @@ export default function ManagedTrackingChoices() {
               <Text style={styles.body}>{`Driver: $${MANAGED_PRICING.driverMonthly}/month per managed driver. Truck: $${MANAGED_PRICING.truckMonthly}/month each. Trailer: $${MANAGED_PRICING.trailerMonthly}/month each.`}</Text>
               <Text style={styles.body}>{`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge when at least one active truck or trailer is added.`}</Text>
               <Text style={styles.body}>{`Building a driver qualification file, when requested, is a separate $${MANAGED_PRICING.dqFileOneTime} one-time charge per file.`}</Text>
-              <Text style={styles.small}>These managed support charges are in addition to your app subscription ($2/month plus $1 per active driver). When your listed drivers are entered as active in the app, the app's $1-per-driver charge applies even before managed support starts. We confirm the managed scope and exact total before you agree or pay. Your request itself starts no managed charge or service.</Text>
+              <Text style={styles.small}>Managed support is separate from your app subscription ($2/month plus $1 per active driver). Your request does not add records or change either charge. If we add a quoted driver after managed checkout, your app subscription also increases by $1/month for that active driver. We show the exact managed quote before you agree or pay.</Text>
             </View>}
             {(selected || activeCoverage || pending) && <View style={styles.contact}>
               <Text style={styles.section}>How should we reach you?</Text>
@@ -338,9 +351,11 @@ export default function ManagedTrackingChoices() {
             <Text style={styles.section}>Your managed-support quote</Text>
             <Text style={styles.body}>{quote.scope}</Text>
             <Text style={styles.body}>Company: {quote.areas.company ? "included" : "self-managed"} · Driver: {quote.areas.drivers ? `${quote.counts.drivers} managed` : "self-managed"} · Fleet: {quote.areas.fleet ? `${quote.counts.trucks} trucks and ${quote.counts.trailers} trailers managed` : "self-managed"}</Text>
+            {quote.areas.drivers && quote.counts.drivers === 0 && <Text style={styles.small}>Driver support has no enrolled drivers and no Driver charge in this quote. Ask us for an updated quote before adding managed drivers later.</Text>}
+            {quote.areas.fleet && quote.counts.trucks + quote.counts.trailers === 0 && <Text style={styles.small}>Fleet support has no enrolled vehicles and no Fleet charge in this quote. Ask us for an updated quote before adding managed equipment later.</Text>}
             <Text style={styles.summary}>${quote.price.firstYearMonthly}/month in year one</Text>
             <Text style={styles.body}>${quote.price.renewalMonthly}/month from year two. {quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime > 0 ? `$${quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime} in one-time charges at checkout.` : "No one-time charges."}</Text>
-            <Text style={styles.small}>Your existing app subscription is billed separately. Quote expires {new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.</Text>
+            <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} Quote expires {new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.</Text>
             {quote.status === "quoted" && <Pressable accessibilityRole="button" disabled={saving}
               onPress={() => void acceptQuote()} style={[styles.button, saving && styles.disabled]}>
               <Text style={styles.buttonText}>Accept quote</Text>
@@ -365,7 +380,7 @@ export default function ManagedTrackingChoices() {
             <Text style={styles.section}>Before service starts</Text>
             <Text style={styles.body}>1. We review your request and send a written scope and exact first-year and ongoing price by email.</Text>
             <Text style={styles.body}>2. You accept the exact quote and complete secure Stripe checkout on this page.</Text>
-            <Text style={styles.body}>3. We activate the selected areas. Your dashboard shows the start date and who manages each area.</Text>
+            <Text style={styles.body}>3. After payment is confirmed, we add any quoted missing units, verify their dates and app billing, then activate the selected areas. Your dashboard shows the start date and who manages each area.</Text>
             <Text style={styles.small}>Your current app subscription and checkout continue unchanged. For help, email aaron@weheartpaperwork.com.</Text>
           </View>
         </>}

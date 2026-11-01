@@ -71,6 +71,15 @@ function queueHighlights(items: Item[], pendingCustom: Detail["pendingCustom"]):
 const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles",
   year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 const AREA_LABEL: Record<keyof Areas, string> = { company: "Company", drivers: "Driver", fleet: "Fleet" };
+const REQUEST_STAGE: Record<string, string> = {
+  requested: "New request · verify details and prepare quote",
+  contacted: "Contact logged · prepare quote",
+  quoted: "Quote ready · waiting for customer acceptance",
+  accepted: "Quote accepted · waiting for checkout",
+  paid_awaiting_start: "Payment confirmed · finish setup and start coverage",
+  change_requested: "Coverage change requested · review before changing billing",
+  end_requested: "Support end requested · review billing end date",
+};
 
 async function call<T>(name: string, data: Record<string, unknown>): Promise<T> {
   const result = await httpsCallable<Record<string, unknown>, T>(functions, name)(data);
@@ -145,6 +154,7 @@ export default function OwnerManaged() {
   const [requestNotes, setRequestNotes] = useState<Record<string, string>>({});
   const [quoteScopes, setQuoteScopes] = useState<Record<string, string>>({});
   const [quoteDqFiles, setQuoteDqFiles] = useState<Record<string, string>>({});
+  const [confirmIntakeId, setConfirmIntakeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState("");
@@ -303,7 +313,7 @@ export default function OwnerManaged() {
       await call("updateManagedServiceRequestStatus", { carrierId: row.carrierId, status, note });
       setRequestNotes(previous => ({ ...previous, [row.carrierId]: "" }));
       await loadRequests();
-      setMessage(status === "contacted" ? "Contact logged. No email was sent by this button." : "Request closed.");
+      setMessage(status === "contacted" ? "Contact logged. No email was sent by this button." : "Request closed without a quote.");
     } catch (error) { setMessage(errorText(error)); }
     finally { setWorking(false); }
   };
@@ -326,16 +336,13 @@ export default function OwnerManaged() {
     const drivers = row.intake?.drivers?.length || 0;
     const vehicles = row.intake?.vehicles?.length || 0;
     if (!drivers && !vehicles) return;
-    if (typeof window !== "undefined" && !window.confirm(
-      `Add the listed ${drivers} driver(s) and ${vehicles} vehicle(s) as active in ${row.companyName}? ` +
-      `New active drivers add $1 each per month to the customer's existing app subscription. ` +
-      "Check the intake and existing account first.")) return;
     setWorking(true);
     try {
       const result = await call<{ driversAdded: number; vehiclesAdded: number }>(
         "enterManagedIntakeUnits", { carrierId: row.carrierId });
+      setConfirmIntakeId(null);
       await loadRequests();
-      setMessage(`Entered ${result.driversAdded} new drivers and ${result.vehiclesAdded} new vehicles. Verify their dates and account billing before preparing the quote.`);
+      setMessage(`Added ${result.driversAdded} quoted drivers and ${result.vehiclesAdded} quoted vehicles. Check their dates and app billing before activating coverage.`);
     } catch (error) { setMessage(errorText(error)); }
     finally { setWorking(false); }
   };
@@ -476,7 +483,7 @@ export default function OwnerManaged() {
       {!requestLoading && !requestError && requests.length === 0 && <Text style={styles.help}>No requests are waiting for review.</Text>}
       {requests.map(row => <View key={row.carrierId} style={styles.item}>
         <Text style={styles.accountTitle}>{row.companyName}</Text>
-        <Text style={styles.small}>{row.status.replaceAll("_", " ")} · Requested: {(["company", "drivers", "fleet"] as (keyof Areas)[])
+        <Text style={styles.small}>{REQUEST_STAGE[row.status] || row.status.replaceAll("_", " ")} · Requested: {(["company", "drivers", "fleet"] as (keyof Areas)[])
           .filter(key => row.areas[key]).map(key => AREA_LABEL[key]).join(", ") || "End managed support"}</Text>
         <ContactDetails contact={{ accountEmail: row.accountEmail,
           preferredEmail: row.preferredEmail, preferredPhone: row.preferredPhone,
@@ -493,9 +500,15 @@ export default function OwnerManaged() {
             {vehicle.registrationExpiration ? ` · Registration expires ${vehicle.registrationExpiration}` : ""}
             {vehicle.inspectionExpiration ? ` · Inspection expires ${vehicle.inspectionExpiration}` : ""}
           </Text>)}
-          <Text style={styles.small}>Verify these details before entering active units. Adding an active driver also changes the customer's app subscription by $1 per driver per month. Quote managed support only after the units are entered.</Text>
-          {(row.intake?.drivers?.length || row.intake?.vehicles?.length) ? <Button
-            label="Enter listed active units" subtle onPress={() => void enterIntake(row)} disabled={working || !["requested", "contacted"].includes(row.status)} /> : null}
+          <Text style={styles.small}>Review these details and existing account records before quoting. Intake is information only; it does not add units or start billing. Quoted units can be added after managed payment is confirmed.</Text>
+          {row.status === "paid_awaiting_start" && !!(row.intake?.drivers?.length || row.intake?.vehicles?.length) && <>
+            {confirmIntakeId !== row.carrierId ? <Button label="Review quoted units for setup" subtle
+              onPress={() => setConfirmIntakeId(row.carrierId)} disabled={working} /> : <View style={styles.contactBox}>
+              <Text style={styles.small}>Check the list above against the paid quote. Adding a new active driver also increases the existing app subscription by $1/month per driver. Existing matching units are skipped.</Text>
+              <Button label="Add quoted units to dashboard" onPress={() => void enterIntake(row)} disabled={working} />
+              <Button label="Cancel setup" subtle onPress={() => setConfirmIntakeId(null)} disabled={working} />
+            </View>}
+          </>}
         </View>}
         {row.quote && <View style={styles.contactBox}>
           <Text style={styles.small}>Quote: {row.quote.status} · ${row.quote.price.firstYearMonthly}/month in year one,
@@ -506,14 +519,15 @@ export default function OwnerManaged() {
         <Text style={styles.small}>Updated: {row.updatedAtMillis
           ? new Date(row.updatedAtMillis).toLocaleString() : "Recently"}</Text>
         {["requested", "contacted", "quoted"].includes(row.status) && !!(row.areas.company || row.areas.drivers || row.areas.fleet) && <View style={styles.contactBox}>
-          <Text style={styles.small}>Prepare the exact price and written scope. Active driver and vehicle counts come from this customer's account.</Text>
+          <Text style={styles.small}>Prepare the written scope and exact price from active account units plus the listed intake. Matching units count once. No unit or charge is added when you prepare a quote.</Text>
           <TextInput style={styles.input} value={quoteScopes[row.carrierId] || ""}
             onChangeText={value => setQuoteScopes(previous => ({ ...previous, [row.carrierId]: value }))}
             placeholder="What we will set up, review, guide, and follow up on; what the customer submits and pays" multiline />
           {row.areas.drivers && <TextInput style={styles.input} value={quoteDqFiles[row.carrierId] || "0"}
             onChangeText={value => setQuoteDqFiles(previous => ({ ...previous, [row.carrierId]: value }))}
             keyboardType="number-pad" placeholder="Number of DQ files to build separately" />}
-          <Button label="Prepare customer quote" onPress={() => void prepareQuote(row)} disabled={working} />
+          <Button label={row.status === "quoted" ? "Replace unaccepted quote" : "Prepare exact customer quote"}
+            onPress={() => void prepareQuote(row)} disabled={working} />
         </View>}
         <Button label="Open company setup" subtle onPress={() => void chooseRequest(row)} disabled={working} />
         {row.status === "end_requested" && <Button label="End managed billing at period end"
@@ -523,7 +537,7 @@ export default function OwnerManaged() {
           placeholder="Note the contact or reason for closing" multiline />
         <View style={styles.row}>
           <Button label="Log customer contacted" subtle onPress={() => void recordRequest(row, "contacted")} disabled={working} />
-          <Button label="Close request" subtle onPress={() => void recordRequest(row, "closed")} disabled={working} />
+          <Button label="Decline and close request" subtle onPress={() => void recordRequest(row, "closed")} disabled={working} />
         </View></>}
       </View>)}
     </View>
