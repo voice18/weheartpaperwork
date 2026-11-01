@@ -356,13 +356,17 @@ export default function ManagedTrackingChoices() {
             <Text style={styles.summary}>${quote.price.firstYearMonthly}/month in year one</Text>
             <Text style={styles.body}>${quote.price.renewalMonthly}/month from year two. {quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime > 0 ? `$${quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime} in one-time charges at checkout.` : "No one-time charges."}</Text>
             <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} Quote expires {new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.</Text>
-            {quote.status === "quoted" && <Pressable accessibilityRole="button" disabled={saving}
-              onPress={() => void acceptQuote()} style={[styles.button, saving && styles.disabled]}>
-              <Text style={styles.buttonText}>Accept quote</Text>
+            {quote.appDriverIncrease == null && <Pressable accessibilityRole="link"
+              onPress={() => void Linking.openURL("mailto:aaron@weheartpaperwork.com?subject=Updated%20managed%20support%20quote")}>
+              <Text style={styles.link}>Ask for an updated quote ›</Text>
             </Pressable>}
-            {quote.status === "accepted" && <Pressable accessibilityRole="button" disabled={saving}
-              onPress={() => void openManagedCheckout()} style={[styles.button, saving && styles.disabled]}>
-              <Text style={styles.buttonText}>Continue to secure checkout</Text>
+            {quote.status === "quoted" && <Pressable accessibilityRole="button" disabled={saving || quote.appDriverIncrease == null}
+              onPress={() => void acceptQuote()} style={[styles.button, (saving || quote.appDriverIncrease == null) && styles.disabled]}>
+              <Text style={styles.buttonText}>{quote.appDriverIncrease == null ? "Updated quote required" : "Accept quote"}</Text>
+            </Pressable>}
+            {quote.status === "accepted" && <Pressable accessibilityRole="button" disabled={saving || quote.appDriverIncrease == null}
+              onPress={() => void openManagedCheckout()} style={[styles.button, (saving || quote.appDriverIncrease == null) && styles.disabled]}>
+              <Text style={styles.buttonText}>{quote.appDriverIncrease == null ? "Updated quote required" : "Continue to secure checkout"}</Text>
             </Pressable>}
             {quote.status === "accepted" && <Pressable accessibilityRole="button" disabled={saving}
               onPress={() => void withdrawQuote()} style={[styles.contactButton, saving && styles.disabled]}>
