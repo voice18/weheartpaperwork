@@ -425,10 +425,11 @@ export async function syncManagedSubscription(db: FirebaseFirestore.Firestore, s
   const ref = db.collection("managedServiceBilling").doc(id);
   const existing = await ref.get();
   if (existing.exists && existing.data()?.stripeSubscriptionId !== subscription.id) return;
+  const scheduledEnd = subscription.cancel_at_period_end ? managedPeriodEnd(subscription) : subscription.cancel_at;
   await ref.set({ quoteId: subscription.metadata.quoteId, stripeSubscriptionId: subscription.id,
     status: subscription.status, monthlyAmountCents: managedMonthlyAmountCents(subscription),
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    cancelAt: subscription.cancel_at_period_end ? admin.firestore.Timestamp.fromMillis(managedPeriodEnd(subscription) * 1000) : null,
+    cancelAtPeriodEnd: Boolean(scheduledEnd),
+    cancelAt: scheduledEnd ? admin.firestore.Timestamp.fromMillis(scheduledEnd * 1000) : null,
     updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
   if (["canceled", "unpaid", "incomplete_expired"].includes(subscription.status)) {
     const coverageRef = db.collection("managedServiceCoverage").doc(id);
@@ -458,6 +459,32 @@ function managedPeriodEnd(subscription: Stripe.Subscription): number {
   return end;
 }
 
+export async function scheduleManagedCancellation(stripe: Stripe, current: Stripe.Subscription): Promise<{ subscription: Stripe.Subscription; cancelAt: number }> {
+  const periodEnd = managedPeriodEnd(current);
+  if (current.cancel_at_period_end || current.cancel_at)
+    return { subscription: current, cancelAt: current.cancel_at ?? periodEnd };
+  if (current.schedule) {
+    const scheduleId = typeof current.schedule === "string" ? current.schedule : current.schedule.id;
+    const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+    if (schedule.status !== "active" || !schedule.current_phase)
+      throw new HttpsError("failed-precondition", "The managed billing schedule is unavailable. Please contact support.");
+    // Stripe rejects direct cancellation changes while a schedule manages the subscription.
+    // Shorten its current phase to the paid-through date and cancel when that phase ends.
+    await stripe.subscriptionSchedules.update(scheduleId, {
+      end_behavior: "cancel", proration_behavior: "none",
+      phases: [{ start_date: schedule.current_phase.start_date, end_date: periodEnd,
+        items: current.items.data.map(item => ({ price: item.price.id, quantity: item.quantity ?? 1 })) }],
+    }, { idempotencyKey: `managed_schedule_end_v2_${current.id}_${periodEnd}` });
+    const updated = await stripe.subscriptions.retrieve(current.id);
+    if (updated.cancel_at !== periodEnd && !updated.cancel_at_period_end)
+      throw new HttpsError("internal", "Stripe did not schedule the managed support end date. Please contact support.");
+    return { subscription: updated, cancelAt: updated.cancel_at ?? periodEnd };
+  }
+  const updated = await stripe.subscriptions.update(current.id, { cancel_at_period_end: true },
+    { idempotencyKey: `managed_customer_end_v2_${current.id}_${periodEnd}` });
+  return { subscription: updated, cancelAt: updated.cancel_at ?? periodEnd };
+}
+
 export const endMyManagedSupport = onCall({ region: "us-central1", secrets: [stripeSecretKey] }, async request => {
   const id = request.auth?.uid;
   if (!id) throw new HttpsError("unauthenticated", "Sign in to continue.");
@@ -478,9 +505,8 @@ export const endMyManagedSupport = onCall({ region: "us-central1", secrets: [str
     throw new HttpsError("failed-precondition", "Managed billing does not match this company.");
   if (!(["active", "trialing", "past_due"].includes(current.status)))
     throw new HttpsError("failed-precondition", "This managed subscription is not currently active.");
-  const periodEndMillis = managedPeriodEnd(current) * 1000;
-  const updated = current.cancel_at_period_end ? current : await stripe.subscriptions.update(subscriptionId,
-    { cancel_at_period_end: true }, { idempotencyKey: `managed_customer_end_${id}_${subscriptionId}` });
+  const { subscription: updated, cancelAt } = await scheduleManagedCancellation(stripe, current);
+  const periodEndMillis = cancelAt * 1000;
   await syncManagedSubscription(db, updated);
   const requestRef = db.collection("managedServiceRequests").doc(id);
   const mailRef = db.collection("mail").doc(`managed_customer_end_${subscriptionId}`);
@@ -518,8 +544,7 @@ export const scheduleManagedServiceEnd = onCall({ region: "us-central1", secrets
   const current = await stripe.subscriptions.retrieve(subscriptionId);
   if (current.metadata.serviceKind !== "managed" || current.metadata.carrierId !== id)
     throw new HttpsError("failed-precondition", "Managed subscription does not match this customer.");
-  const updated = current.cancel_at_period_end ? current : await stripe.subscriptions.update(subscriptionId,
-    { cancel_at_period_end: true }, { idempotencyKey: `managed_end_${id}_${serviceRequest.data()?.revision}` });
+  const { subscription: updated } = await scheduleManagedCancellation(stripe, current);
   await db.runTransaction(async tx => {
     const latest = await tx.get(serviceRequest.ref);
     if (latest.data()?.status === "end_requested" && latest.data()?.revision === serviceRequest.data()?.revision) {
