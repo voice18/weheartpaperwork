@@ -10,8 +10,8 @@ type Area = "company" | "drivers" | "fleet";
 const LABEL: Record<Area, string> = { company: "Company", drivers: "Driver", fleet: "Fleet" };
 
 export default function ManagedCoverageNotice({
-  coverage, area,
-}: { coverage: ManagedCoverage | null; area?: Area }) {
+  coverage, area, unmanagedCount = 0,
+}: { coverage: ManagedCoverage | null; area?: Area; unmanagedCount?: number }) {
   if (!coverage) return null;
   const active = coverage.status === "active";
   if (area) {
@@ -25,6 +25,7 @@ export default function ManagedCoverageNotice({
         : managed
         ? "We monitor the listed deadlines, send instructions, and follow up. You complete filings, payments, reviews, and inspections, then confirm they are done. Custom Company items are included only after we verify and accept their due dates."
         : "Your app reminders remain available. Personal follow-up from We Heart Paperwork is not active for this tab."}</Text>
+      {managed && unmanagedCount > 0 && <Text style={styles.body}>{unmanagedCount} newly added {area === "drivers" ? "driver" : "vehicle"}{unmanagedCount === 1 ? " is" : "s are"} tracked in your app but not included in managed support. We will contact you before adding a managed charge or taking responsibility for {unmanagedCount === 1 ? "this unit" : "these units"}.</Text>}
     </View>;
   }
   const areas = (["company", "drivers", "fleet"] as Area[])

@@ -554,12 +554,18 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
   </>
 ) : tab === "drivers" ? (
   <>
-    <ManagedCoverageNotice coverage={managedCoverage} area="drivers" />
+    <ManagedCoverageNotice coverage={managedCoverage} area="drivers"
+      unmanagedCount={managedCoverage?.managedUnitIds?.driverIds
+        ? drivers.filter(driver => driver.status !== "inactive" &&
+          !managedCoverage.managedUnitIds!.driverIds!.includes(driver.id)).length : 0} />
     <DriversPanel />
   </>
 ) : (
   <>
-    <ManagedCoverageNotice coverage={managedCoverage} area="fleet" />
+    <ManagedCoverageNotice coverage={managedCoverage} area="fleet"
+      unmanagedCount={managedCoverage?.managedUnitIds?.vehicleIds
+        ? vehicles.filter(vehicle => vehicle.status !== "inactive" &&
+          !managedCoverage.managedUnitIds!.vehicleIds!.includes(vehicle.id)).length : 0} />
     <FleetPanel />
   </>
 )}

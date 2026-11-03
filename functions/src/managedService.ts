@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
+import { createHash } from "node:crypto";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
+import { queueOwnerEmail } from "./ownerNotifications";
 
 type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
@@ -604,7 +606,32 @@ export const signalManagedCarrierChange = onDocumentWritten(
   async event => signalManagedChange(event.params.carrierId));
 export const signalManagedItemChange = onDocumentWritten(
   { document: "carriers/{carrierId}/{collectionId}/{docId}", region: "us-central1" },
-  async event => signalManagedChange(event.params.carrierId));
+  async event => {
+    const { carrierId, collectionId, docId } = event.params;
+    await signalManagedChange(carrierId);
+    if (collectionId !== "drivers" && collectionId !== "vehicles") return;
+    const before = event.data?.before.exists ? event.data.before.data() : null;
+    const after = event.data?.after.exists ? event.data.after.data() : null;
+    if (!after || after.status === "inactive" || (before && before.status !== "inactive")) return;
+    const db = admin.firestore();
+    const [coverage, carrier, serviceRequest] = await Promise.all([
+      db.collection("managedServiceCoverage").doc(carrierId).get(),
+      db.collection("carriers").doc(carrierId).get(),
+      db.collection("managedServiceRequests").doc(carrierId).get(),
+    ]);
+    if (coverage.data()?.status !== "active" || !carrier.exists || carrier.data()?.deletingAccount === true) return;
+    const managedUnits = object(coverage.data()?.managedUnitIds);
+    const enrolled = collectionId === "drivers" ? managedUnits.driverIds : managedUnits.vehicleIds;
+    if (!Array.isArray(enrolled) || enrolled.includes(docId)) return;
+    const kind = collectionId === "drivers" ? "driver" : after.type === "trailer" ? "trailer" : "truck";
+    const label = String(collectionId === "drivers" ? after.name || "Driver" : after.unitNumber || "Vehicle").slice(0, 100);
+    const company = String(carrier.data()?.companyName || "Company").slice(0, 150);
+    const contact = String(serviceRequest.data()?.preferredEmail || carrier.data()?.email || "Not provided").slice(0, 254);
+    const digest = createHash("sha256").update(event.id).digest("hex").slice(0, 24);
+    await queueOwnerEmail(db, `managed_new_unit_${carrierId}_${docId}_${digest}`,
+      `Managed customer added a ${kind}: ${company}`,
+      `${company} added or reactivated ${kind} ${label}.\n\nContact: ${contact}\n\nThis unit is not in the paid managed scope. The current managed price and coverage have not changed. Contact the customer to ask whether they want it managed, then confirm the added monthly price and record their agreement before updating coverage.\n\nOpen the owner managed work queue to review the unit.`);
+  });
 export const signalManagedCoverageChange = onDocumentWritten(
   { document: "managedServiceCoverage/{carrierId}", region: "us-central1" },
   async event => signalManagedChange(event.params.carrierId));
