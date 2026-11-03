@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import Head from "expo-router/head";
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { auth, db, functions } from "../../lib/firebase";
+import { MANAGED_PRICING } from "../../lib/managedPricing";
 import { collection, onSnapshot } from "firebase/firestore";
 
 type Areas = { company: boolean; drivers: boolean; fleet: boolean };
@@ -22,7 +23,10 @@ type Item = { key: string; area: string; label: string; dueDate: string | null; 
   sourceVersion: string | null; sourceInputDate: string | null };
 type Detail = Omit<Summary, "itemCount" | "pendingCustomCount"> & {
   coverage: Summary["coverage"] & { consentReference?: string };
-  items: Item[]; pendingCustom: { id: string; name: string; reason: string; kind?: "unit" }[];
+  items: Item[]; pendingCustom: { id: string; name: string; reason: string; kind?: "unit";
+    collectionId?: "drivers" | "vehicles"; unitType?: "driver" | "truck" | "trailer" }[];
+  managedStripeSubscriptionId?: string | null;
+  selfManagedUnitCounts?: { drivers: number; vehicles: number };
   history: { id: string; type: string; itemKey: string | null; itemLabel: string | null; note: string | null; createdAtMillis: number | null }[];
 };
 type ServiceRequest = { carrierId: string; companyName: string; accountEmail: string;
@@ -183,6 +187,7 @@ export default function OwnerManaged() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const detailId = useRef<string | null>(null);
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
+  const [unitAgreements, setUnitAgreements] = useState<Record<string, string>>({});
   const [itemDates, setItemDates] = useState<Record<string, string>>({});
   const [busyItem, setBusyItem] = useState<string | null>(null);
   useEffect(() => {
@@ -250,6 +255,26 @@ export default function OwnerManaged() {
       focusDetail.current = true;
     } catch (error) { setMessage(errorText(error)); }
     finally { setWorking(false); }
+  };
+  const enrollUnit = async (row: Detail["pendingCustom"][number]) => {
+    if (!detail || !row.collectionId) return;
+    const key = row.collectionId + ":" + row.id;
+    const agreementReference = (unitAgreements[key] || "").trim();
+    if (agreementReference.length < 8) {
+      setMessage("Record where the customer agreed to this added monthly charge.");
+      return;
+    }
+    setBusyItem(key);
+    try {
+      await call("enrollApprovedManagedUnit", {
+        carrierId: detail.carrierId, collectionId: row.collectionId,
+        unitId: row.id, agreementReference,
+      });
+      setUnitAgreements(previous => ({ ...previous, [key]: "" }));
+      await open(detail.carrierId);
+      setMessage(`${row.name} is now in managed coverage. The existing Company rate was not changed.`);
+    } catch (error) { setMessage(errorText(error)); }
+    finally { setBusyItem(null); }
   };
   useEffect(() => {
     if (ownerAccess !== "allowed") return;
@@ -638,10 +663,22 @@ export default function OwnerManaged() {
         <Button label="Open next listed company ›" subtle onPress={() => void open(queueAccounts[0].carrierId)} disabled={working} />
       </View>}
       <Text style={styles.help}>Open a public guide, send your message outside this app, then log what you did here. These buttons do not send email. Verified date changes here update the customer's dashboard. Customers confirm completed filings, reviews, and inspections in their app.</Text>
+      {!!(detail.selfManagedUnitCounts?.drivers || detail.selfManagedUnitCounts?.vehicles) &&
+        <Text style={styles.help}>Outside managed coverage: {detail.selfManagedUnitCounts?.drivers || 0} self-managed drivers and {detail.selfManagedUnitCounts?.vehicles || 0} self-managed trucks/trailers. If the customer wants an area they did not select, prepare a separate scope and billing change before managing its units.</Text>}
       {detail.pendingCustom.length > 0 && (queueFilter === "all" || queueFilter === "needsInfo") && <>
         <Text style={styles.subheading}>New units and custom items awaiting review</Text>
+        {detail.managedStripeSubscriptionId && <Text selectable style={styles.small}>Managed Stripe subscription: {detail.managedStripeSubscriptionId}</Text>}
         {detail.pendingCustom.map(row => <View key={row.id} style={styles.item}>
           <Text style={styles.accountTitle}>{row.name}</Text><Text style={styles.small}>{row.reason}</Text>
+          {row.kind === "unit" && row.collectionId && <>
+            <Text style={styles.small}>Added managed price: ${row.unitType === "driver" ? MANAGED_PRICING.driverMonthly
+              : row.unitType === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly}/month. The existing Company rate stays the same. Contact the customer first and record their agreement. Update this unit's recurring quantity in the managed Stripe subscription and every remaining schedule phase, with no proration. Then verify and enroll it here.</Text>
+            <TextInput style={styles.input} value={unitAgreements[row.collectionId + ":" + row.id] || ""}
+              onChangeText={value => setUnitAgreements(previous => ({ ...previous, [row.collectionId + ":" + row.id]: value }))}
+              placeholder="Where the customer agreed to the added monthly charge" />
+            <Button label="Verify billing and enroll this unit" subtle
+              onPress={() => void enrollUnit(row)} disabled={!!busyItem} />
+          </>}
           {row.kind !== "unit" && <TextInput style={styles.input} value={itemNotes["custom:" + row.id] || ""}
             onChangeText={value => setItemNotes(previous => ({ ...previous, ["custom:" + row.id]: value }))}
             placeholder="Where did you verify the filing due date?" multiline />}

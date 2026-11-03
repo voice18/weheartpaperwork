@@ -3023,7 +3023,7 @@ export { submitCustomerReview, withdrawCustomerReview, listCustomerReviewsForMod
 export { submitDemoRequest } from "./demoRequests";
 
 export { findManagedServiceCandidate, listManagedServiceCandidates, saveManagedServiceCoverage, listManagedServiceAccounts, getManagedServiceAccount, updateManagedServiceWork, acceptManagedCustomRequirement, saveManagedServiceDeadline, removeManagedServiceOnCarrierDeletion,
-  signalManagedCarrierChange, signalManagedItemChange, signalManagedCoverageChange, signalManagedWorkChange } from "./managedService";
+  enrollApprovedManagedUnit, signalManagedCarrierChange, signalManagedItemChange, signalManagedCoverageChange, signalManagedWorkChange } from "./managedService";
 export { submitManagedServiceRequest, listManagedServiceRequests, enterManagedIntakeUnits, updateManagedServiceRequestStatus } from "./managedServiceRequests";
 export { getManagedServiceQuote, prepareManagedServiceQuote, acceptManagedServiceQuote, createManagedCheckoutSession,
   withdrawManagedServiceQuote,

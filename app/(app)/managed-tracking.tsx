@@ -9,7 +9,8 @@ import { MANAGED_COMPANY_SETUP_TOTAL, MANAGED_PRICING } from "../../lib/managedP
 
 type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
-type Coverage = { status?: string; areas?: Areas; effectiveDate?: string | null };
+type Coverage = { status?: string; areas?: Areas; effectiveDate?: string | null;
+  managedUnitIds?: { driverIds?: string[]; vehicleIds?: string[] } };
 type ServiceRequest = { status?: string; areas?: Areas; updatedAt?: unknown;
   preferredEmail?: string; preferredPhone?: string; textPermission?: boolean;
   intake?: Intake };
@@ -386,9 +387,11 @@ export default function ManagedTrackingChoices() {
             <Text style={styles.noticeText}>Your existing quote covers the previously submitted areas and units. Submit your revised request for a new quote before accepting or paying.</Text>
           </View>}
           {quote && (paymentConfirmed || (same(areas, quote.areas) && intakeMatchesRequest)) && <View style={styles.card}>
-            <Text style={styles.section}>{paymentConfirmed ? "Your paid managed-support plan" : "Your managed-support quote"}</Text>
+            <Text style={styles.section}>{activeCoverage ? "Your original managed-support quote"
+              : paymentConfirmed ? "Your paid managed-support plan" : "Your managed-support quote"}</Text>
             <Text style={styles.body}>{quote.scope}</Text>
             <Text style={styles.body}>Company: {quote.areas.company ? "included" : "self-managed"} · Driver: {quote.areas.drivers ? `${quote.counts.drivers} managed` : "self-managed"} · Fleet: {quote.areas.fleet ? `${quote.counts.trucks} trucks and ${quote.counts.trailers} trailers managed` : "self-managed"}</Text>
+            {activeCoverage && <Text style={styles.small}>Current managed roster: {coverage?.managedUnitIds?.driverIds?.length || 0} drivers and {coverage?.managedUnitIds?.vehicleIds?.length || 0} trucks/trailers. New units are added only after we contact you, confirm the added monthly price, and approve them. Your original Company rate stays the same.</Text>}
             {quote.areas.drivers && quote.counts.drivers === 0 && <Text style={styles.small}>Driver support has no enrolled drivers and no Driver charge in this quote. Ask us for an updated quote before adding managed drivers later.</Text>}
             {quote.areas.fleet && quote.counts.trucks + quote.counts.trailers === 0 && <Text style={styles.small}>Fleet support has no enrolled vehicles and no Fleet charge in this quote. Ask us for an updated quote before adding managed equipment later.</Text>}
             <Text style={styles.summary}>${quote.price.firstYearMonthly}/month in year one</Text>

@@ -2,7 +2,10 @@ import * as admin from "firebase-admin";
 import { createHash } from "node:crypto";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentDeleted, onDocumentWritten } from "firebase-functions/v2/firestore";
+import { defineSecret } from "firebase-functions/params";
+import Stripe from "stripe";
 import { queueOwnerEmail } from "./ownerNotifications";
+import { MANAGED_PRICING } from "./managedPricing";
 
 type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
@@ -18,6 +21,7 @@ const COMPANY_ITEMS = [
   ["irp", "IRP registration renewal"], ["insurance", "Commercial auto insurance"],
   ["drug", "Drug and alcohol consortium renewal"], ["boc3", "BOC-3 process agent status"],
 ] as const;
+const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 
 function owner(request: { auth?: { uid: string; token: Record<string, unknown> } }): string {
   if (!request.auth) throw new HttpsError("unauthenticated", "Sign in to continue.");
@@ -79,20 +83,26 @@ function add(items: Item[], key: string, area: Area, label: string, raw: unknown
 async function account(carrierId: string, coverage: Data) {
   const db = admin.firestore();
   const ref = db.collection("carriers").doc(carrierId);
-  const [carrier, compliance, drivers, vehicles, custom, work, request] = await Promise.all([
+  const [carrier, compliance, drivers, vehicles, custom, work, request, billing] = await Promise.all([
     ref.get(), ref.collection("compliance").get(), ref.collection("drivers").get(),
     ref.collection("vehicles").get(), ref.collection("customRequirements").get(),
     db.collection("managedServiceWork").doc(carrierId).collection("items").get(),
     db.collection("managedServiceRequests").doc(carrierId).get(),
+    db.collection("managedServiceBilling").doc(carrierId).get(),
   ]);
   if (!carrier.exists || carrier.data()?.deletingAccount === true) return null;
   const areas = object(coverage.areas);
   const current = today();
   const items: Item[] = [];
-  const pendingCustom: { id: string; name: string; reason: string; kind?: "unit" }[] = [];
+  const pendingCustom: { id: string; name: string; reason: string; kind?: "unit";
+    collectionId?: "drivers" | "vehicles"; unitType?: "driver" | "truck" | "trailer" }[] = [];
   const managedUnits = object(coverage.managedUnitIds);
   const driverIds = Array.isArray(managedUnits.driverIds) ? new Set(managedUnits.driverIds) : null;
   const vehicleIds = Array.isArray(managedUnits.vehicleIds) ? new Set(managedUnits.vehicleIds) : null;
+  const selfManagedUnitCounts = {
+    drivers: areas.drivers === true ? 0 : drivers.docs.filter(row => row.data().status !== "inactive").length,
+    vehicles: areas.fleet === true ? 0 : vehicles.docs.filter(row => row.data().status !== "inactive").length,
+  };
   if (areas.company === true) {
     const stored = new Map(compliance.docs.map(row => [row.id, row.data()]));
     for (const [key, label] of COMPANY_ITEMS) {
@@ -109,7 +119,8 @@ async function account(carrierId: string, coverage: Data) {
     if (value.status === "inactive") continue;
     const name = typeof value.name === "string" && value.name.trim() ? value.name.trim() : "Driver";
     if (driverIds && !driverIds.has(row.id)) {
-      pendingCustom.push({ id: row.id, name, kind: "unit", reason: "New driver is outside the paid scope; review and quote before managing" });
+      pendingCustom.push({ id: row.id, name, kind: "unit", collectionId: "drivers", unitType: "driver",
+        reason: "New driver is outside paid managed scope; contact the customer before enrolling" });
       continue;
     }
     add(items, "driver:" + row.id + ":cdl", "drivers", name + " · CDL expiration", value.cdlExpiration, current);
@@ -131,7 +142,9 @@ async function account(carrierId: string, coverage: Data) {
     if (value.status === "inactive") continue;
     const unit = typeof value.unitNumber === "string" && value.unitNumber.trim() ? value.unitNumber.trim() : "Vehicle";
     if (vehicleIds && !vehicleIds.has(row.id)) {
-      pendingCustom.push({ id: row.id, name: unit, kind: "unit", reason: "New vehicle is outside the paid scope; review and quote before managing" });
+      pendingCustom.push({ id: row.id, name: unit, kind: "unit", collectionId: "vehicles",
+        unitType: value.type === "trailer" ? "trailer" : "truck",
+        reason: "New vehicle is outside paid managed scope; contact the customer before enrolling" });
       continue;
     }
     const label = (value.type === "trailer" ? "Trailer " : "Truck ") + unit;
@@ -207,7 +220,9 @@ async function account(carrierId: string, coverage: Data) {
     contact,
     coverage: { status: coverage.status ?? "draft", areas, effectiveDate: coverage.effectiveDate ?? null,
       anniversaryDate: plus(date(coverage.effectiveDate), 1, "year") },
-    counts, items, pendingCustom };
+    counts, items, pendingCustom, selfManagedUnitCounts,
+    managedStripeSubscriptionId: typeof billing.data()?.stripeSubscriptionId === "string"
+      ? billing.data()!.stripeSubscriptionId : null };
 }
 export const findManagedServiceCandidate = onCall({ region: "us-central1" }, async request => {
   owner(request);
@@ -601,6 +616,96 @@ async function signalManagedChange(carrierId: string): Promise<void> {
     await signal.delete();
   }
 }
+export const enrollApprovedManagedUnit = onCall(
+  { region: "us-central1", secrets: [stripeSecretKey] }, async request => {
+    const actor = owner(request);
+    const carrierId = identifier(request.data?.carrierId);
+    const unitId = identifier(request.data?.unitId);
+    const collectionId = request.data?.collectionId;
+    if (collectionId !== "drivers" && collectionId !== "vehicles")
+      throw new HttpsError("invalid-argument", "Choose a driver or vehicle.");
+    const agreement = typeof request.data?.agreementReference === "string"
+      ? request.data.agreementReference.trim().slice(0, 300) : "";
+    if (agreement.length < 8)
+      throw new HttpsError("failed-precondition", "Record where the customer agreed to the added monthly charge.");
+    const db = admin.firestore();
+    const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+    const billingRef = db.collection("managedServiceBilling").doc(carrierId);
+    const unitRef = db.collection("carriers").doc(carrierId).collection(collectionId).doc(unitId);
+    const [coverage, billing, unit] = await Promise.all([coverageRef.get(), billingRef.get(), unitRef.get()]);
+    const area = collectionId === "drivers" ? "drivers" : "fleet";
+    const units = object(coverage.data()?.managedUnitIds);
+    const field = collectionId === "drivers" ? "driverIds" : "vehicleIds";
+    const enrolled = units[field];
+    if (coverage.data()?.status !== "active" || object(coverage.data()?.areas)[area] !== true ||
+        billing.data()?.status !== "active" || !Array.isArray(enrolled) || !unit.exists ||
+        unit.data()?.status === "inactive")
+      throw new HttpsError("failed-precondition", "Active managed coverage, billing, and an active unit in this area are required.");
+    if (enrolled.includes(unitId)) return { alreadyEnrolled: true };
+    const subscriptionId = billing.data()?.stripeSubscriptionId;
+    if (typeof subscriptionId !== "string" || !subscriptionId.startsWith("sub_"))
+      throw new HttpsError("failed-precondition", "Find the managed Stripe subscription before enrolling this unit.");
+    const kind = collectionId === "drivers" ? "driver" : unit.data()?.type === "trailer" ? "trailer" : "truck";
+    const name = kind === "driver" ? "Managed Driver compliance"
+      : kind === "trailer" ? "Managed Trailer compliance" : "Managed Truck compliance";
+    const amount = kind === "driver" ? MANAGED_PRICING.driverMonthly
+      : kind === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly;
+    const enrolledDocs = await Promise.all(enrolled.map(id =>
+      db.collection("carriers").doc(carrierId).collection(collectionId).doc(id).get()));
+    const currentCount = collectionId === "drivers" ? enrolled.length
+      : enrolledDocs.filter(row => (row.data()?.type === "trailer" ? "trailer" : "truck") === kind).length;
+    const targetQuantity = currentCount + 1;
+    const stripe = new Stripe(stripeSecretKey.value());
+    const project = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? admin.app().options.projectId;
+    if (project === "weheartpaperwork-staging" && !stripeSecretKey.value().startsWith("sk_test_"))
+      throw new HttpsError("failed-precondition", "Staging verification requires a Stripe test key.");
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (subscription.status !== "active" || subscription.cancel_at_period_end || subscription.cancel_at ||
+        subscription.metadata.serviceKind !== "managed" || subscription.metadata.carrierId !== carrierId)
+      throw new HttpsError("failed-precondition", "The managed subscription is not active and payable.");
+    let priceId: string | null = null;
+    for (const item of subscription.items.data) {
+      if (item.price.unit_amount !== amount * 100) continue;
+      const productId = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
+      const product = await stripe.products.retrieve(productId);
+      if (product.name === name && item.quantity === targetQuantity) { priceId = item.price.id; break; }
+    }
+    if (!priceId) throw new HttpsError("failed-precondition",
+      `Update the ${name} quantity to ${targetQuantity} in Stripe, without proration, before enrolling this unit.`);
+    if (subscription.schedule) {
+      const scheduleId = typeof subscription.schedule === "string" ? subscription.schedule : subscription.schedule.id;
+      const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+      if (schedule.status !== "active" || schedule.end_behavior !== "release" ||
+          schedule.phases.filter(phase => phase.end_date > Math.floor(Date.now() / 1000))
+            .some(phase => !phase.items.some(item => item.price === priceId && item.quantity === targetQuantity)))
+        throw new HttpsError("failed-precondition",
+          "Update this unit's quantity in every remaining Stripe schedule phase before enrolling it.");
+    }
+    await db.runTransaction(async tx => {
+      const [latestCoverage, latestBilling, latestUnit] = await Promise.all([
+        tx.get(coverageRef), tx.get(billingRef), tx.get(unitRef),
+      ]);
+      const latestIds = object(latestCoverage.data()?.managedUnitIds)[field];
+      if (latestCoverage.data()?.status !== "active" ||
+          object(latestCoverage.data()?.areas)[area] !== true || !latestUnit.exists ||
+          latestUnit.data()?.status === "inactive" ||
+          latestBilling.data()?.stripeSubscriptionId !== subscriptionId ||
+          latestBilling.data()?.status !== "active" ||
+          !Array.isArray(latestIds))
+        throw new HttpsError("aborted", "Coverage or billing changed. Refresh and review before retrying.");
+      if (latestIds.includes(unitId)) return;
+      if (latestIds.length !== enrolled.length ||
+          latestIds.some((id: unknown, index: number) => id !== enrolled[index]))
+        throw new HttpsError("aborted", "Another unit was enrolled. Verify Stripe quantity again before retrying.");
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      tx.update(coverageRef, { [`managedUnitIds.${field}`]: admin.firestore.FieldValue.arrayUnion(unitId),
+        updatedAt: now, updatedBy: actor });
+      tx.create(coverageRef.collection("events").doc(), { type: "unit_enrolled", collectionId, unitId,
+        kind, monthlyAdded: amount, agreementReference: agreement, stripeSubscriptionId: subscriptionId,
+        stripePriceId: priceId, actor, createdAt: now });
+    });
+    return { enrolled: true, monthlyAdded: amount };
+  });
 export const signalManagedCarrierChange = onDocumentWritten(
   { document: "carriers/{carrierId}", region: "us-central1" },
   async event => signalManagedChange(event.params.carrierId));
@@ -622,7 +727,8 @@ export const signalManagedItemChange = onDocumentWritten(
     if (coverage.data()?.status !== "active" || !carrier.exists || carrier.data()?.deletingAccount === true) return;
     const managedUnits = object(coverage.data()?.managedUnitIds);
     const enrolled = collectionId === "drivers" ? managedUnits.driverIds : managedUnits.vehicleIds;
-    if (!Array.isArray(enrolled) || enrolled.includes(docId)) return;
+    if (Array.isArray(enrolled) && enrolled.includes(docId)) return;
+    const areaSelected = object(coverage.data()?.areas)[collectionId === "drivers" ? "drivers" : "fleet"] === true;
     const kind = collectionId === "drivers" ? "driver" : after.type === "trailer" ? "trailer" : "truck";
     const label = String(collectionId === "drivers" ? after.name || "Driver" : after.unitNumber || "Vehicle").slice(0, 100);
     const company = String(carrier.data()?.companyName || "Company").slice(0, 150);
@@ -630,7 +736,9 @@ export const signalManagedItemChange = onDocumentWritten(
     const digest = createHash("sha256").update(event.id).digest("hex").slice(0, 24);
     await queueOwnerEmail(db, `managed_new_unit_${carrierId}_${docId}_${digest}`,
       `Managed customer added a ${kind}: ${company}`,
-      `${company} added or reactivated ${kind} ${label}.\n\nContact: ${contact}\n\nThis unit is not in the paid managed scope. The current managed price and coverage have not changed. Contact the customer to ask whether they want it managed, then confirm the added monthly price and record their agreement before updating coverage.\n\nOpen the owner managed work queue to review the unit.`);
+      `${company} added or reactivated ${kind} ${label}.\n\nContact: ${contact}\n\nThis unit is not in the paid managed scope. The current managed price and coverage have not changed. Contact the customer to ask whether they want it managed, then confirm the added monthly price and record their agreement before updating coverage.\n\n${areaSelected
+        ? "Open the owner managed work queue to review the unit."
+        : "This customer did not select this managed area. A separate scope and billing review is required before it can be added."}`);
   });
 export const signalManagedCoverageChange = onDocumentWritten(
   { document: "managedServiceCoverage/{carrierId}", region: "us-central1" },
