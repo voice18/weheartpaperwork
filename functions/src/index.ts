@@ -1878,6 +1878,10 @@ console.log(
       );
 
       // STEP 7: Create the Stripe client.
+      const checkoutProject = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? admin.app().options.projectId;
+      if (checkoutProject === "weheartpaperwork-staging" && !stripeSecretKey.value().startsWith("sk_test_")) {
+        throw new HttpsError("failed-precondition", "Staging checkout requires a Stripe test key.");
+      }
       const stripe = new Stripe(
         stripeSecretKey.value()
       );
