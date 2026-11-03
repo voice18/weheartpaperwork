@@ -670,7 +670,9 @@ export default function OwnerManaged() {
         {detail.managedStripeSubscriptionId && <Text selectable style={styles.small}>Managed Stripe subscription: {detail.managedStripeSubscriptionId}</Text>}
         {detail.pendingCustom.map(row => <View key={row.id} style={styles.item}>
           <Text style={styles.accountTitle}>{row.name}</Text><Text style={styles.small}>{row.reason}</Text>
-          {row.kind === "unit" && row.collectionId && <>
+          {row.kind === "unit" && row.collectionId && !detail.managedStripeSubscriptionId &&
+            <Text style={styles.small}>No paid managed subscription is linked to this company. You can review the new unit here, but it cannot be enrolled in managed coverage yet.</Text>}
+          {row.kind === "unit" && row.collectionId && detail.managedStripeSubscriptionId && <>
             <Text style={styles.small}>Added managed price: ${row.unitType === "driver" ? MANAGED_PRICING.driverMonthly
               : row.unitType === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly}/month. The existing Company rate stays the same. Contact the customer first and record their agreement. Update this unit's recurring quantity in the managed Stripe subscription and every remaining schedule phase, with no proration. Then verify and enroll it here.</Text>
             <TextInput style={styles.input} value={unitAgreements[row.collectionId + ":" + row.id] || ""}
