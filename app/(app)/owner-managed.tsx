@@ -22,10 +22,12 @@ type Item = { key: string; area: string; label: string; dueDate: string | null; 
   issue: string | null; status: string; note: string | null;
   sourceVersion: string | null; sourceInputDate: string | null };
 type Detail = Omit<Summary, "itemCount" | "pendingCustomCount"> & {
+  stagingDemo?: boolean;
   coverage: Summary["coverage"] & { consentReference?: string };
   items: Item[]; pendingCustom: { id: string; name: string; reason: string; kind?: "unit";
     collectionId?: "drivers" | "vehicles"; unitType?: "driver" | "truck" | "trailer" }[];
   managedStripeSubscriptionId?: string | null;
+  managedBillingStatus?: string | null;
   selfManagedUnitCounts?: { drivers: number; vehicles: number };
   history: { id: string; type: string; itemKey: string | null; itemLabel: string | null; note: string | null; createdAtMillis: number | null }[];
 };
@@ -746,9 +748,10 @@ export default function OwnerManaged() {
       </View>
       <Text style={styles.help}>This setup applies only to {detail?.companyName || candidate?.companyName}. It is separate from the daily work queue.</Text>
       {(detail?.contact || candidate?.contact) && <ContactDetails contact={(detail?.contact || candidate?.contact)!} />}
-      <Text style={styles.help}>Use this when the service starts or its scope changes. It is not part of your daily work. Choose whole tabs; custom Company items require separate due-date verification.</Text>
+      <Text style={styles.help}>Use this to start a paid managed plan. Active scope changes need a separate customer agreement and billing review. Custom Company items require separate due-date verification.</Text>
       <View style={styles.row}>{(["company", "drivers", "fleet"] as (keyof Areas)[]).map(key =>
-        <Pressable key={key} onPress={() => setAreas(value => ({ ...value, [key]: !value[key] }))}
+        <Pressable key={key} disabled={detail?.coverage.status === "active"}
+          onPress={() => setAreas(value => ({ ...value, [key]: !value[key] }))}
           style={[styles.choice, areas[key] && styles.selected]}>
           <Text style={styles.choiceText}>{areas[key] ? "✓ " : ""}{AREA_LABEL[key]}</Text>
         </Pressable>)}</View>
@@ -758,12 +761,16 @@ export default function OwnerManaged() {
       <TextInput style={styles.input} value={consentReference} onChangeText={setConsentReference}
         placeholder="For example: email agreement dated Oct 27" />
       <Text style={styles.help}>Keep the agreement itself in your normal business records. This field records where to find it.</Text>
+      {detail?.stagingDemo && <Text style={styles.help}>Demo company: this sample coverage has no customer payment or agreement. Review its queue without changing its setup.</Text>}
+      {detail?.coverage.status === "active" && !detail.stagingDemo && <Text style={styles.help}>Managed coverage is already active. The customer paid through Stripe before it started. This screen does not charge the customer again.</Text>}
       <View style={styles.row}>
-        <Button label="Save setup draft" subtle onPress={() => void save("draft")} disabled={working} />
-        <Button label="Start managed coverage" onPress={() => void save("active")}
-          disabled={working || !(detail?.coverage.status === "active" ||
-            requests.some(row => row.carrierId === (detail?.carrierId || candidate?.carrierId) && row.status === "paid_awaiting_start"))} />
-        {detail?.coverage.status === "active" && <Button label="Pause managed coverage" subtle onPress={() => void save("paused")} disabled={working} />}
+        {detail?.coverage.status !== "active" && !detail?.stagingDemo && <>
+          <Button label="Save setup draft" subtle onPress={() => void save("draft")} disabled={working} />
+          <Button label="Start paid managed coverage" onPress={() => void save("active")}
+            disabled={working || !requests.some(row => row.carrierId === (detail?.carrierId || candidate?.carrierId) && row.status === "paid_awaiting_start")} />
+        </>}
+        {detail?.coverage.status === "active" && !detail.stagingDemo && detail.managedBillingStatus !== "active" &&
+          <Button label="Pause managed coverage" subtle onPress={() => void save("paused")} disabled={working} />}
       </View>
       {detail && <Text style={styles.help}>Current status: {detail.coverage.status}. First-year anniversary: {detail.coverage.anniversaryDate || "Not set"}. Coverage changes appear in the customer dashboard after saving.</Text>}
     </View>}

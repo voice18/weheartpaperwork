@@ -6,6 +6,7 @@ import { defineSecret } from "firebase-functions/params";
 import Stripe from "stripe";
 import { queueOwnerEmail } from "./ownerNotifications";
 import { MANAGED_PRICING } from "./managedPricing";
+import { managedUnitIdsForSave } from "./managedCoverageTransition";
 
 type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
@@ -216,13 +217,15 @@ async function account(carrierId: string, coverage: Data) {
   const data = carrier.data() ?? {};
   const contact = await contactForCarrier(carrierId, data, request.data() ?? {});
   return { carrierId, companyName: String(data.companyName || "Unnamed company"),
+    stagingDemo: data.stagingDemo === true,
     billingStatus: object(data.billing).status ?? null,
     contact,
     coverage: { status: coverage.status ?? "draft", areas, effectiveDate: coverage.effectiveDate ?? null,
       anniversaryDate: plus(date(coverage.effectiveDate), 1, "year") },
     counts, items, pendingCustom, selfManagedUnitCounts,
     managedStripeSubscriptionId: typeof billing.data()?.stripeSubscriptionId === "string"
-      ? billing.data()!.stripeSubscriptionId : null };
+      ? billing.data()!.stripeSubscriptionId : null,
+    managedBillingStatus: typeof billing.data()?.status === "string" ? billing.data()!.status : null };
 }
 export const findManagedServiceCandidate = onCall({ region: "us-central1" }, async request => {
   owner(request);
@@ -312,10 +315,12 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
     const [previous, serviceRequest, quote, billing] = await Promise.all([
       tx.get(ref), tx.get(requestRef), tx.get(quoteRef), tx.get(billingRef),
     ]);
+    if (previous.data()?.status === "active" && status === "draft")
+      throw new HttpsError("failed-precondition", "Active managed coverage cannot be changed to a draft. End managed billing before pausing coverage.");
+    const continuing = status === "active" && previous.data()?.status === "active" &&
+      quote.data()?.status === "active" && serviceRequest.data()?.status === "active";
     if (status === "active") {
       const agreed = object(quote.data()?.areas);
-      const continuing = previous.data()?.status === "active" && quote.data()?.status === "active" &&
-        serviceRequest.data()?.status === "active";
       if ((!continuing && (quote.data()?.status !== "paid_awaiting_start" ||
           serviceRequest.data()?.status !== "paid_awaiting_start")) ||
           quote.data()?.requestRevision !== serviceRequest.data()?.revision ||
@@ -346,15 +351,23 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
     const acceptedCustomIds = Array.isArray(previous.data()?.acceptedCustomIds)
       ? previous.data()!.acceptedCustomIds : [];
     const now = admin.firestore.FieldValue.serverTimestamp();
-    tx.set(ref, { status, areas, effectiveDate, consentReference, acceptedCustomIds,
-      managedUnitIds: status === "active" ? quote.data()?.units ?? {} : previous.data()?.managedUnitIds ?? {},
+    const savedEffectiveDate = previous.data()?.status === "active" && status !== "draft"
+      ? previous.data()?.effectiveDate : effectiveDate;
+    const savedConsentReference = previous.data()?.status === "active" && status !== "draft"
+      ? previous.data()?.consentReference : consentReference;
+    const savedAreas = previous.data()?.status === "active" && status === "paused"
+      ? previous.data()?.areas : areas;
+    tx.set(ref, { status, areas: savedAreas, effectiveDate: savedEffectiveDate, consentReference: savedConsentReference, acceptedCustomIds,
+      managedUnitIds: managedUnitIdsForSave(status, continuing,
+        previous.data()?.managedUnitIds, quote.data()?.units),
       updatedAt: now, updatedBy: actor, ...(previous.exists ? {} : { createdAt: now }) }, { merge: true });
     if (serviceRequest.exists && (status === "active" || status === "paused"))
       tx.set(requestRef, { status, updatedAt: now }, { merge: true });
     if (status === "active" && quote.data()?.status !== "active")
       tx.update(quoteRef, { status: "active", activatedAt: now, activatedBy: actor });
     tx.create(ref.collection("events").doc(), {
-      carrierId, actor, type: "coverage_updated", status, areas, effectiveDate, consentReference, createdAt: now });
+      carrierId, actor, type: "coverage_updated", status, areas: savedAreas,
+      effectiveDate: savedEffectiveDate, consentReference: savedConsentReference, createdAt: now });
   });
   return { saved: true };
 });
