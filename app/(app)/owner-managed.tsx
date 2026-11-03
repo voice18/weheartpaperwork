@@ -27,7 +27,9 @@ type Detail = Omit<Summary, "itemCount" | "pendingCustomCount"> & {
 };
 type ServiceRequest = { carrierId: string; companyName: string; accountEmail: string;
   preferredEmail: string; preferredPhone: string; accountPhone: string; textPermission: boolean | null;
-  billingStatus: string | null; areas: Areas; status: string; updatedAtMillis: number | null;
+  billingStatus: string | null; areas: Areas; status: string; revision: number; updatedAtMillis: number | null;
+  intakeUnitsConfirmedRevision?: number | null;
+  intakeUnitsAdded?: { drivers: number; vehicles: number } | null;
   intake?: { drivers: { name: string; cdlNumber: string; cdlClass: string; cdlState: string;
     cdlExpiration: string; medicalExpiration: string }[];
     vehicles: { type: string; unitNumber: string; vin: string;
@@ -164,6 +166,7 @@ export default function OwnerManaged() {
   const [quoteScopes, setQuoteScopes] = useState<Record<string, string>>({});
   const [quoteDqFiles, setQuoteDqFiles] = useState<Record<string, string>>({});
   const [quoteFeedback, setQuoteFeedback] = useState<Record<string, string>>({});
+  const [intakeFeedback, setIntakeFeedback] = useState<Record<string, string>>({});
   const [confirmIntakeId, setConfirmIntakeId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -355,12 +358,16 @@ export default function OwnerManaged() {
     if (!drivers && !vehicles) return;
     setWorking(true);
     try {
-      const result = await call<{ driversAdded: number; vehiclesAdded: number }>(
+      const result = await call<{ driversAdded: number; vehiclesAdded: number; alreadyConfirmed: boolean }>(
         "enterManagedIntakeUnits", { carrierId: row.carrierId });
       setConfirmIntakeId(null);
       await loadRequests();
-      setMessage(`Added ${result.driversAdded} quoted drivers and ${result.vehiclesAdded} quoted vehicles. Check their dates and app billing before activating coverage.`);
-    } catch (error) { setMessage(errorText(error)); }
+      setIntakeFeedback(previous => ({ ...previous, [row.carrierId]: result.alreadyConfirmed
+        ? "These quoted records were already checked. Continue with paid company setup below."
+        : result.driversAdded || result.vehiclesAdded
+          ? `Added ${result.driversAdded} driver${result.driversAdded === 1 ? "" : "s"} and ${result.vehiclesAdded} vehicle${result.vehiclesAdded === 1 ? "" : "s"}. Check their dates and app billing, then finish paid company setup below.`
+          : "All quoted drivers and vehicles were already on the customer's dashboard. No new records were added. Continue with paid company setup below." }));
+    } catch (error) { setIntakeFeedback(previous => ({ ...previous, [row.carrierId]: errorText(error) })); }
     finally { setWorking(false); }
   };
   const scheduleEnd = async (row: ServiceRequest) => {
@@ -517,14 +524,18 @@ export default function OwnerManaged() {
             {vehicle.registrationExpiration ? ` · Registration expires ${vehicle.registrationExpiration}` : ""}
             {vehicle.inspectionExpiration ? ` · Inspection expires ${vehicle.inspectionExpiration}` : ""}
           </Text>)}
-          <Text style={styles.small}>Review these details and existing account records before quoting. Intake is information only; it does not add units or start billing. Quoted units can be added after managed payment is confirmed.</Text>
+          <Text style={styles.small}>Review these details and existing account records before quoting. Intake is information only; it does not add units or start billing. After payment, you can check the quoted units and add any missing records.</Text>
           {row.status === "paid_awaiting_start" && !!(row.intake?.drivers?.length || row.intake?.vehicles?.length) && <>
-            {confirmIntakeId !== row.carrierId ? <Button label="Review quoted units for setup" subtle
+            {row.intakeUnitsConfirmedRevision === row.revision ? <Text style={styles.small} accessibilityRole="alert">
+              Quoted units checked. {row.intakeUnitsAdded?.drivers || 0} driver{row.intakeUnitsAdded?.drivers === 1 ? "" : "s"} and {row.intakeUnitsAdded?.vehicles || 0} vehicle{row.intakeUnitsAdded?.vehicles === 1 ? "" : "s"} added. Any matching records were left unchanged. Continue with paid company setup below.
+            </Text> : confirmIntakeId !== row.carrierId ? <Button label="Check quoted units against dashboard" subtle
               onPress={() => setConfirmIntakeId(row.carrierId)} disabled={working} /> : <View style={styles.contactBox}>
-              <Text style={styles.small}>Check the list above against the paid quote. Adding a new active driver also increases the existing app subscription by $1/month per driver. Existing matching units are skipped.</Text>
-              <Button label="Add quoted units to dashboard" onPress={() => void enterIntake(row)} disabled={working} />
+              <Text style={styles.small}>Check the list above against the paid quote. This adds missing driver or vehicle records only; matching records are left as they are. A new active driver also increases the separate app subscription by $1/month per driver.</Text>
+              <Button label="Confirm and add missing records" onPress={() => void enterIntake(row)} disabled={working} />
               <Button label="Cancel setup" subtle onPress={() => setConfirmIntakeId(null)} disabled={working} />
             </View>}
+            {!!intakeFeedback[row.carrierId] && row.intakeUnitsConfirmedRevision !== row.revision &&
+              <Text style={styles.small} accessibilityRole="alert">{intakeFeedback[row.carrierId]}</Text>}
           </>}
         </View>}
         {row.quote && <View style={styles.contactBox}>

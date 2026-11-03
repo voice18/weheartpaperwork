@@ -75,8 +75,11 @@ export const submitManagedServiceRequest = onCall({ region: "us-central1" }, asy
       tx.set(requestRef, { ...contact, carrierId: uid, companyName,
         accountEmail: String(request.auth?.token.email || "").slice(0, 254),
         textConsentAt: contact.textPermission ? now : null,
+        ...(Number.isSafeInteger(before.intakeUnitsConfirmedRevision) &&
+          before.intakeUnitsConfirmedRevision === before.revision
+          ? { intakeUnitsConfirmedRevision: revision } : {}),
         status: before.status || "active", revision, updatedAt: now }, { merge: true });
-      if (quote.exists && ["quoted", "accepted", "active"].includes(String(quote.data()?.status)) &&
+      if (quote.exists && ["quoted", "accepted", "paid_awaiting_start", "active"].includes(String(quote.data()?.status)) &&
           quote.data()?.requestRevision === before.revision)
         tx.update(quoteRef, { requestRevision: revision });
       tx.create(requestRef.collection("events").doc(), {
@@ -122,8 +125,12 @@ export const submitManagedServiceRequest = onCall({ region: "us-central1" }, asy
       textConsentAt: contact.textPermission ? now : null,
       billingStatus: carrier.data()?.billing?.status ?? null, areas: selected,
       status: contactOnly ? before.status : nextStatus, revision,
+      intakeUnitsConfirmedRevision: contactOnly && Number.isSafeInteger(before.intakeUnitsConfirmedRevision) &&
+        before.intakeUnitsConfirmedRevision === before.revision
+        ? revision : null,
+      intakeUnitsAdded: contactOnly ? before.intakeUnitsAdded ?? null : null,
       ...(contactOnly ? {} : { submittedAt: now }), updatedAt: now }, { merge: true });
-    if (contactOnly && quote.exists && ["quoted", "accepted"].includes(String(quote.data()?.status)) &&
+    if (contactOnly && quote.exists && ["quoted", "accepted", "paid_awaiting_start"].includes(String(quote.data()?.status)) &&
         quote.data()?.requestRevision === before.revision)
       tx.update(quoteRef, { requestRevision: revision });
     tx.create(requestRef.collection("events").doc(), {
@@ -161,7 +168,10 @@ export const listManagedServiceRequests = onCall({ region: "us-central1" }, asyn
           price: quote.data()?.price ?? null, counts: quote.data()?.counts ?? null } : null,
       billingStatus: value.billingStatus ?? null,
       intake: value.intake || { drivers: [], vehicles: [] },
-      areas: areas(value.areas), status: String(value.status || "requested"),
+      intakeUnitsConfirmedRevision: Number.isSafeInteger(value.intakeUnitsConfirmedRevision)
+        ? value.intakeUnitsConfirmedRevision : null,
+      intakeUnitsAdded: value.intakeUnitsAdded || null,
+      revision: Number(value.revision || 0), areas: areas(value.areas), status: String(value.status || "requested"),
       updatedAtMillis: value.updatedAt?.toMillis?.() ?? null };
   }));
   requests.sort((a, b) => (b.updatedAtMillis || 0) - (a.updatedAtMillis || 0));
@@ -200,7 +210,9 @@ export const enterManagedIntakeUnits = onCall({ region: "us-central1" }, async r
   if (JSON.stringify(roster.driverIds) !== JSON.stringify(quotedUnits.driverIds) ||
       JSON.stringify(roster.vehicleIds) !== JSON.stringify(quotedUnits.vehicleIds))
     throw new HttpsError("failed-precondition", "The active roster changed after the quote. Review billing before adding units.");
-  if (!roster.newDrivers.length && !roster.newVehicles.length) return { driversAdded: 0, vehiclesAdded: 0 };
+  if (Number.isSafeInteger(currentRequest.data()?.intakeUnitsConfirmedRevision) &&
+      currentRequest.data()?.intakeUnitsConfirmedRevision === currentRequest.data()?.revision)
+    return { driversAdded: 0, vehiclesAdded: 0, alreadyConfirmed: true };
   const batch = db.batch();
   for (const { id, row } of roster.newDrivers) {
     batch.create(carrierRef.collection("drivers").doc(id), {
@@ -222,9 +234,13 @@ export const enterManagedIntakeUnits = onCall({ region: "us-central1" }, async r
   batch.create(requestRef.collection("events").doc(), { type: "intake_units_entered",
     driversAdded: roster.newDrivers.length, vehiclesAdded: roster.newVehicles.length,
     actor: request.auth!.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  batch.update(requestRef, { intakeUnitsConfirmedRevision: currentRequest.data()?.revision,
+    intakeUnitsAdded: { drivers: roster.newDrivers.length, vehicles: roster.newVehicles.length },
+    intakeUnitsConfirmedAt: admin.firestore.FieldValue.serverTimestamp() });
   try { await batch.commit(); }
   catch (error) { throw new HttpsError("aborted", "The intake or account changed while adding units. Refresh and check the customer account before retrying."); }
-  return { driversAdded: roster.newDrivers.length, vehiclesAdded: roster.newVehicles.length };
+  return { driversAdded: roster.newDrivers.length, vehiclesAdded: roster.newVehicles.length,
+    alreadyConfirmed: false };
 });
 export const updateManagedServiceRequestStatus = onCall({ region: "us-central1" }, async request => {
   owner(request);
