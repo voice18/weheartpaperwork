@@ -10,10 +10,10 @@
 | Entering a date | `MM-DD-YYYY` with real-date validation | Same format and validator | Aligned; owner additionally records the verification source |
 | Saving a date | Updates the carrier's compliance, driver, vehicle or custom requirement document | Updates that same document using a guarded transaction | Both views read the same saved value |
 | Completion history | Reads the requirement's completion-history collection | Reads the same collection, without a display cap | Aligned for managed Company, Driver and Fleet items that have history |
-| Deleting completion history | Older entries do not rewind the current date; latest entry restores only if its result is still current | Same guarded rollback conditions through an owner-only function | Implemented; end-to-end deletion still needs a disposable staging record |
-| Form 2290, UCR, IFTA license, quarterly IFTA, and BOC-3 completion | Marks the carrier requirement complete and writes shared completion history | Owner can confirm completion with a date and verification note; writes the same carrier document and history path | Controls visible in staging; saving a disposable completion still needs a click-through |
-| Company applicability | Customer can mark a built-in item not applicable and reverse the choice | Owner can do the same; item remains visible in All active and leaves urgent counts | Demo BOC-3 was observed as not applicable and excluded from urgent counts; reversal is not yet verified |
-| Driver qualification file | Eight document and qualification checks on the driver record | Owner can update those same eight fields with a source note; all eight must be confirmed for the owner checklist to read complete | Implemented in staging; click-through still needed |
+| Deleting completion history | Older entries do not rewind the current date; latest entry restores only if its result is still current | Same guarded rollback conditions through an owner-only function | Latest-entry deletion restored the earlier status on DEMO 01; older-entry behavior still needs a separate staging test |
+| Form 2290, UCR, IFTA license, quarterly IFTA, and BOC-3 completion | Marks the carrier requirement complete and writes shared completion history | Owner can confirm completion with a date and verification note; writes the same carrier document and history path | DEMO 01 BOC-3 completion saved and appeared in history |
+| Company applicability | Customer can mark a built-in item not applicable and reverse the choice | Owner can do the same; item remains visible in All active and leaves urgent counts | Demo BOC-3 was observed as not applicable, then successfully returned to active tracking |
+| Driver qualification file | Eight document and qualification checks on the driver record | Owner can update those same eight fields with a source note; all eight must be confirmed for the owner checklist to read complete | DEMO 02 first check saved, then reverted; blank source was rejected |
 
 ## Deliberate workflow differences
 
@@ -32,7 +32,12 @@
 - Staging functions and the preview hosting channel were deployed; production was not changed.
 - The live staging owner page shows the completion date and applicability controls. A staging demo work-log action saved successfully and appeared in action history with a visible success message.
 - On November 13 the staging browser stalled during a demo applicability reversal. The outcome was not observable, so it is not counted as a passed test.
+- A fresh owner-page read later confirmed that reversal: DEMO 01 BOC-3 returned to active tracking and its action history recorded the change.
+- The owner marked DEMO 01 BOC-3 complete using a synthetic staging note. A fresh read showed Completed, one completion-history record, and a saved action. Customer sign-in for that demo carrier is unavailable, so customer-screen parity remains unverified.
+- On DEMO 02, an invalid truck inspection date was rejected without changing the stored date. A valid date changed its countdown and queue status; restoring the original date worked. A Driver CDL date also saved, changed its displayed date, and restored correctly.
+- A DQ checklist update without a source note was rejected. With a synthetic source note, the first check moved from 0/8 to 1/8, then returned to 0/8 with another logged update.
+- The browser stalled on the native deletion confirmation, but a fresh read confirmed the deletion succeeded: DEMO 01 BOC-3 returned to Needs information, the completion record disappeared, and action history logged the deletion. The owner page now uses an on-page two-step confirmation; that new confirmation control itself still needs a staging click-through.
 
 ## Before production
 
-Use a disposable staging completion record to verify a completed requirement appears in both views, deletion of an older entry leaves the current deadline unchanged, and deletion of the newest entry restores the previous deadline in both views. Also check one Company, one Driver and one Fleet requirement with an actual saved date. Do not use a real customer's compliance record for this test.
+Use a disposable staging record to check the new two-step deletion control and an older history entry before treating older-entry deletion as proven. Use a customer account that can sign in to staging to verify a Company, Driver, and Fleet change from both views. Do not use a real customer's compliance record for this test.

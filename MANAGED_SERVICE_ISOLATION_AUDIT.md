@@ -17,9 +17,9 @@ The managed service is staged separately, but it is not fully independent of the
 
 - The branch is `managed-service-staging-20261030`; managed support has not been released to production.
 - Staging owner controls and three new functions were deployed to `weheartpaperwork-staging` only.
-- The staging owner page visibly shows Company completion and applicability controls. One demo work-log action saved and appeared in Action history.
+- Staging owner tests saved and restored Company applicability and BOC-3 completion, a Driver CDL date and DQ checklist status, and a Fleet inspection date. Invalid dates and a blank DQ verification source were rejected. Deleting the latest BOC-3 completion restored its earlier status.
 - All 73 Firebase Functions tests pass. The app TypeScript check and mobile configuration validation pass.
-- The new completion, applicability, and DQ update paths still need end-to-end checks against disposable staging records in both owner and customer views.
+- The owner-side controls have been exercised on disposable staging records. A sign-in-capable test carrier is still needed to confirm that the customer sees the same saved dates, countdowns, and history. The new on-page history deletion confirmation and older-history deletion still need click-through checks.
 
 ## Production gate
 

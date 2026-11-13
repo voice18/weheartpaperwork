@@ -3,7 +3,7 @@ import { httpsCallable } from "firebase/functions";
 import { getIdTokenResult, onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "expo-router";
 import Head from "expo-router/head";
-import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { auth, db, functions } from "../../lib/firebase";
 import { MANAGED_PRICING } from "../../lib/managedPricing";
 import { formatDateInput, inputToIso, isoToInput } from "../../lib/dateUtils";
@@ -228,6 +228,7 @@ export default function OwnerManaged() {
   const [itemFeedback, setItemFeedback] = useState<Record<string, string>>({});
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [busyItem, setBusyItem] = useState<string | null>(null);
+  const [pendingHistoryDelete, setPendingHistoryDelete] = useState<string | null>(null);
   useEffect(() => {
     let generation = 0;
     return onAuthStateChanged(auth, user => {
@@ -590,30 +591,20 @@ export default function OwnerManaged() {
     } catch (error) { await open(detail.carrierId); setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
     finally { setBusyItem(null); }
   };
-  const deleteCompletion = (item: Item, record: CompletionHistory["records"][number], newest: boolean) => {
+  const deleteCompletion = async (item: Item, record: CompletionHistory["records"][number]) => {
     if (!detail || busyItem) return;
-    const message = newest
-      ? "Delete this completion record? If its result is still the current deadline, the previous date will be restored. This cannot be undone."
-      : "Delete this older completion record? The current deadline will not change. This cannot be undone.";
-    const perform = async () => {
-      if (!detail) return;
-      setBusyItem(item.key);
-      try {
-        const result = await call<{ restoredDeadline: boolean }>("deleteManagedComplianceHistoryRecord", {
-          carrierId: detail.carrierId, itemKey: item.key, recordId: record.id,
-        });
-        await open(detail.carrierId);
-        setExpandedItems(previous => ({ ...previous, [item.key]: true }));
-        setItemFeedback(previous => ({ ...previous, [item.key]: result.restoredDeadline
-          ? "Completion deleted; the previous date was restored on the customer's dashboard."
-          : "Completion deleted; the customer's current date was left unchanged." }));
-      } catch (error) { setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
-      finally { setBusyItem(null); }
-    };
-    if (Platform.OS === "web") { if (window.confirm(message)) void perform(); }
-    else Alert.alert("Delete completion record?", message, [
-      { text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void perform() },
-    ]);
+    setBusyItem(item.key);
+    try {
+      const result = await call<{ restoredDeadline: boolean }>("deleteManagedComplianceHistoryRecord", {
+        carrierId: detail.carrierId, itemKey: item.key, recordId: record.id,
+      });
+      await open(detail.carrierId);
+      setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+      setItemFeedback(previous => ({ ...previous, [item.key]: result.restoredDeadline
+        ? "Completion deleted; the previous date was restored on the customer's dashboard."
+        : "Completion deleted; the customer's current date was left unchanged." }));
+    } catch (error) { setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
+    finally { setBusyItem(null); setPendingHistoryDelete(null); }
   };
   const acceptCustom = async (customId: string) => {
     if (!detail) return;
@@ -956,10 +947,24 @@ export default function OwnerManaged() {
               return <View>
                 <Text style={styles.label}>Completion history ({records.length})</Text>
                 {records.length === 0 && <Text style={styles.small}>No completion records yet.</Text>}
-                {records.map((record, index) => <View key={record.id} style={styles.row}>
-                  <Text style={styles.small}>{record.completionDate || "Date not recorded"} · {record.previousDueDate || "—"} → {record.nextDueDate || "—"}</Text>
-                  <Button label="Delete" subtle disabled={!!busyItem} onPress={() => deleteCompletion(item, record, index === 0)} />
-                </View>)}
+                {records.map((record, index) => {
+                  const deleteKey = `${detail.carrierId}:${item.key}:${record.id}`;
+                  return <View key={record.id}>
+                    <View style={styles.row}>
+                      <Text style={styles.small}>{record.completionDate || "Date not recorded"} · {record.previousDueDate || "—"} → {record.nextDueDate || "—"}</Text>
+                      <Button label="Delete" subtle disabled={!!busyItem} onPress={() => setPendingHistoryDelete(deleteKey)} />
+                    </View>
+                    {pendingHistoryDelete === deleteKey && <>
+                      <Text style={styles.help}>{index === 0
+                        ? "Delete this completion? If its result is still current, the previous date will be restored. The deletion cannot be undone."
+                        : "Delete this older completion? The current date will stay the same. The deletion cannot be undone."}</Text>
+                      <View style={styles.row}>
+                        <Button label="Confirm delete" disabled={!!busyItem} onPress={() => void deleteCompletion(item, record)} />
+                        <Button label="Keep record" subtle onPress={() => setPendingHistoryDelete(null)} />
+                      </View>
+                    </>}
+                  </View>;
+                })}
               </View>;
             })()}
             {!!itemFeedback[item.key] && <Text style={styles.small} accessibilityRole="alert">{itemFeedback[item.key]}</Text>}
