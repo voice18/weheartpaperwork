@@ -83,7 +83,7 @@ export default function NotificationsOnboarding() {
     { merge: true }
   );
 
-  router.replace("/(app)/dashboard");
+  router.replace(Platform.OS === "web" ? "/(app)/service-choice" : "/(app)/dashboard");
 };
 
   const watchMyPaperwork = async () => {

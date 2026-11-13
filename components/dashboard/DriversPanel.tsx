@@ -118,7 +118,7 @@ function DriverEntryField({
     </View>
   );
 }
-export default function DriversPanel() {
+export default function DriversPanel({ managedUnitIds = [] }: { managedUnitIds?: string[] }) {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [newDriverName, setNewDriverName] = useState("");
   const [newDriverNumber, setNewDriverNumber] = useState("");
@@ -315,7 +315,9 @@ export default function DriversPanel() {
 
         const message =
           `${driver.name} will be removed from your active driver list. ` +
-          "Their profile and compliance history will be preserved for future audits.";
+          "Their profile and compliance history will be preserved for future audits." +
+          (managedUnitIds.includes(driver.id) ?
+            " We Heart Paperwork will stop tracking this driver's deadlines and review the managed charge. The charge remains until that billing change is confirmed." : "");
 
         if (Platform.OS === "web") {
           const confirmed = window.confirm(

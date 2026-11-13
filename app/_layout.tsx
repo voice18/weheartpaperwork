@@ -24,6 +24,7 @@ import { onAuthStateChanged } from "firebase/auth";
 
 import { auth, db } from "../lib/firebase";
 import { syncCurrentDevicePushToken } from "../lib/syncPushToken";
+import { clearOwnerReturn, hasOwnerReturn, rememberOwnerReturn } from "../lib/ownerReturn";
 import {
   hasBillingAccess,
   type CarrierBilling,
@@ -93,6 +94,7 @@ const isAccountRoute =
   const componentMounted = useRef(false);
 
   const navigationReady = Boolean(rootNavigationState?.key);
+  const authRouteKey = Platform.OS === "web" ? null : pathname;
 
   const openDashboard = useCallback(() => {
     if (!componentMounted.current || !navigationReady) {
@@ -100,6 +102,14 @@ const isAccountRoute =
     }
 
     const pending = pendingNotification.current;
+
+    // Authentication may refresh while a customer navigates inside the web
+    // app. Only choose the dashboard from an entry route; never replace the
+    // page the customer just opened (for example Settings).
+    if (Platform.OS === "web" && !pending) {
+      const entryRoutes = new Set(["/", "/login", "/company", "/notifications"]);
+      if (!entryRoutes.has(window.location.pathname)) return;
+    }
 
     if (pending) {
       pendingNotification.current = null;
@@ -127,6 +137,10 @@ const isAccountRoute =
   }, []);
 
   useEffect(() => {
+    if (Platform.OS === "web" && pathname === "/owner-managed") rememberOwnerReturn();
+  }, [pathname]);
+
+  useEffect(() => {
   if (!navigationReady) {
   return;
 }
@@ -141,6 +155,7 @@ if (isPublicRoute) {
   const unsubscribeAuth = onAuthStateChanged(
     auth,
     (user) => {
+      const currentPath = Platform.OS === "web" ? window.location.pathname : pathname;
       carrierUnsubscribe?.();
       carrierUnsubscribe = null;
 
@@ -154,17 +169,30 @@ if (isPublicRoute) {
       if (!user) {
         appReady.current = false;
 
-        if (pathname === "/login") {
+        if (currentPath === "/owner-managed") rememberOwnerReturn();
+
+        if (currentPath === "/login") {
           return;
         }
 
-        router.replace("/(auth)/login");
+        router.replace(currentPath === "/owner-managed"
+          ? { pathname: "/(auth)/login", params: { returnTo: "/owner-managed" } }
+          : "/(auth)/login");
         return;
       }
 
       void syncCurrentDevicePushToken(user).catch(error => {
         console.log("Unable to refresh this device notification token:", error);
       });
+
+      // The owner workspace checks the ownerAdmin claim itself. It must remain
+      // reachable even when this account has no customer subscription.
+      if (Platform.OS === "web" && (currentPath === "/owner-managed" || hasOwnerReturn())) {
+        appReady.current = true;
+        clearOwnerReturn();
+        if (currentPath !== "/owner-managed") router.replace("/(app)/owner-managed");
+        return;
+      }
 
         if (isAccountRoute) {
         appReady.current = false;
@@ -248,17 +276,27 @@ const carrierRef = doc(
 
             if (!hasAccess) {
               appReady.current = false;
-
-              router.replace(
-                "/(app)/subscription-required"
-              );
+              const firstSignup = Platform.OS === "web" && !billing?.status &&
+                billing?.hasUsedTrial !== true && !billing?.trialEndsAt;
+              const currentPath = Platform.OS === "web" ? window.location.pathname : pathname;
+              if (firstSignup && ["/service-choice", "/managed-tracking", "/subscription-required"].includes(currentPath))
+                return;
+              router.replace(firstSignup ? "/(app)/service-choice" : "/(app)/subscription-required");
 
               return;
             }
 
             appReady.current = true;
 
-            if (pathname === "/settings" || pathname === "/review" || pathname === "/feedback" || pathname === "/owner-reviews" || pathname === "/owner-managed" || pathname === "/managed-tracking") {
+            if (Platform.OS === "web" && hasOwnerReturn()) {
+              clearOwnerReturn();
+              if (window.location.pathname !== "/owner-managed")
+                router.replace("/(app)/owner-managed");
+              return;
+            }
+
+            const currentPath = Platform.OS === "web" ? window.location.pathname : pathname;
+            if (currentPath === "/settings" || currentPath === "/review" || currentPath === "/feedback" || currentPath === "/owner-reviews" || currentPath === "/owner-managed" || currentPath === "/managed-tracking") {
                return;
               }
 
@@ -311,6 +349,7 @@ const carrierRef = doc(
   router,
   isPublicRoute,
   isAccountRoute,
+  authRouteKey,
 ]);
 
   useEffect(() => {

@@ -31,6 +31,7 @@ import {
 export default function SubscriptionRequiredScreen() {
   const [isStartingTrial, setIsStartingTrial] =
     useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [hasUsedTrial, setHasUsedTrial] =
   useState(false);
 
@@ -41,6 +42,16 @@ export default function SubscriptionRequiredScreen() {
   useState(true);
   const [hasRequestedBillingRefresh, setHasRequestedBillingRefresh] =
     useState(false);
+  useEffect(() => {
+    if (Platform.OS !== "web" || !auth.currentUser) return;
+    let active = true;
+    void httpsCallable<Record<string, never>, { quote: { signupQuote?: boolean; status?: string } | null }>(
+      functions, "getManagedServiceQuote")({}).then(result => {
+      if (active && result.data.quote?.signupQuote && ["quoted", "accepted", "paid_awaiting_start"].includes(
+        result.data.quote.status || "")) router.replace("/(app)/managed-tracking" as any);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
 useEffect(() => {
   const user = auth.currentUser;
@@ -211,6 +222,7 @@ const billingNote = hasUsedTrial
 
     try {
       setIsStartingTrial(true);
+      setCheckoutError(null);
 
       const createCheckoutSession = httpsCallable<
         { returnOrigin?: string },
@@ -253,7 +265,11 @@ const billingNote = hasUsedTrial
         }
       );
 
-      await Linking.openURL(url);
+      if (typeof window !== "undefined") {
+        window.location.assign(url);
+      } else {
+        await Linking.openURL(url);
+      }
     } catch (error: any) {
       console.error(
         "Unable to open checkout:",
@@ -267,10 +283,7 @@ const billingNote = hasUsedTrial
             ? error.message
             : "Checkout is not available right now.";
 
-      Alert.alert(
-      "Unable to open checkout",
-      message
-    );
+      setCheckoutError(message);
     } finally {
       setIsStartingTrial(false);
     }
@@ -386,6 +399,12 @@ const billingNote = hasUsedTrial
                   : checkoutButtonLabel}
               </Text>
             </TouchableOpacity>
+
+            {checkoutError ? (
+              <Text accessibilityRole="alert" style={styles.checkoutError}>
+                {checkoutError}
+              </Text>
+            ) : null}
 
             <Text style={styles.billingNote}>
               {billingNote}
@@ -665,6 +684,14 @@ const styles = StyleSheet.create({
     color: "#7A828D",
     textAlign: "center",
     marginTop: 12,
+  },
+
+  checkoutError: {
+    marginTop: 12,
+    color: "#9B1C1C",
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
   },
 
   browserNote: {

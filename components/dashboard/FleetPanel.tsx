@@ -92,7 +92,7 @@ export function vehicleDeadlineItems(vehicles: FleetVehicle[]) {
     });
 }
 
-export default function FleetPanel() {
+export default function FleetPanel({ managedUnitIds = [] }: { managedUnitIds?: string[] }) {
   const [vehicles, setVehicles] = useState<FleetVehicle[]>([]);
   const [draft, setDraft] = useState(emptyDraft);
   const [adding, setAdding] = useState(false);
@@ -234,7 +234,9 @@ export default function FleetPanel() {
   const archiveVehicle = (vehicle: FleetVehicle) => {
     confirmAction(
       "Mark vehicle sold or removed?",
-      `${vehicle.unitNumber} will leave the active fleet. Its information and history will be preserved.`,
+      `${vehicle.unitNumber} will leave the active fleet. Its information and history will be preserved.` +
+        (managedUnitIds.includes(vehicle.id) ?
+          " We Heart Paperwork will stop tracking this unit's deadlines and review the managed charge. The charge remains until that billing change is confirmed." : ""),
       "Mark Sold or Removed",
       async () => {
         await updateVehicle(vehicle.id, {
@@ -247,6 +249,12 @@ export default function FleetPanel() {
   };
 
   const permanentlyDeleteVehicle = (vehicle: FleetVehicle) => {
+    if (managedUnitIds.includes(vehicle.id)) {
+      confirmAction("Managed billing still includes this vehicle",
+        "Mark it sold or removed first. You can permanently delete it after We Heart Paperwork confirms removal from managed billing.",
+        "OK", async () => {});
+      return;
+    }
     confirmAction(
       "Permanently delete vehicle?",
       `${vehicle.unitNumber} and its saved deadline history will be permanently deleted. This cannot be undone.`,

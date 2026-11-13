@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, getIdTokenResult, sendPasswordResetEmail, signInWithEmailAndPassword } from "firebase/auth";
 import { router, useLocalSearchParams } from "expo-router";
 import Constants from "expo-constants";
 
 import { auth } from "../../lib/firebase";
 import AppStoreLink from "../../components/public/AppStoreLink";
 import { savePendingReferralCode } from "../../lib/referrals";
+import { hasOwnerReturn, rememberOwnerReturn } from "../../lib/ownerReturn";
 
 type AuthMode = "login" | "create";
 
@@ -29,7 +30,8 @@ export default function Login() {
   const params = useLocalSearchParams<{ ref?: string | string[]; mode?: string | string[]; returnTo?: string | string[] }>();
   const referralCode = firstParam(params.ref);
   const requestedReturnTo = firstParam(params.returnTo);
-  const returnTo = requestedReturnTo === "/review" ? "/review" : null;
+  const returnTo = requestedReturnTo === "/review" || requestedReturnTo === "/owner-managed"
+    ? requestedReturnTo : isWeb && hasOwnerReturn() ? "/owner-managed" : null;
   const requestedMode: AuthMode = isWeb && firstParam(params.mode) === "create" ? "create" : "login";
   const [mode, setMode] = useState<AuthMode>(requestedMode);
   const [email, setEmail] = useState("");
@@ -67,7 +69,16 @@ export default function Login() {
         await createUserWithEmailAndPassword(auth, cleanedEmail, password);
         router.replace("/(onboarding)/company");
       } else {
-        await signInWithEmailAndPassword(auth, cleanedEmail, password);
+        if (isWeb && returnTo === "/owner-managed") rememberOwnerReturn();
+        const signedIn = await signInWithEmailAndPassword(auth, cleanedEmail, password);
+        if (isWeb && returnTo !== "/review") {
+          const token = await getIdTokenResult(signedIn.user, true);
+          if (token.claims.ownerAdmin === true) {
+            rememberOwnerReturn();
+            router.replace("/(app)/owner-managed");
+            return;
+          }
+        }
         router.replace((returnTo || "/(app)/dashboard") as any);
       }
     } catch (error) {

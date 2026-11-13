@@ -7,14 +7,16 @@ import Stripe from "stripe";
 import { queueOwnerEmail } from "./ownerNotifications";
 import { MANAGED_PRICING } from "./managedPricing";
 import { managedUnitIdsForSave } from "./managedCoverageTransition";
+import { addUnitToManagedBilling, removeUnitFromManagedBilling } from "./managedUnitBilling";
+import { complianceAddDays, complianceAddYears, complianceDaysFrom, complianceToday, complianceUsdotDue, complianceNextIftaQuarterDue, complianceFollowingIftaQuarterDue, complianceIftaQuarterEnd, complianceFixedCalendarDue, validComplianceDate } from "./sharedComplianceDates";
 
 type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
 type Data = Record<string, unknown>;
-type WorkStatus = "not_started" | "instructions_sent" | "waiting_on_customer" | "follow_up_due" | "needs_review";
+type WorkStatus = "not_started" | "instructions_sent" | "waiting_on_customer" | "follow_up_due" | "needs_review" | "completed" | "not_applicable";
 type Item = { key: string; area: Area; label: string; dueDate: string | null; days: number | null;
   issue: string | null; status: WorkStatus; note: string | null;
-  sourceVersion: string | null; sourceInputDate: string | null };
+  sourceVersion: string | null; sourceInputDate: string | null; dqChecks?: Record<string, boolean | string> };
 const COMPANY_ITEMS = [
   ["mcs150", "MCS-150 / USDOT update"], ["tax2290", "Form 2290 heavy vehicle use tax"],
   ["fmcsa-portal", "FMCSA Portal access"], ["ucr", "UCR registration"],
@@ -38,26 +40,14 @@ function object(value: unknown): Data {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Data : {};
 }
 function date(value: unknown): string | null {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(value + "T00:00:00Z");
-  return !Number.isNaN(parsed.valueOf()) && parsed.toISOString().slice(0, 10) === value ? value : null;
+  return validComplianceDate(value);
 }
 function plus(value: string | null, amount: number, unit: "day" | "year"): string | null {
   if (!value) return null;
-  const parsed = new Date(value + "T00:00:00Z");
-  if (unit === "day") parsed.setUTCDate(parsed.getUTCDate() + amount);
-  else {
-    const targetYear = parsed.getUTCFullYear() + amount;
-    const month = parsed.getUTCMonth();
-    const day = parsed.getUTCDate();
-    const lastDay = new Date(Date.UTC(targetYear, month + 1, 0)).getUTCDate();
-    parsed.setUTCFullYear(targetYear, month, Math.min(day, lastDay));
-  }
-  return parsed.toISOString().slice(0, 10);
+  return (unit === "day" ? complianceAddDays(value, amount) : complianceAddYears(value, amount)) || null;
 }
 function today(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles",
-    year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  return complianceToday();
 }
 async function contactForCarrier(carrierId: string, carrier: Data, request: Data) {
   let accountEmail = typeof request.accountEmail === "string" ? request.accountEmail : "";
@@ -78,7 +68,7 @@ function add(items: Item[], key: string, area: Area, label: string, raw: unknown
   current: string, issue: string | null = null): void {
   const dueDate = date(raw);
   items.push({ key, area, label, dueDate, issue: issue ?? (dueDate ? null : "Missing date"),
-    days: dueDate ? Math.round((Date.parse(dueDate + "T00:00:00Z") - Date.parse(current + "T00:00:00Z")) / 86400000) : null,
+    days: complianceDaysFrom(dueDate, current),
     status: "not_started", note: null, sourceVersion: null, sourceInputDate: null });
 }
 async function account(carrierId: string, coverage: Data) {
@@ -95,7 +85,7 @@ async function account(carrierId: string, coverage: Data) {
   const areas = object(coverage.areas);
   const current = today();
   const items: Item[] = [];
-  const pendingCustom: { id: string; name: string; reason: string; kind?: "unit";
+  const pendingCustom: { id: string; name: string; reason: string; kind?: "unit" | "removal";
     collectionId?: "drivers" | "vehicles"; unitType?: "driver" | "truck" | "trailer" }[] = [];
   const managedUnits = object(coverage.managedUnitIds);
   const driverIds = Array.isArray(managedUnits.driverIds) ? new Set(managedUnits.driverIds) : null;
@@ -108,16 +98,37 @@ async function account(carrierId: string, coverage: Data) {
     const stored = new Map(compliance.docs.map(row => [row.id, row.data()]));
     for (const [key, label] of COMPANY_ITEMS) {
       const value = stored.get(key) ?? {};
-      if (value.applicable === false || value.completed === true) continue;
+      if (value.applicable === false) {
+        add(items, "company:" + key, "company", label, null, current);
+        items[items.length - 1].status = "not_applicable";
+        items[items.length - 1].issue = null;
+        continue;
+      }
+      if (value.completed === true) {
+        add(items, "company:" + key, "company", label, null, current, null);
+        const completedItem = items[items.length - 1];
+        completedItem.status = "completed";
+        completedItem.issue = null;
+        continue;
+      }
       const due = key === "fmcsa-portal"
-        ? date(value.dueDate) ?? plus(date(value.enteredDate), 90, "day") : value.dueDate;
+        ? date(value.dueDate) ?? plus(date(value.enteredDate), 90, "day")
+        : date(value.dueDate) ?? (key === "mcs150" ? complianceUsdotDue(String(carrier.data()?.usdotNumber || ""), current)
+          : key === "ifta-quarterly" ? complianceNextIftaQuarterDue(current)
+          : complianceFixedCalendarDue(key, current)
+          ?? (["irp", "insurance", "drug"].includes(key) ? date(value.enteredDate) : null));
       add(items, "company:" + key, "company", label, due, current,
         key === "boc3" ? "Verify filing status" : null);
     }
   }
   if (areas.drivers === true) for (const row of drivers.docs) {
     const value = row.data();
-    if (value.status === "inactive") continue;
+    if (value.status === "inactive") {
+      if (driverIds?.has(row.id)) pendingCustom.push({ id: row.id,
+        name: String(value.name || "Driver"), kind: "removal", collectionId: "drivers", unitType: "driver",
+        reason: "Managed driver is inactive. Remove its managed charge before the next invoice." });
+      continue;
+    }
     const name = typeof value.name === "string" && value.name.trim() ? value.name.trim() : "Driver";
     if (driverIds && !driverIds.has(row.id)) {
       pendingCustom.push({ id: row.id, name, kind: "unit", collectionId: "drivers", unitType: "driver",
@@ -135,12 +146,25 @@ async function account(carrierId: string, coverage: Data) {
       "previousEmployerInvestigationComplete"].filter(field => value[field] === true).length
       + ["speStatus", "lcvStatus"].filter(field =>
         value[field] === "on_file" || value[field] === "not_applicable").length;
-    if (checks < 8) add(items, "driver:" + row.id + ":dq", "drivers",
-      name + " · DQ setup checklist (" + checks + "/8)", null, current, "Setup needs review");
+    add(items, "driver:" + row.id + ":dq", "drivers",
+      name + " · DQ setup checklist (" + checks + "/8)", null, current,
+      checks < 8 ? "Setup needs review" : null);
+    const dq = items[items.length - 1];
+    dq.dqChecks = Object.fromEntries(["employmentApplicationOnFile", "initialMvrOnFile", "roadTestOnFile",
+      "preEmploymentClearinghouseQueryComplete", "preEmploymentDrugTestComplete",
+      "previousEmployerInvestigationComplete", "speStatus", "lcvStatus"].map(field =>
+      [field, value[field] ?? (field.endsWith("Status") ? "missing" : false)]));
+    if (checks === 8) { dq.status = "completed"; dq.issue = null; }
   }
   if (areas.fleet === true) for (const row of vehicles.docs) {
     const value = row.data();
-    if (value.status === "inactive") continue;
+    if (value.status === "inactive") {
+      if (vehicleIds?.has(row.id)) pendingCustom.push({ id: row.id,
+        name: String(value.unitNumber || "Vehicle"), kind: "removal", collectionId: "vehicles",
+        unitType: value.type === "trailer" ? "trailer" : "truck",
+        reason: "Managed vehicle is inactive. Remove its managed charge before the next invoice." });
+      continue;
+    }
     const unit = typeof value.unitNumber === "string" && value.unitNumber.trim() ? value.unitNumber.trim() : "Vehicle";
     if (vehicleIds && !vehicleIds.has(row.id)) {
       pendingCustom.push({ id: row.id, name: unit, kind: "unit", collectionId: "vehicles",
@@ -160,8 +184,14 @@ async function account(carrierId: string, coverage: Data) {
   const acceptedDueDates = object(coverage.acceptedCustomDueDates);
   if (areas.company === true) for (const row of custom.docs) {
     const value = row.data();
-    if (value.active === false || value.completed === true) continue;
+    if (value.active === false) continue;
     const name = typeof value.name === "string" && value.name.trim() ? value.name.trim() : "Custom requirement";
+    if (value.completed === true && accepted.includes(row.id)) {
+      add(items, "custom:" + row.id, "company", name, null, current, null);
+      items[items.length - 1].status = "completed";
+      items[items.length - 1].issue = null;
+      continue;
+    }
     const unverifiedRecurrence = value.scheduleType === "rolling";
     if (!accepted.includes(row.id) || unverifiedRecurrence || acceptedDueDates[row.id] !== value.dueDate) {
       pendingCustom.push({ id: row.id, name, reason: unverifiedRecurrence
@@ -175,7 +205,7 @@ async function account(carrierId: string, coverage: Data) {
   const states = new Map(work.docs.map(row => [row.id, row.data()]));
   for (const item of items) {
     const saved = states.get(Buffer.from(item.key).toString("base64url"));
-    if (!saved) continue;
+    if (!saved || item.status === "completed" || item.status === "not_applicable") continue;
     if (saved.dueDateSnapshot !== item.dueDate) {
       item.status = "needs_review";
       item.note = "The app date changed since your last action";
@@ -208,10 +238,10 @@ async function account(carrierId: string, coverage: Data) {
   items.sort((a, b) => (a.dueDate ?? "9999-99-99").localeCompare(b.dueDate ?? "9999-99-99")
     || a.label.localeCompare(b.label));
   const counts = {
-    overdue: items.filter(v => v.days !== null && v.days < 0).length,
-    due30: items.filter(v => v.days !== null && v.days >= 0 && v.days <= 30).length,
-    due90: items.filter(v => v.days !== null && v.days >= 0 && v.days <= 90).length,
-    needsInfo: items.filter(v => v.issue !== null || v.status === "needs_review").length + pendingCustom.length,
+    overdue: items.filter(v => !["completed", "not_applicable"].includes(v.status) && v.days !== null && v.days < 0).length,
+    due30: items.filter(v => !["completed", "not_applicable"].includes(v.status) && v.days !== null && v.days >= 0 && v.days <= 30).length,
+    due90: items.filter(v => !["completed", "not_applicable"].includes(v.status) && v.days !== null && v.days >= 31 && v.days <= 90).length,
+    needsInfo: items.filter(v => !["completed", "not_applicable"].includes(v.status) && (v.issue !== null || v.status === "needs_review")).length + pendingCustom.length,
     waiting: items.filter(v => v.status === "waiting_on_customer").length,
   };
   const data = carrier.data() ?? {};
@@ -297,8 +327,6 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
   if (!effectiveDate) throw new HttpsError("invalid-argument", "Enter YYYY-MM-DD effective date.");
   const consentReference = typeof request.data?.consentReference === "string"
     ? request.data.consentReference.trim().slice(0, 300) : "";
-  if (status === "active" && consentReference.length < 8)
-    throw new HttpsError("failed-precondition", "Record where the customer agreed to this scope.");
   const db = admin.firestore();
   const carrier = await db.collection("carriers").doc(carrierId).get();
   if (!carrier.exists || carrier.data()?.deletingAccount === true)
@@ -321,12 +349,16 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
       quote.data()?.status === "active" && serviceRequest.data()?.status === "active";
     if (status === "active") {
       const agreed = object(quote.data()?.areas);
+      if (!quote.data()?.acceptedAt || quote.data()?.acceptedBy !== carrierId ||
+          typeof quote.data()?.quoteId !== "string")
+        throw new HttpsError("failed-precondition", "The customer must accept this exact quote before coverage starts.");
       if ((!continuing && (quote.data()?.status !== "paid_awaiting_start" ||
           serviceRequest.data()?.status !== "paid_awaiting_start")) ||
           quote.data()?.requestRevision !== serviceRequest.data()?.revision ||
           billing.data()?.quoteId !== quote.data()?.quoteId ||
           billing.data()?.stripeSubscriptionId !== quote.data()?.stripeSubscriptionId ||
           billing.data()?.status !== "active" ||
+          billing.data()?.cancelAtPeriodEnd === true || billing.data()?.cancelAt ||
           !["company", "drivers", "fleet"].every(key => (agreed[key] === true) === areas[key as Area]))
         throw new HttpsError("failed-precondition", "A matching paid managed quote is required before starting this coverage.");
       if (!continuing) {
@@ -353,8 +385,11 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
     const now = admin.firestore.FieldValue.serverTimestamp();
     const savedEffectiveDate = previous.data()?.status === "active" && status !== "draft"
       ? previous.data()?.effectiveDate : effectiveDate;
+    const acceptedQuoteReference = status === "active"
+      ? `Customer accepted quote ${quote.data()?.quoteId} at ${quote.data()?.acceptedAt.toDate().toISOString()}`
+      : "";
     const savedConsentReference = previous.data()?.status === "active" && status !== "draft"
-      ? previous.data()?.consentReference : consentReference;
+      ? previous.data()?.consentReference : acceptedQuoteReference || consentReference;
     const savedAreas = previous.data()?.status === "active" && status === "paused"
       ? previous.data()?.areas : areas;
     tx.set(ref, { status, areas: savedAreas, effectiveDate: savedEffectiveDate, consentReference: savedConsentReference, acceptedCustomIds,
@@ -371,18 +406,41 @@ export const saveManagedServiceCoverage = onCall({ region: "us-central1" }, asyn
   });
   return { saved: true };
 });
+export const attachAcceptedManagedQuoteReference = onCall({ region: "us-central1" }, async request => {
+  const actor = owner(request);
+  const carrierId = identifier(request.data?.carrierId);
+  const db = admin.firestore();
+  const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+  const quoteRef = db.collection("managedServiceQuotes").doc(carrierId);
+  return db.runTransaction(async tx => {
+    const [coverage, quote] = await Promise.all([tx.get(coverageRef), tx.get(quoteRef)]);
+    if (coverage.data()?.status !== "active" || quote.data()?.status !== "active" ||
+        quote.data()?.acceptedBy !== carrierId || !quote.data()?.acceptedAt ||
+        typeof quote.data()?.quoteId !== "string")
+      throw new HttpsError("failed-precondition", "An active coverage record and accepted customer quote are required.");
+    const reference = `Customer accepted quote ${quote.data()!.quoteId} at ${quote.data()!.acceptedAt.toDate().toISOString()}`;
+    const previous = String(coverage.data()?.consentReference || "");
+    if (previous === reference) return { saved: false, reference };
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    tx.update(coverageRef, { consentReference: reference, updatedAt: now, updatedBy: actor });
+    tx.create(coverageRef.collection("events").doc(), { carrierId, actor,
+      type: "acceptance_reference_corrected", previousReference: previous,
+      consentReference: reference, createdAt: now });
+    return { saved: true, reference };
+  });
+});
 function queueHighlights(items: Item[], pendingCustom: { name: string; reason: string }[]) {
   const first = (match: (item: Item) => boolean) => {
     const item = items.find(match);
     return item ? { label: item.label, dueDate: item.dueDate, issue: item.issue } : null;
   };
   return {
-    overdue: first(item => item.days !== null && item.days < 0),
-    due30: first(item => item.days !== null && item.days >= 0 && item.days <= 30),
-    due90: first(item => item.days !== null && item.days >= 31 && item.days <= 90),
+    overdue: first(item => !["completed", "not_applicable"].includes(item.status) && item.days !== null && item.days < 0),
+    due30: first(item => !["completed", "not_applicable"].includes(item.status) && item.days !== null && item.days >= 0 && item.days <= 30),
+    due90: first(item => !["completed", "not_applicable"].includes(item.status) && item.days !== null && item.days >= 31 && item.days <= 90),
     needsInfo: pendingCustom.length > 0
       ? { label: pendingCustom[0].name, dueDate: null, issue: pendingCustom[0].reason }
-      : first(item => item.issue !== null || item.status === "needs_review"),
+      : first(item => !["completed", "not_applicable"].includes(item.status) && (item.issue !== null || item.status === "needs_review")),
     waiting: first(item => item.status === "waiting_on_customer"),
     all: first(() => true),
   };
@@ -410,9 +468,114 @@ export const getManagedServiceAccount = onCall({ region: "us-central1" }, async 
   if (!result) throw new HttpsError("not-found", "Carrier not found.");
   const history = await admin.firestore().collection("managedServiceCoverage").doc(carrierId).collection("events")
     .orderBy("createdAt", "desc").limit(30).get();
-  return { ...result, coverage: { ...result.coverage, consentReference: coverage.data()?.consentReference ?? "" }, history: history.docs.map(row => ({ id: row.id, type: row.data().type,
+  const completionHistory = await Promise.all(result.items.map(async item => {
+    const path = completionHistoryPath(carrierId, item.key);
+    if (!path) return { itemKey: item.key, records: [] };
+    const records = await admin.firestore().collection(path).get();
+    return { itemKey: item.key, records: records.docs.map(row => ({
+      id: row.id, completionDate: date(row.data().completionDate),
+      previousDueDate: date(row.data().previousDueDate), nextDueDate: date(row.data().nextDueDate),
+      completedAtMillis: row.data().completedAt?.toMillis?.() ?? row.data().createdAt?.toMillis?.() ?? 0,
+    })).sort((a, b) => b.completedAtMillis - a.completedAtMillis) };
+  }));
+  return { ...result, completionHistory, coverage: { ...result.coverage, consentReference: coverage.data()?.consentReference ?? "" }, history: history.docs.map(row => ({ id: row.id, type: row.data().type,
     itemKey: row.data().itemKey ?? null, itemLabel: row.data().itemLabel ?? null, note: row.data().note ?? null,
     createdAtMillis: row.data().createdAt?.toMillis?.() ?? null })) };
+});
+function completionHistoryPath(carrierId: string, key: string): string | null {
+  const [kind, id, field] = key.split(":");
+  if (kind === "company" && COMPANY_ITEMS.some(row => row[0] === id))
+    return `carriers/${carrierId}/complianceRecords/${id}/history`;
+  if (kind === "custom" && id) return `carriers/${carrierId}/customRequirements/${id}/history`;
+  if (kind === "driver" && id && ["medical", "mvr", "clearinghouse"].includes(field))
+    return `carriers/${carrierId}/drivers/${id}/complianceRecords/${field}/history`;
+  if (kind === "fleet" && id && ["registration", "inspection"].includes(field))
+    return `carriers/${carrierId}/vehicles/${id}/complianceRecords/${field === "registration" ? "registrationExpiration" : "inspectionExpiration"}/history`;
+  return null;
+}
+export const deleteManagedComplianceHistoryRecord = onCall({ region: "us-central1" }, async request => {
+  const actor = owner(request);
+  const carrierId = identifier(request.data?.carrierId);
+  const itemKey = typeof request.data?.itemKey === "string" ? request.data.itemKey : "";
+  const recordId = identifier(request.data?.recordId);
+  const path = completionHistoryPath(carrierId, itemKey);
+  if (!path) throw new HttpsError("invalid-argument", "This requirement has no completion history.");
+  const db = admin.firestore();
+  const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+  const source = workSourceRef(db, carrierId, itemKey);
+  if (!source) throw new HttpsError("invalid-argument", "Unknown requirement.");
+  const [kind, , field] = itemKey.split(":");
+  const recordsRef = db.collection(path);
+  const recordRef = recordsRef.doc(recordId);
+  const eventRef = coverageRef.collection("events").doc();
+  return db.runTransaction(async tx => {
+    const [coverage, history, record, live] = await Promise.all([
+      tx.get(coverageRef), tx.get(recordsRef), tx.get(recordRef), tx.get(source),
+    ]);
+    const area = kind === "driver" ? "drivers" : kind === "fleet" ? "fleet" : "company";
+    if (coverage.data()?.status !== "active" || object(coverage.data()?.areas)[area] !== true)
+      throw new HttpsError("failed-precondition", "This area is not actively managed.");
+    const units = object(coverage.data()?.managedUnitIds);
+    if (kind === "driver" && Array.isArray(units.driverIds) && !units.driverIds.includes(itemKey.split(":")[1]))
+      throw new HttpsError("permission-denied", "This driver is outside managed coverage.");
+    if (kind === "fleet" && Array.isArray(units.vehicleIds) && !units.vehicleIds.includes(itemKey.split(":")[1]))
+      throw new HttpsError("permission-denied", "This vehicle is outside managed coverage.");
+    if (!record.exists) throw new HttpsError("not-found", "The completion record was already removed.");
+    const ordered = history.docs.sort((a, b) =>
+      (b.data().completedAt?.toMillis?.() ?? b.data().createdAt?.toMillis?.() ?? 0)
+      - (a.data().completedAt?.toMillis?.() ?? a.data().createdAt?.toMillis?.() ?? 0));
+    const latest = ordered[0]?.id === recordId;
+    const value = record.data() ?? {};
+    const current = live.data() ?? {};
+    let restored = false;
+    const update: Data = {};
+    if (latest && live.exists) {
+      if (kind === "company" && value.nextDueDate && current.dueDate === value.nextDueDate) {
+        Object.assign(update, { dueDate: value.previousDueDate ?? null,
+          enteredDate: value.previousEnteredDate ?? null, previousDueDate: null,
+          completed: false, completedDate: null, completedAt: null,
+          notified30: false, notified90: false });
+        restored = true;
+      } else if (kind === "company" && !value.nextDueDate && current.completed === true
+        && (!value.completionDate || !current.completedDate || current.completedDate === value.completionDate)) {
+        Object.assign(update, { completed: false, completedDate: null, completedAt: null,
+          notified30: false, notified90: false });
+        restored = true;
+      } else if (kind === "custom" && current.dueDate === value.nextDueDate
+        && (!value.completionDate || current.completedDate === value.completionDate)) {
+        Object.assign(update, { dueDate: value.previousDueDate ?? null, completed: false,
+          completedDate: null, completedAt: null, notified30: false, notified90: false });
+        restored = true;
+      } else if (kind === "driver") {
+        const driverField = field === "medical" ? "medicalExpiration" : field === "mvr" ? "mvrDue" : "clearinghouseDue";
+        const expected = field === "medical" ? value.nextDueDate : value.completionDate;
+        if (expected && current[driverField] === expected) {
+          update[driverField] = value.previousCompletionDate ?? "";
+          restored = true;
+        }
+      } else if (kind === "fleet") {
+        const fleetField = field === "registration" ? "registrationExpiration" : "inspectionExpiration";
+        if (value.nextDueDate && current[fleetField] === value.nextDueDate) {
+          update[fleetField] = value.previousDueDate ?? "";
+          restored = true;
+        }
+      }
+    }
+    if (restored) {
+      update[kind === "custom" ? "updatedAt" : "lastUpdated"] = admin.firestore.FieldValue.serverTimestamp();
+      tx.set(source, update, { merge: true });
+      if (kind === "custom") {
+        const customId = itemKey.slice(7);
+        tx.update(coverageRef, { acceptedCustomDueDates: {
+          ...object(coverage.data()?.acceptedCustomDueDates), [customId]: update.dueDate,
+        } });
+      }
+    }
+    tx.delete(recordRef);
+    tx.create(eventRef, { carrierId, actor, type: "completion_history_deleted", itemKey,
+      recordId, restoredDeadline: restored, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    return { deleted: true, restoredDeadline: restored };
+  });
 });
 type EditableSource = { ref: FirebaseFirestore.DocumentReference; field: string; area: Area;
   mode: "due" | "lastYear" | "last365" | "last90"; kind: "company" | "driver" | "fleet" | "custom" };
@@ -546,6 +709,137 @@ export const saveManagedServiceDeadline = onCall({ region: "us-central1" }, asyn
     return { saved: true, nextDueDate };
   });
 });
+// These owner actions write the same carrier records read by the customer dashboard.
+export const setManagedCompanyApplicable = onCall({ region: "us-central1" }, async request => {
+  const actor = owner(request);
+  const carrierId = identifier(request.data?.carrierId);
+  const requirementId = identifier(request.data?.requirementId);
+  if (!COMPANY_ITEMS.some(row => row[0] === requirementId))
+    throw new HttpsError("invalid-argument", "Unknown Company requirement.");
+  if (typeof request.data?.applicable !== "boolean")
+    throw new HttpsError("invalid-argument", "Choose whether this requirement applies.");
+  const expectedVersion = checkedVersion(request.data?.sourceVersion);
+  const db = admin.firestore();
+  const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+  const sourceRef = db.collection("carriers").doc(carrierId).collection("compliance").doc(requirementId);
+  const workRef = db.collection("managedServiceWork").doc(carrierId).collection("items")
+    .doc(Buffer.from("company:" + requirementId).toString("base64url"));
+  const eventRef = coverageRef.collection("events").doc();
+  return db.runTransaction(async tx => {
+    const [coverage, source] = await Promise.all([tx.get(coverageRef), tx.get(sourceRef)]);
+    if (coverage.data()?.status !== "active" || object(coverage.data()?.areas).company !== true)
+      throw new HttpsError("failed-precondition", "Company management is not active.");
+    if (sourceVersion(source) !== expectedVersion)
+      throw new HttpsError("aborted", "This requirement changed. Refresh before updating it.");
+    tx.set(sourceRef, { applicable: request.data.applicable, notified30: false,
+      notified90: false, lastUpdated: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+    tx.delete(workRef);
+    tx.create(eventRef, { carrierId, actor, itemKey: "company:" + requirementId,
+      type: request.data.applicable ? "requirement_reenabled" : "requirement_not_applicable",
+      createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    return { applicable: request.data.applicable };
+  });
+});
+
+export const completeManagedCompanyRequirement = onCall({ region: "us-central1" }, async request => {
+  const actor = owner(request);
+  const carrierId = identifier(request.data?.carrierId);
+  const requirementId = identifier(request.data?.requirementId);
+  if (!["tax2290", "ucr", "ifta", "boc3", "ifta-quarterly"].includes(requirementId))
+    throw new HttpsError("invalid-argument", "Use the applicable date or completion control for this requirement.");
+  const note = typeof request.data?.note === "string" ? request.data.note.trim().slice(0, 500) : "";
+  if (note.length < 8) throw new HttpsError("invalid-argument", "Record the document or source confirming completion.");
+  const completionDate = date(request.data?.completionDate);
+  if (!completionDate) throw new HttpsError("invalid-argument", "Enter a valid completion date.");
+  const expectedVersion = checkedVersion(request.data?.sourceVersion);
+  const db = admin.firestore();
+  const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+  const sourceRef = db.collection("carriers").doc(carrierId).collection("compliance").doc(requirementId);
+  const historyRef = db.collection("carriers").doc(carrierId).collection("complianceRecords")
+    .doc(requirementId).collection("history").doc();
+  const eventRef = coverageRef.collection("events").doc();
+  return db.runTransaction(async tx => {
+    const [coverage, source] = await Promise.all([tx.get(coverageRef), tx.get(sourceRef)]);
+    if (coverage.data()?.status !== "active" || object(coverage.data()?.areas).company !== true)
+      throw new HttpsError("failed-precondition", "Company management is not active.");
+    if (sourceVersion(source) !== expectedVersion)
+      throw new HttpsError("aborted", "The customer changed this requirement. Refresh before confirming completion.");
+    const value = source.data() ?? {};
+    if (value.applicable === false || value.completed === true)
+      throw new HttpsError("failed-precondition", "This requirement cannot be completed in its current state.");
+    const previousEnteredDate = date(value.enteredDate);
+    const current = today();
+    const due = date(value.dueDate) ?? previousEnteredDate ?? complianceFixedCalendarDue(requirementId, current)
+      ?? (requirementId === "ifta-quarterly" ? complianceNextIftaQuarterDue(current) : null);
+    if (requirementId === "ifta-quarterly") {
+      if (!due) throw new HttpsError("failed-precondition", "The quarterly due date is missing.");
+      const periodEnd = complianceIftaQuarterEnd(due);
+      if (!periodEnd || completionDate <= periodEnd)
+        throw new HttpsError("failed-precondition", "The quarterly filing period has not ended.");
+    }
+    if (requirementId !== "boc3" && !due)
+      throw new HttpsError("failed-precondition", "The current deadline is missing.");
+    const nextDueDate = requirementId === "boc3" ? null
+      : requirementId === "ifta-quarterly" ? complianceFollowingIftaQuarterDue(due!)
+        : complianceAddYears(due!, 1);
+    if (requirementId !== "boc3" && !nextDueDate)
+      throw new HttpsError("failed-precondition", "The next deadline could not be calculated.");
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    tx.set(sourceRef, requirementId === "boc3"
+      ? { completed: true, completedDate: completionDate, completedAt: now, lastUpdated: now }
+      : { previousDueDate: due, dueDate: nextDueDate, completed: false,
+          completedDate: null, completedAt: null, lastUpdated: now, notified30: false, notified90: false },
+    { merge: true });
+    tx.create(historyRef, { recordType: "completion", requirementId, carrierId, completionDate,
+      completedAt: now, completedByUserId: actor, completedByName: request.auth?.token.email || "Managed service owner",
+      previousDueDate: due, previousEnteredDate, nextDueDate, note, file: null,
+      source: "company", createdAt: now });
+    tx.create(eventRef, { carrierId, actor, type: "requirement_completed", itemKey: "company:" + requirementId,
+      note, previousDueDate: due, nextDueDate, createdAt: now });
+    return { nextDueDate };
+  });
+});
+
+const DQ_BOOLEAN_FIELDS = ["employmentApplicationOnFile", "initialMvrOnFile", "roadTestOnFile",
+  "preEmploymentClearinghouseQueryComplete", "preEmploymentDrugTestComplete",
+  "previousEmployerInvestigationComplete"];
+export const updateManagedDqCheck = onCall({ region: "us-central1" }, async request => {
+  const actor = owner(request);
+  const carrierId = identifier(request.data?.carrierId);
+  const driverId = identifier(request.data?.driverId);
+  const field = identifier(request.data?.field);
+  const isBoolean = DQ_BOOLEAN_FIELDS.includes(field);
+  if (!isBoolean && !["speStatus", "lcvStatus"].includes(field))
+    throw new HttpsError("invalid-argument", "Unknown DQ checklist item.");
+  const value = request.data?.value;
+  if (isBoolean ? typeof value !== "boolean" : !["missing", "on_file", "not_applicable"].includes(value))
+    throw new HttpsError("invalid-argument", "Invalid DQ checklist value.");
+  const note = typeof request.data?.note === "string" ? request.data.note.trim().slice(0, 500) : "";
+  if (note.length < 8) throw new HttpsError("invalid-argument", "Record how this DQ item was verified.");
+  const expectedVersion = checkedVersion(request.data?.sourceVersion);
+  const db = admin.firestore();
+  const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+  const driverRef = db.collection("carriers").doc(carrierId).collection("drivers").doc(driverId);
+  const eventRef = coverageRef.collection("events").doc();
+  return db.runTransaction(async tx => {
+    const [coverage, driver] = await Promise.all([tx.get(coverageRef), tx.get(driverRef)]);
+    const units = object(coverage.data()?.managedUnitIds);
+    if (coverage.data()?.status !== "active" || object(coverage.data()?.areas).drivers !== true
+      || (Array.isArray(units.driverIds) && !units.driverIds.includes(driverId)))
+      throw new HttpsError("failed-precondition", "This driver is outside active managed coverage.");
+    if (!driver.exists || driver.data()?.status === "inactive")
+      throw new HttpsError("not-found", "This driver is no longer active.");
+    if (sourceVersion(driver) !== expectedVersion)
+      throw new HttpsError("aborted", "The driver changed. Refresh before saving.");
+    const previous = driver.data()?.[field] ?? (isBoolean ? false : "missing");
+    if (previous === value) return { saved: false };
+    tx.update(driverRef, { [field]: value, lastUpdated: admin.firestore.FieldValue.serverTimestamp() });
+    tx.create(eventRef, { carrierId, actor, type: "dq_check_updated", itemKey: `driver:${driverId}:dq`,
+      field, previous, value, note, createdAt: admin.firestore.FieldValue.serverTimestamp() });
+    return { saved: true };
+  });
+});
+
 export const updateManagedServiceWork = onCall({ region: "us-central1" }, async request => {
   const actor = owner(request);
   const carrierId = identifier(request.data?.carrierId);
@@ -563,6 +857,8 @@ export const updateManagedServiceWork = onCall({ region: "us-central1" }, async 
   const result = await account(carrierId, coverage.data() ?? {});
   const item = result?.items.find(candidate => candidate.key === itemKey);
   if (!item) throw new HttpsError("not-found", "The managed item is no longer active.");
+  if (item.status === "completed" || item.status === "not_applicable")
+    throw new HttpsError("failed-precondition", "This requirement is closed or not applicable.");
   if (item.sourceVersion !== expectedVersion)
     throw new HttpsError("aborted", "This item changed on the customer side. Refresh before logging work.");
   const sourceRef = workSourceRef(db, carrierId, itemKey);
@@ -659,8 +955,6 @@ export const enrollApprovedManagedUnit = onCall(
     if (typeof subscriptionId !== "string" || !subscriptionId.startsWith("sub_"))
       throw new HttpsError("failed-precondition", "Find the managed Stripe subscription before enrolling this unit.");
     const kind = collectionId === "drivers" ? "driver" : unit.data()?.type === "trailer" ? "trailer" : "truck";
-    const name = kind === "driver" ? "Managed Driver compliance"
-      : kind === "trailer" ? "Managed Trailer compliance" : "Managed Truck compliance";
     const amount = kind === "driver" ? MANAGED_PRICING.driverMonthly
       : kind === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly;
     const enrolledDocs = await Promise.all(enrolled.map(id =>
@@ -674,27 +968,30 @@ export const enrollApprovedManagedUnit = onCall(
       throw new HttpsError("failed-precondition", "Staging verification requires a Stripe test key.");
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     if (subscription.status !== "active" || subscription.cancel_at_period_end || subscription.cancel_at ||
-        subscription.metadata.serviceKind !== "managed" || subscription.metadata.carrierId !== carrierId)
+        billing.data()?.cancelAtPeriodEnd === true ||
+        !["managed", "app_with_managed"].includes(subscription.metadata.serviceKind) || subscription.metadata.carrierId !== carrierId)
       throw new HttpsError("failed-precondition", "The managed subscription is not active and payable.");
-    let priceId: string | null = null;
-    for (const item of subscription.items.data) {
-      if (item.price.unit_amount !== amount * 100) continue;
-      const productId = typeof item.price.product === "string" ? item.price.product : item.price.product.id;
-      const product = await stripe.products.retrieve(productId);
-      if (product.name === name && item.quantity === targetQuantity) { priceId = item.price.id; break; }
-    }
-    if (!priceId) throw new HttpsError("failed-precondition",
-      `Update the ${name} quantity to ${targetQuantity} in Stripe, without proration, before enrolling this unit.`);
-    if (subscription.schedule) {
-      const scheduleId = typeof subscription.schedule === "string" ? subscription.schedule : subscription.schedule.id;
-      const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
-      if (schedule.status !== "active" || schedule.end_behavior !== "release" ||
-          schedule.phases.filter(phase => phase.end_date > Math.floor(Date.now() / 1000))
-            .some(phase => !phase.items.some(item => item.price === priceId && item.quantity === targetQuantity)))
-        throw new HttpsError("failed-precondition",
-          "Update this unit's quantity in every remaining Stripe schedule phase before enrolling it.");
-    }
+    const operationRef = db.collection("managedServiceUnitOperations").doc(carrierId);
+    const operationKey = `${carrierId}_${collectionId}_${unitId}_${targetQuantity}`;
     await db.runTransaction(async tx => {
+      const current = await tx.get(operationRef);
+      const value = current.data() ?? {};
+      if (value.status === "applying" && value.startedAt?.toMillis?.() > Date.now() - 2 * 60 * 1000)
+        throw new HttpsError("aborted", "Another unit billing change is in progress. Refresh shortly.");
+      if (value.status === "needs_reconciliation" && value.operationKey !== operationKey)
+        throw new HttpsError("failed-precondition", "A prior Stripe change needs reconciliation before another unit can be added.");
+      tx.set(operationRef, { operationKey, collectionId, unitId, kind, targetQuantity,
+        agreementReference: agreement, status: "applying", startedAt: admin.firestore.FieldValue.serverTimestamp(), actor });
+    });
+    let priceId: string;
+    try {
+      priceId = await addUnitToManagedBilling(stripe, subscription, kind, amount, currentCount, operationKey);
+    } catch (error) {
+      await operationRef.set({ status: "needs_reconciliation", error: String(error).slice(0, 500),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      throw new HttpsError("failed-precondition", `${error instanceof Error ? error.message : "Stripe update failed."} Review Stripe before retrying.`);
+    }
+    try { await db.runTransaction(async tx => {
       const [latestCoverage, latestBilling, latestUnit] = await Promise.all([
         tx.get(coverageRef), tx.get(billingRef), tx.get(unitRef),
       ]);
@@ -716,8 +1013,104 @@ export const enrollApprovedManagedUnit = onCall(
       tx.create(coverageRef.collection("events").doc(), { type: "unit_enrolled", collectionId, unitId,
         kind, monthlyAdded: amount, agreementReference: agreement, stripeSubscriptionId: subscriptionId,
         stripePriceId: priceId, actor, createdAt: now });
-    });
+      tx.set(operationRef, { status: "completed", completedAt: now }, { merge: true });
+    }); } catch (error) {
+      await operationRef.set({ status: "needs_reconciliation", error: String(error).slice(0, 500),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      throw new HttpsError("aborted", "Stripe changed, but coverage could not be confirmed. Reconcile billing and coverage before retrying.");
+    }
     return { enrolled: true, monthlyAdded: amount };
+  });
+export const removeInactiveManagedUnit = onCall(
+  { region: "us-central1", secrets: [stripeSecretKey] }, async request => {
+    const actor = owner(request);
+    const carrierId = identifier(request.data?.carrierId);
+    const unitId = identifier(request.data?.unitId);
+    const collectionId = request.data?.collectionId;
+    if (collectionId !== "drivers" && collectionId !== "vehicles")
+      throw new HttpsError("invalid-argument", "Choose a driver or vehicle.");
+    const db = admin.firestore();
+    const coverageRef = db.collection("managedServiceCoverage").doc(carrierId);
+    const billingRef = db.collection("managedServiceBilling").doc(carrierId);
+    const unitRef = db.collection("carriers").doc(carrierId).collection(collectionId).doc(unitId);
+    const field = collectionId === "drivers" ? "driverIds" : "vehicleIds";
+    const area = collectionId === "drivers" ? "drivers" : "fleet";
+    const [coverage, billing, unit] = await Promise.all([coverageRef.get(), billingRef.get(), unitRef.get()]);
+    const enrolled = object(coverage.data()?.managedUnitIds)[field];
+    if (coverage.data()?.status !== "active" || object(coverage.data()?.areas)[area] !== true ||
+        !Array.isArray(enrolled) || !unit.exists)
+      throw new HttpsError("failed-precondition", "Active managed coverage and the original unit record are required.");
+    if (!enrolled.includes(unitId)) return { alreadyRemoved: true };
+    if (unit.data()?.status !== "inactive")
+      throw new HttpsError("failed-precondition", "Mark the unit inactive before removing its managed charge.");
+    const subscriptionId = billing.data()?.stripeSubscriptionId;
+    if (billing.data()?.status !== "active" || typeof subscriptionId !== "string" || !subscriptionId.startsWith("sub_"))
+      throw new HttpsError("failed-precondition", "An active managed Stripe subscription is required.");
+    const kind = collectionId === "drivers" ? "driver" : unit.data()?.type === "trailer" ? "trailer" : "truck";
+    const amount = kind === "driver" ? MANAGED_PRICING.driverMonthly
+      : kind === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly;
+    const enrolledDocs = await Promise.all(enrolled.map(id =>
+      db.collection("carriers").doc(carrierId).collection(collectionId).doc(id).get()));
+    if (enrolledDocs.some(row => !row.exists))
+      throw new HttpsError("failed-precondition", "A managed unit record is missing. Reconcile the roster before billing changes.");
+    const currentCount = collectionId === "drivers" ? enrolled.length
+      : enrolledDocs.filter(row => (row.data()?.type === "trailer" ? "trailer" : "truck") === kind).length;
+    const stripe = new Stripe(stripeSecretKey.value());
+    const project = process.env.GCLOUD_PROJECT ?? process.env.GCP_PROJECT ?? admin.app().options.projectId;
+    if (project === "weheartpaperwork-staging" && !stripeSecretKey.value().startsWith("sk_test_"))
+      throw new HttpsError("failed-precondition", "Staging verification requires a Stripe test key.");
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    if (subscription.status !== "active" || subscription.cancel_at_period_end || subscription.cancel_at ||
+        billing.data()?.cancelAtPeriodEnd === true ||
+        !["managed", "app_with_managed"].includes(subscription.metadata.serviceKind) ||
+        subscription.metadata.carrierId !== carrierId)
+      throw new HttpsError("failed-precondition", "Review the managed subscription before reducing its charge.");
+    const operationRef = db.collection("managedServiceUnitOperations").doc(carrierId);
+    const operationKey = `${carrierId}_${collectionId}_${unitId}_remove_${currentCount}`;
+    await db.runTransaction(async tx => {
+      const current = await tx.get(operationRef);
+      const value = current.data() ?? {};
+      if (value.status === "applying" && value.startedAt?.toMillis?.() > Date.now() - 2 * 60 * 1000)
+        throw new HttpsError("aborted", "Another unit billing change is in progress. Refresh shortly.");
+      if (value.status === "needs_reconciliation" && value.operationKey !== operationKey)
+        throw new HttpsError("failed-precondition", "A prior Stripe change needs reconciliation first.");
+      tx.set(operationRef, { operationKey, collectionId, unitId, kind,
+        targetQuantity: currentCount - 1, status: "applying",
+        startedAt: admin.firestore.FieldValue.serverTimestamp(), actor });
+    });
+    let priceId: string;
+    try {
+      priceId = await removeUnitFromManagedBilling(stripe, subscription, kind, amount, currentCount, operationKey);
+    } catch (error) {
+      await operationRef.set({ status: "needs_reconciliation", error: String(error).slice(0, 500),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      throw new HttpsError("failed-precondition", `${error instanceof Error ? error.message : "Stripe update failed."} Review Stripe before retrying.`);
+    }
+    try { await db.runTransaction(async tx => {
+      const [latestCoverage, latestBilling, latestUnit] = await Promise.all([
+        tx.get(coverageRef), tx.get(billingRef), tx.get(unitRef),
+      ]);
+      const latestIds = object(latestCoverage.data()?.managedUnitIds)[field];
+      if (latestCoverage.data()?.status !== "active" ||
+          object(latestCoverage.data()?.areas)[area] !== true ||
+          latestBilling.data()?.stripeSubscriptionId !== subscriptionId ||
+          latestBilling.data()?.status !== "active" || latestUnit.data()?.status !== "inactive" ||
+          !Array.isArray(latestIds) || latestIds.length !== enrolled.length ||
+          latestIds.some((id: unknown, index: number) => id !== enrolled[index]))
+        throw new HttpsError("aborted", "Coverage or billing changed. Reconcile before retrying.");
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      tx.update(coverageRef, { [`managedUnitIds.${field}`]: admin.firestore.FieldValue.arrayRemove(unitId),
+        updatedAt: now, updatedBy: actor });
+      tx.create(coverageRef.collection("events").doc(), { type: "unit_removed", collectionId, unitId,
+        kind, monthlyRemoved: amount, stripeSubscriptionId: subscriptionId, stripePriceId: priceId,
+        actor, createdAt: now });
+      tx.set(operationRef, { status: "completed", completedAt: now }, { merge: true });
+    }); } catch (error) {
+      await operationRef.set({ status: "needs_reconciliation", error: String(error).slice(0, 500),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      throw new HttpsError("aborted", "Stripe changed, but coverage could not be confirmed. Reconcile billing and coverage before retrying.");
+    }
+    return { removed: true, monthlyRemoved: amount };
   });
 export const signalManagedCarrierChange = onDocumentWritten(
   { document: "carriers/{carrierId}", region: "us-central1" },
@@ -730,6 +1123,27 @@ export const signalManagedItemChange = onDocumentWritten(
     if (collectionId !== "drivers" && collectionId !== "vehicles") return;
     const before = event.data?.before.exists ? event.data.before.data() : null;
     const after = event.data?.after.exists ? event.data.after.data() : null;
+    if (before && before.status !== "inactive" && (!after || after.status === "inactive")) {
+      const db = admin.firestore();
+      const [coverage, carrier, serviceRequest] = await Promise.all([
+        db.collection("managedServiceCoverage").doc(carrierId).get(),
+        db.collection("carriers").doc(carrierId).get(),
+        db.collection("managedServiceRequests").doc(carrierId).get(),
+      ]);
+      const enrolled = object(coverage.data()?.managedUnitIds)[collectionId === "drivers" ? "driverIds" : "vehicleIds"];
+      if (coverage.data()?.status === "active" && Array.isArray(enrolled) && enrolled.includes(docId) &&
+          carrier.exists && carrier.data()?.deletingAccount !== true) {
+        const kind = collectionId === "drivers" ? "driver" : before.type === "trailer" ? "trailer" : "truck";
+        const label = String(collectionId === "drivers" ? before.name || "Driver" : before.unitNumber || "Vehicle").slice(0, 100);
+        const company = String(carrier.data()?.companyName || "Company").slice(0, 150);
+        const contact = String(serviceRequest.data()?.preferredEmail || carrier.data()?.email || "Not provided").slice(0, 254);
+        const digest = createHash("sha256").update(event.id).digest("hex").slice(0, 24);
+        await queueOwnerEmail(db, `managed_removed_unit_${carrierId}_${docId}_${digest}`,
+          `Managed ${kind} removed: ${company}`,
+          `${company} removed managed ${kind} ${label}.\n\nContact: ${contact}\n\nThe managed charge is still on the subscription until you process this removal. Open the owner managed queue before the next invoice, verify the unit is inactive, and use the reduce-charge action. The customer keeps app access and saved records.`);
+      }
+      return;
+    }
     if (!after || after.status === "inactive" || (before && before.status !== "inactive")) return;
     const db = admin.firestore();
     const [coverage, carrier, serviceRequest] = await Promise.all([

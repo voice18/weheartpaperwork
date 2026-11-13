@@ -12,9 +12,11 @@ import {
 } from "react-native";
 import { usePublicCompact } from "../hooks/usePublicCompact";
 import { MANAGED_COMPANY_SETUP_TOTAL, MANAGED_PRICING } from "../lib/managedPricing";
+import { useManagedSupportAvailability } from "../lib/useManagedSupportAvailability";
 
 export default function PricingPage() {
   const compact = usePublicCompact();
+  const managedAvailable = useManagedSupportAvailability();
 
   const [driverCount, setDriverCount] = useState(1);
 
@@ -410,6 +412,7 @@ export default function PricingPage() {
         {/* Optional managed support is priced separately from app access. */}
         <View style={styles.section}>
           <Text style={styles.eyebrow}>OPTIONAL MANAGED SUPPORT</Text>
+          {managedAvailable === false && <Text style={styles.sectionDescription}>Managed support is currently available by invitation. App tracking remains open for signup.</Text>}
           <Text style={[styles.sectionTitle, compact && styles.sectionTitleCompact]}>
             We prepare the next steps. You take the final action.
           </Text>
@@ -505,7 +508,7 @@ export default function PricingPage() {
 
             <FaqItem
               question="Is there a free trial?"
-              answer="The app subscription starts with a 14-day free trial before app billing begins. Managed support is separate and starts only after we confirm the scope, price, payment, and start date with you."
+              answer="App-only signup includes a 14-day trial. If you choose managed support when you first sign up, your app and managed charges begin together at checkout with no trial. Managed coverage starts after we verify your records and confirm your start date."
             />
 
             <FaqItem

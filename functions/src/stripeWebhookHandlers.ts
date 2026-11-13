@@ -194,10 +194,14 @@ export async function syncSubscriptionToCarrier(
     existingBilling.activeDriverCountAtBilling ??
     0;
 
-  const monthlyAmountCents =
-    calculateMonthlyAmountCents(
-      subscription
-    );
+  const monthlyAmountCents = subscription.metadata.serviceKind === "app_with_managed"
+    ? subscription.items.data.filter(item => item.price.id === subscription.metadata.appCompanyPriceId ||
+        item.price.id === subscription.metadata.appDriverPriceId)
+      .reduce((total, item) => total + (item.price.unit_amount ?? 0) * (item.quantity ?? 1), 0)
+    : calculateMonthlyAmountCents(subscription);
+  if (subscription.metadata.serviceKind === "app_with_managed" &&
+      !subscription.items.data.some(item => item.price.id === subscription.metadata.appCompanyPriceId))
+    throw new Error("Combined subscription has no app base item.");
 
   await db.runTransaction(async transaction => {
     const current = await transaction.get(carrierRef);

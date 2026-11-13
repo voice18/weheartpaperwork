@@ -18,18 +18,33 @@ export async function queueReferralReview(db: FirebaseFirestore.Firestore, id: s
     updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
 }
 
-/** Fail closed for mixed invoices. Tax consumes received cash before rewards;
- * customer balance credits and manually marked-paid invoices are not cash. */
+/** Allocate only app lines on combined invoices. Unclear discounts or adjustments
+ * go to owner review rather than receiving an estimated referral reward. */
 export function qualifyingInvoiceCents(invoice: Stripe.Invoice, lines: Stripe.InvoiceLineItem[], prices: string[]): number {
   if (invoice.status !== "paid" || invoice.amount_paid <= 0 || !subscriptionId(invoice)) return 0;
   if (invoice.currency !== "usd" || invoice.total_excluding_tax == null) throw new Error("Missing USD/pretax evidence.");
+  const combined = invoice.parent?.subscription_details?.metadata?.serviceKind === "app_with_managed";
+  let eligible = 0;
+  let lineTotal = 0;
   for (const line of lines) {
     if (!line.amount) continue;
     const price = stringId(line.pricing?.price_details?.price);
-    if (!price || !prices.includes(price) || !line.parent?.subscription_item_details) throw new Error("Mixed/unapproved subscription invoice.");
+    if (!price || (combined && line.currency !== "usd") || !Number.isSafeInteger(line.amount) || line.amount < 0)
+      throw new Error("Mixed/unapproved subscription invoice.");
+    if (!combined && (!prices.includes(price) || !line.parent?.subscription_item_details))
+      throw new Error("Mixed/unapproved subscription invoice.");
+    if (prices.includes(price)) {
+      if (!line.parent?.subscription_item_details) throw new Error("Unverified app invoice item.");
+      eligible += line.amount;
+    }
+    lineTotal += line.amount;
   }
   const tax = Math.max(0, invoice.total - invoice.total_excluding_tax);
-  return Math.max(0, Math.min(invoice.total_excluding_tax, invoice.amount_paid - tax));
+  const cashPretax = Math.max(0, Math.min(invoice.total_excluding_tax, invoice.amount_paid - tax));
+  if (!combined) return cashPretax;
+  if (lineTotal !== invoice.total_excluding_tax || lineTotal <= 0 || eligible > lineTotal)
+    throw new Error("Combined invoice has discounts or adjustments requiring referral review.");
+  return Number(BigInt(eligible) * BigInt(cashPretax) / BigInt(lineTotal));
 }
 
 type Evidence = {

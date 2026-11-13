@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "expo-router";
 import Head from "expo-router/head";
 import { httpsCallable } from "firebase/functions";
-import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { auth, db, functions } from "../../lib/firebase";
 import { MANAGED_COMPANY_SETUP_TOTAL, MANAGED_PRICING } from "../../lib/managedPricing";
+import { useManagedSupportAvailability } from "../../lib/useManagedSupportAvailability";
 
 type Area = "company" | "drivers" | "fleet";
 type Areas = Record<Area, boolean>;
@@ -19,8 +20,10 @@ type IntakeDriver = { name: string; cdlNumber: string; cdlClass: string; cdlStat
 type IntakeVehicle = { type: "truck" | "trailer"; unitNumber: string; vin: string;
   registrationExpiration: string; inspectionExpiration: string };
 type Intake = { drivers: IntakeDriver[]; vehicles: IntakeVehicle[] };
+type DashboardDriver = { id: string; name: string; cdlNumber: string; cdlState: string };
+type DashboardVehicle = { id: string; type: "truck" | "trailer"; unitNumber: string; vin: string };
 type ManagedQuote = { quoteId: string; status: string; scope: string; expiresAtMillis: number;
-  appDriverIncrease?: number | null;
+  appDriverIncrease?: number | null; appMonthly?: number | null; signupQuote?: boolean;
   areas: Areas; counts: { drivers: number; trucks: number; trailers: number; dqFiles: number };
   price: { firstYearMonthly: number; renewalMonthly: number;
     fleetOnlyOnboardingOneTime: number; dqFileOneTime: number } };
@@ -72,30 +75,38 @@ function requestProgress(status?: string): string {
 }
 export default function ManagedTrackingChoices() {
   const router = useRouter();
+  const managedAvailable = useManagedSupportAvailability();
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [serviceRequest, setServiceRequest] = useState<ServiceRequest | null>(null);
   const [quote, setQuote] = useState<ManagedQuote | null>(null);
+  const [hasAppAccess, setHasAppAccess] = useState<boolean | null>(null);
   const [areas, setAreas] = useState<Areas>(NONE);
   const [step, setStep] = useState(1);
   const [intake, setIntake] = useState<Intake>({ drivers: [], vehicles: [] });
+  const [dashboardDrivers, setDashboardDrivers] = useState<DashboardDriver[] | null>(null);
+  const [dashboardVehicles, setDashboardVehicles] = useState<DashboardVehicle[] | null>(null);
   const [preferredEmail, setPreferredEmail] = useState(auth.currentUser?.email || "");
   const [preferredPhone, setPreferredPhone] = useState("");
   const [textPermission, setTextPermission] = useState<boolean | null>(null);
+  const [buildDqFiles, setBuildDqFiles] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [formError, setFormError] = useState("");
   useEffect(() => {
     const uid = auth.currentUser?.uid;
     if (!uid || Platform.OS !== "web") { setLoading(false); return; }
     const coverageRef = doc(db, "managedServiceCoverage", uid);
     const requestRef = doc(db, "managedServiceRequests", uid);
     let active = true;
-    void Promise.all([getDoc(coverageRef), getDoc(requestRef)]).then(([current, pending]) => {
+    const carrierRef = doc(db, "carriers", uid);
+    void Promise.all([getDoc(coverageRef), getDoc(requestRef), getDoc(carrierRef)]).then(([current, pending, carrier]) => {
       if (!active) return;
       const currentCoverage = current.exists() ? current.data() as Coverage : null;
       const currentRequest = pending.exists() ? pending.data() as ServiceRequest : null;
       setCoverage(currentCoverage);
       setServiceRequest(currentRequest);
+      setHasAppAccess(["active", "trialing"].includes(String(carrier.data()?.billing?.status || "")));
       setPreferredEmail(currentRequest?.preferredEmail || auth.currentUser?.email || "");
       setPreferredPhone(currentRequest?.preferredPhone || "");
       setTextPermission(typeof currentRequest?.textPermission === "boolean"
@@ -103,8 +114,9 @@ export default function ManagedTrackingChoices() {
       setIntake(currentRequest?.intake || { drivers: [], vehicles: [] });
       setAreas(PENDING.has(currentRequest?.status || "")
         ? { ...NONE, ...currentRequest?.areas }
-        : currentCoverage?.status === "active" ? { ...NONE, ...currentCoverage.areas } : NONE);
-      if (currentCoverage?.status === "active" || PENDING.has(currentRequest?.status || "")) setStep(2);
+        : currentCoverage?.status === "active" ? { ...NONE, ...currentCoverage.areas } : ALL);
+      if (currentCoverage?.status === "active" || PENDING.has(currentRequest?.status || "") ||
+          !["active", "trialing"].includes(String(carrier.data()?.billing?.status || ""))) setStep(2);
       setLoading(false);
     }).catch(() => { if (active) { setMessage("We could not load your support choices. Try again later."); setLoading(false); } });
     const unsubscribeCoverage = onSnapshot(coverageRef,
@@ -113,14 +125,33 @@ export default function ManagedTrackingChoices() {
     const unsubscribeRequest = onSnapshot(requestRef,
       snap => { if (active) setServiceRequest(snap.exists() ? snap.data() as ServiceRequest : null); },
       () => { if (active) setMessage("Request status is temporarily unavailable."); });
-    return () => { active = false; unsubscribeCoverage(); unsubscribeRequest(); };
+    const unsubscribeCarrier = onSnapshot(carrierRef,
+      snap => { if (active) setHasAppAccess(["active", "trialing"].includes(String(snap.data()?.billing?.status || ""))); },
+      () => { if (active) setMessage("Billing status is temporarily unavailable."); });
+    const unsubscribeDrivers = onSnapshot(collection(carrierRef, "drivers"), snap => {
+      if (active) setDashboardDrivers(snap.docs.filter(row => row.data().status !== "inactive").map(row => ({
+        id: row.id, name: String(row.data().name || "Unnamed driver"),
+        cdlNumber: String(row.data().cdlNumber || ""), cdlState: String(row.data().cdlState || ""),
+      })));
+    }, () => { if (active) setMessage("Driver list is temporarily unavailable. Refresh before requesting a quote."); });
+    const unsubscribeVehicles = onSnapshot(collection(carrierRef, "vehicles"), snap => {
+      if (active) setDashboardVehicles(snap.docs.filter(row => row.data().status !== "inactive").map(row => ({
+        id: row.id, type: row.data().type === "trailer" ? "trailer" : "truck",
+        unitNumber: String(row.data().unitNumber || "Unnamed unit"), vin: String(row.data().vin || ""),
+      })));
+    }, () => { if (active) setMessage("Equipment list is temporarily unavailable. Refresh before requesting a quote."); });
+    return () => { active = false; unsubscribeCoverage(); unsubscribeRequest(); unsubscribeCarrier();
+      unsubscribeDrivers(); unsubscribeVehicles(); };
   }, []);
   useEffect(() => {
     if (Platform.OS !== "web" || !auth.currentUser) return;
     let active = true;
     void httpsCallable<Record<string, never>, { quote: ManagedQuote | null }>(
       functions, "getManagedServiceQuote")({}).then(result => {
-      if (active) setQuote(result.data.quote);
+      if (active) {
+        setQuote(result.data.quote);
+        if (result.data.quote?.signupQuote) setBuildDqFiles((result.data.quote.counts?.dqFiles || 0) > 0);
+      }
     }).catch(() => { if (active) setQuote(null); });
     return () => { active = false; };
   }, [serviceRequest?.status, serviceRequest?.updatedAt]);
@@ -129,16 +160,37 @@ export default function ManagedTrackingChoices() {
   const lockedQuote = ["accepted", "paid_awaiting_start"].includes(serviceRequest?.status || "");
   const currentAreas = { ...NONE, ...coverage?.areas };
   const pending = PENDING.has(serviceRequest?.status || "");
+  const rosterCounts = useMemo(() => {
+    if (!dashboardDrivers || !dashboardVehicles) return null;
+    const driverKeys = new Set(dashboardDrivers.map(row =>
+      `${row.cdlState.toUpperCase()}:${row.cdlNumber.replace(/[^A-Z0-9]/gi, "").toUpperCase()}`));
+    const vehicleVins = new Set(dashboardVehicles.map(row => row.vin.toUpperCase()));
+    const additionalDrivers = areas.drivers ? intake.drivers.filter(row =>
+      !driverKeys.has(`${row.cdlState.toUpperCase()}:${row.cdlNumber.replace(/[^A-Z0-9]/gi, "").toUpperCase()}`)) : [];
+    const additionalVehicles = areas.fleet ? intake.vehicles.filter(row => !vehicleVins.has(row.vin.toUpperCase())) : [];
+    return {
+      drivers: areas.drivers ? dashboardDrivers.length + additionalDrivers.length : 0,
+      trucks: areas.fleet ? dashboardVehicles.filter(row => row.type === "truck").length +
+        additionalVehicles.filter(row => row.type === "truck").length : 0,
+      trailers: areas.fleet ? dashboardVehicles.filter(row => row.type === "trailer").length +
+        additionalVehicles.filter(row => row.type === "trailer").length : 0,
+    };
+  }, [areas, dashboardDrivers, dashboardVehicles, intake]);
+  const quoteStale = !!quote && ["quoted", "accepted"].includes(quote.status) && !!rosterCounts &&
+    (quote.counts.drivers !== rosterCounts.drivers || quote.counts.trucks !== rosterCounts.trucks ||
+      quote.counts.trailers !== rosterCounts.trailers);
   const intakeMatchesRequest = sameIntake(intake, serviceRequest?.intake, areas);
-  const matchesRequest = pending && same(areas, { ...NONE, ...serviceRequest?.areas }) && intakeMatchesRequest;
+  const dqMatchesQuote = !quote?.signupQuote || quote.counts.dqFiles ===
+    (areas.drivers && buildDqFiles ? intake.drivers.length : 0);
+  const matchesRequest = pending && same(areas, { ...NONE, ...serviceRequest?.areas }) && intakeMatchesRequest && dqMatchesQuote;
   const matchesCoverage = activeCoverage && same(areas, currentAreas);
   const selected = areas.company || areas.drivers || areas.fleet;
   const updateDriver = (index: number, key: keyof IntakeDriver, value: string) =>
-    setIntake(previous => ({ ...previous, drivers: previous.drivers.map((row, i) =>
-      i === index ? { ...row, [key]: value } : row) }));
+    { setFormError(""); setIntake(previous => ({ ...previous, drivers: previous.drivers.map((row, i) =>
+      i === index ? { ...row, [key]: value } : row) })); };
   const updateVehicle = (index: number, key: keyof IntakeVehicle, value: string) =>
-    setIntake(previous => ({ ...previous, vehicles: previous.vehicles.map((row, i) =>
-      i === index ? { ...row, [key]: value } : row) }));
+    { setFormError(""); setIntake(previous => ({ ...previous, vehicles: previous.vehicles.map((row, i) =>
+      i === index ? { ...row, [key]: value } : row) })); };
   const action = useMemo(() => {
     if (!selected && !activeCoverage) return pending
       ? { label: "Withdraw request and keep managing myself", operation: "withdraw", disabled: false }
@@ -146,50 +198,78 @@ export default function ManagedTrackingChoices() {
     if (matchesCoverage && pending) return {
       label: "Keep current coverage and withdraw change request", operation: "request", disabled: false };
     if (matchesCoverage) return { label: "These are already your active areas", operation: "none", disabled: true };
+    if (matchesRequest && quoteStale && quote?.status === "quoted") return {
+      label: "Request an updated quote for these dashboard records", operation: "request", disabled: false };
     if (matchesRequest) return { label: "Request already received", operation: "none", disabled: true };
     if (!selected) return { label: "Choose an area, or end managed support in Settings", operation: "none", disabled: true };
     return { label: activeCoverage ? "Request a scope change" : "Request a written quote",
       operation: "request", disabled: false };
-  }, [activeCoverage, matchesCoverage, matchesRequest, pending, selected]);
+  }, [activeCoverage, matchesCoverage, matchesRequest, pending, quote?.status, quoteStale, selected]);
   const submit = async (override?: "contact") => {
-    if (!override && action.operation === "back") { router.replace("/(app)/dashboard"); return; }
+    if (!override && action.operation === "back") { router.replace(hasAppAccess ? "/(app)/dashboard" : "/(app)/service-choice"); return; }
     if ((!override && action.disabled) || saving) return;
+    setFormError("");
     const operation = override || action.operation;
     if (!override && operation === "request" && selected) {
-      if (areas.drivers && intake.drivers.some(row => !row.name.trim() || !row.cdlNumber.trim() ||
-        !/^[ABC]$/i.test(row.cdlClass.trim()) || !/^[A-Z]{2}$/i.test(row.cdlState.trim()))) {
-        setMessage("For each listed driver, enter the name, CDL number, class, and issuing state."); return;
+      if (!rosterCounts) {
+        setFormError("Your dashboard records are still loading. Wait a moment and try again."); return;
       }
-      if (areas.fleet && intake.vehicles.some(row => !row.unitNumber.trim() || row.vin.trim().length < 5)) {
-        setMessage("For each listed truck or trailer, enter a unit number and VIN or serial number."); return;
+      if (areas.drivers) {
+        for (let index = 0; index < intake.drivers.length; index++) {
+          const row = intake.drivers[index];
+          const missing = !row.name.trim() ? "full name" : !row.cdlNumber.trim() ? "CDL number" :
+            !/^[ABC]$/i.test(row.cdlClass.trim()) ? "CDL class (A, B, or C)" :
+            !/^[A-Z]{2}$/i.test(row.cdlState.trim()) ? "two-letter issuing state" : "";
+          if (missing) { setFormError(`Driver ${index + 1} of ${intake.drivers.length}: enter ${missing}, or remove this driver if listed by mistake.`); return; }
+        }
+      }
+      if (areas.fleet) {
+        for (let index = 0; index < intake.vehicles.length; index++) {
+          const row = intake.vehicles[index];
+          const missing = !row.unitNumber.trim() ? "unit number" : row.vin.trim().length < 5 ? "VIN or serial number (at least 5 characters)" : "";
+          if (missing) { setFormError(`Equipment ${index + 1} of ${intake.vehicles.length}: enter ${missing}, or remove this unit if listed by mistake.`); return; }
+        }
       }
     }
     if (operation === "request" || operation === "contact") {
       if (!preferredEmail.trim() || !preferredPhone.trim()) {
-        setMessage("Enter the best email and phone number for managed-support updates."); return;
+        setFormError("Enter the best email and phone number for managed-support updates."); return;
       }
       if (textPermission === null) {
-        setMessage("Choose yes or no for service-related texts."); return;
+        setFormError("Choose yes or no for service-related texts."); return;
       }
     }
     setSaving(true);
     setMessage("");
     try {
-      const callable = httpsCallable(functions, "submitManagedServiceRequest");
-      const result = await callable({ action: operation, areas,
+      if (!hasAppAccess && operation === "withdraw" && quote?.signupQuote) {
+        await httpsCallable(functions, "withdrawManagedServiceQuote")({});
+        setQuote(null);
+        setMessage("Your managed quote was withdrawn. You can choose app-only signup now.");
+        return;
+      }
+      const signup = !hasAppAccess && operation === "request";
+      const callable = httpsCallable(functions, signup ? "prepareManagedSignupQuote" : "submitManagedServiceRequest");
+      const result = await callable({ ...(signup ? { dqFiles: areas.drivers && buildDqFiles ? intake.drivers.length : 0 }
+        : { action: operation }), areas,
         intake: { drivers: areas.drivers ? intake.drivers : [],
           vehicles: areas.fleet ? intake.vehicles : [] },
-        preferredEmail, preferredPhone, textPermission });
+        preferredEmail, preferredPhone, textPermission,
+        ...(quoteStale && quote?.status === "quoted" ? { rosterChanged: true } : {}) });
       const status = (result.data as { status?: string })?.status;
-      setMessage(status === "withdrawn" || status === "already-active"
+      if (signup) {
+        setStep(3);
+        setMessage("Your exact combined price is ready below. Review and accept it before one secure checkout. No trial applies to managed signup.");
+      } else setMessage(status === "withdrawn" || status === "already-active"
         ? "Your pending change was withdrawn. Your current tracking continues."
         : status === "contact-updated" ? "Your contact details are updated. We will use these for managed-support follow-up."
         : status === "contact-unchanged" ? "These contact details are already on file."
+        : status === "roster-update-requested" ? "Your updated driver and equipment list was sent for a corrected quote. The old quote cannot be accepted."
         : status === "already-pending" ? "We already have this request and will use your contact details below."
         : status === "end_requested" ? "Your request to end managed support is recorded. Current coverage continues until we confirm the change."
         : "Your request is recorded. We will contact you with a written scope and price. Nothing has been charged or changed yet.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save your request. Please try again.");
+      setFormError(error instanceof Error ? error.message : "Could not save your request. Please try again.");
     } finally { setSaving(false); }
   };
   const acceptQuote = async () => {
@@ -207,8 +287,10 @@ export default function ManagedTrackingChoices() {
     if (!quote || saving || Platform.OS !== "web") return;
     setSaving(true); setMessage("");
     try {
-      const callable = httpsCallable<Record<string, unknown>, { url: string }>(functions, "createManagedCheckoutSession");
-      const result = await callable({ quoteId: quote.quoteId, returnOrigin: window.location.origin });
+      const callable = httpsCallable<Record<string, unknown>, { url: string }>(functions,
+        quote.signupQuote ? "createCheckoutSession" : "createManagedCheckoutSession");
+      const result = await callable({ ...(quote.signupQuote ? { managedQuoteId: quote.quoteId } : { quoteId: quote.quoteId }),
+        returnOrigin: window.location.origin });
       if (!result.data.url) throw new Error("Checkout is not available. Please try again.");
       await Linking.openURL(result.data.url);
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not open checkout."); }
@@ -224,10 +306,22 @@ export default function ManagedTrackingChoices() {
     } catch (error) { setMessage(error instanceof Error ? error.message : "Could not withdraw this quote."); }
     finally { setSaving(false); }
   };
+  if (managedAvailable === null) return <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}><ActivityIndicator /></View>;
+  if (!managedAvailable && coverage?.status !== "active" &&
+      !["paid_awaiting_start", "active", "end_scheduled"].includes(serviceRequest?.status || ""))
+    return <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+    <View style={styles.card}>
+      <Text style={styles.title}>Managed support is not available for this account yet</Text>
+      <Text style={styles.body}>Your app access, records, and reminders continue. You can still track your deadlines yourself.</Text>
+      <Pressable onPress={() => router.replace(hasAppAccess ? "/(app)/dashboard" : "/(app)/service-choice")}>
+        <Text style={styles.link}>‹ Back to app access</Text>
+      </Pressable>
+    </View>
+  </ScrollView>;
   return <><Head><title>Managed Tracking Options | We Heart Paperwork</title>
     <meta name="robots" content="noindex,nofollow" /></Head>
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
-      <Pressable onPress={() => router.replace("/(app)/dashboard")}><Text style={styles.link}>‹ Back to dashboard</Text></Pressable>
+      <Pressable onPress={() => router.replace(hasAppAccess ? "/(app)/dashboard" : "/(app)/service-choice")}><Text style={styles.link}>‹ {hasAppAccess ? "Back to dashboard" : "Back to service choice"}</Text></Pressable>
       {Platform.OS !== "web" ? <View style={styles.card}>
         <Text style={styles.title}>Your support options</Text>
         <Text style={styles.body}>Managed tracking choices are available after signing in on the We Heart Paperwork website.</Text>
@@ -251,8 +345,8 @@ export default function ManagedTrackingChoices() {
           {paymentConfirmed && <View style={styles.card}>
             <Text style={styles.title}>Payment received</Text>
             <Text style={styles.body}>Your managed-support checkout is complete. You do not need to choose areas or pay again.</Text>
-            <Text style={styles.body}>Next, we will verify the quoted records and dates, finish setup, and confirm when your selected support starts. Your existing app subscription remains separate.</Text>
-            <Text style={styles.small}>You can end the separate managed-support subscription in Settings. Your app subscription, records, and reminders continue.</Text>
+            <Text style={styles.body}>Next, we will verify the quoted records and dates, finish setup, and confirm when your selected support starts. Your app access continues while setup is in progress.</Text>
+            <Text style={styles.small}>You can end managed support in Settings while keeping app access, records, and reminders.</Text>
             <Pressable accessibilityRole="button" style={styles.contactButton}
               onPress={() => router.push("/(app)/settings" as any)}>
               <Text style={styles.contactButtonText}>Manage managed support billing</Text>
@@ -268,7 +362,7 @@ export default function ManagedTrackingChoices() {
             <Pressable accessibilityRole="button" style={styles.button} onPress={() => { setAreas(ALL); setStep(2); }}>
               <Text style={styles.buttonText}>Ask us to manage deadlines</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" style={styles.contactButton} onPress={() => router.replace("/(app)/dashboard")}>
+            <Pressable accessibilityRole="button" style={styles.contactButton} onPress={() => router.replace(hasAppAccess ? "/(app)/dashboard" : "/(app)/service-choice")}>
               <Text style={styles.contactButtonText}>Keep managing them myself</Text>
             </Pressable>
             <Text style={styles.small}>Choosing help starts a request. You can remove any of the three areas on the next screen. We send an exact quote before any managed charge.</Text>
@@ -297,10 +391,13 @@ export default function ManagedTrackingChoices() {
           </View>}</>}
           {!paymentConfirmed && step === 3 && <><Text style={styles.section}>2. Tell us who and what to set up</Text>
           {areas.drivers && <View style={styles.card}>
-            <Text style={styles.section}>Drivers · {intake.drivers.length} listed</Text>
-            <Text style={styles.body}>List drivers you want us to set up. Leave this empty if you have none. We check this list against your existing dashboard before quoting. Listing a driver does not add them or change billing.</Text>
+            <Text style={styles.section}>Drivers · {dashboardDrivers === null ? "loading dashboard records" : `${dashboardDrivers.length} on dashboard`} · {intake.drivers.length} entered here</Text>
+            <Text style={styles.body}>Active drivers already on your dashboard are included when we prepare your quote. Only enter drivers here if they are not on your dashboard. We count a matching CDL once; entering a driver here does not add or charge for that record.</Text>
+            {dashboardDrivers !== null && dashboardDrivers.length > 0 && <Text style={styles.small}>Already on your dashboard: {dashboardDrivers.map(row => row.name).join(" · ")}.</Text>}
+            {intake.drivers.length > 0 && <Text style={styles.small}>Entries on this page: {intake.drivers.map((row, index) =>
+              `${index + 1}. ${row.name.trim() || "Unnamed driver"}`).join(" · ")}. Review every entry below before requesting a quote.</Text>}
             {intake.drivers.map((row, index) => <View key={index} style={styles.contact}>
-              <Text style={styles.label}>Driver {index + 1}</Text>
+              <Text style={styles.label}>Driver {index + 1} of {intake.drivers.length}{row.name.trim() ? ` · ${row.name.trim()}` : " · name needed"}</Text>
               {([ ["name", "Full name"], ["cdlNumber", "CDL number"], ["cdlClass", "CDL class (A, B, or C)"], ["cdlState", "Issuing state (2 letters)"],
                 ["cdlExpiration", "CDL expiration (YYYY-MM-DD, if known)"], ["medicalExpiration", "Medical expiration (YYYY-MM-DD, if known)"] ] as [keyof IntakeDriver, string][])
                 .map(([key, label]) => <TextInput key={key} style={styles.input} value={row[key]}
@@ -311,12 +408,21 @@ export default function ManagedTrackingChoices() {
             <Pressable accessibilityRole="button" style={styles.contactButton} onPress={() => setIntake(previous => ({ ...previous,
               drivers: [...previous.drivers, { name: "", cdlNumber: "", cdlClass: "", cdlState: "",
                 cdlExpiration: "", medicalExpiration: "" }] }))}><Text style={styles.contactButtonText}>+ Add a driver</Text></Pressable>
+            {!hasAppAccess && intake.drivers.length > 0 && <Pressable accessibilityRole="button"
+              accessibilityState={{ selected: buildDqFiles }} disabled={lockedQuote}
+              onPress={() => setBuildDqFiles(value => !value)}
+              style={[styles.choice, buildDqFiles && styles.choiceSelected, lockedQuote && styles.disabled]}>
+              <Text style={[styles.choiceText, buildDqFiles && styles.choiceSelectedText]}>
+                {buildDqFiles ? "✓ Include" : "Optional:"} DQ-file setup for each listed driver · $99 per file once
+              </Text>
+            </Pressable>}
           </View>}
           {areas.fleet && <View style={styles.card}>
-            <Text style={styles.section}>Trucks and trailers · {intake.vehicles.length} listed</Text>
-            <Text style={styles.body}>List trucks and trailers you want us to set up. Leave this empty if you have none. We check this list against your existing dashboard before quoting. Listing equipment does not add it or change billing.</Text>
+            <Text style={styles.section}>Trucks and trailers · {dashboardVehicles === null ? "loading dashboard records" : `${dashboardVehicles.length} on dashboard`} · {intake.vehicles.length} entered here</Text>
+            <Text style={styles.body}>Active trucks and trailers already on your dashboard are included when we prepare your quote. Only enter units here if they are not on your dashboard. We count a matching VIN once; entering a unit here does not add or charge for it.</Text>
+            {dashboardVehicles !== null && dashboardVehicles.length > 0 && <Text style={styles.small}>Already on your dashboard: {dashboardVehicles.map(row => row.unitNumber).join(" · ")}.</Text>}
             {intake.vehicles.map((row, index) => <View key={index} style={styles.contact}>
-              <Text style={styles.label}>Equipment {index + 1}</Text>
+              <Text style={styles.label}>Equipment {index + 1} of {intake.vehicles.length}{row.unitNumber.trim() ? ` · ${row.unitNumber.trim()}` : " · unit number needed"}</Text>
               <View style={styles.contactOptions}>{(["truck", "trailer"] as const).map(type => <Pressable key={type}
                 accessibilityRole="button" accessibilityState={{ selected: row.type === type }}
                 onPress={() => updateVehicle(index, "type", type)} style={[styles.choice, row.type === type && styles.choiceSelected]}>
@@ -344,7 +450,7 @@ export default function ManagedTrackingChoices() {
               <Text style={styles.body}>{`Driver: $${MANAGED_PRICING.driverMonthly}/month per managed driver. Truck: $${MANAGED_PRICING.truckMonthly}/month each. Trailer: $${MANAGED_PRICING.trailerMonthly}/month each.`}</Text>
               <Text style={styles.body}>{`Fleet-only support has a $${MANAGED_PRICING.fleetOnlyOnboardingOneTime} one-time onboarding charge when at least one active truck or trailer is added.`}</Text>
               <Text style={styles.body}>{`Building a driver qualification file, when requested, is a separate $${MANAGED_PRICING.dqFileOneTime} one-time charge per file.`}</Text>
-              <Text style={styles.small}>Managed support is separate from your app subscription ($2/month plus $1 per active driver). Your request does not add records or change either charge. If we add a quoted driver after managed checkout, your app subscription also increases by $1/month for that active driver. We show the exact managed quote before you agree or pay.</Text>
+              <Text style={styles.small}>{hasAppAccess ? "Managed support has its own charge alongside your app subscription ($2/month plus $1 per active driver)." : "New managed signup includes the app ($2/month plus $1 per active driver) and managed support in one checkout, with no trial."} Your request does not add records or change billing. The exact quote shows all selected charges before you agree or pay.</Text>
             </View>}
             {(selected || activeCoverage || pending) && <View style={styles.contact}>
               <Text style={styles.section}>How should we reach you?</Text>
@@ -377,37 +483,47 @@ export default function ManagedTrackingChoices() {
                 <Text style={styles.contactButtonText}>Save contact details</Text>
               </Pressable>}
             </View>}
+            {!!formError && <View style={styles.errorNotice} accessibilityLiveRegion="polite">
+              <Text style={styles.errorText}>{formError}</Text>
+            </View>}
             <Pressable accessibilityRole="button" disabled={action.disabled || saving || lockedQuote}
               onPress={() => void submit()} style={[styles.button, (action.disabled || saving || lockedQuote) && styles.disabled]}>
               <Text style={styles.buttonText}>{saving ? "Saving…" : lockedQuote ? "Quote in progress · contact us to change" : action.label}</Text>
             </Pressable>
           </View>
           </>}
-          {quote && !paymentConfirmed && (!same(areas, quote.areas) || !intakeMatchesRequest) && <View style={styles.notice}>
+          {quote && !paymentConfirmed && (!same(areas, quote.areas) || !intakeMatchesRequest || !dqMatchesQuote) && <View style={styles.notice}>
             <Text style={styles.noticeText}>Your existing quote covers the previously submitted areas and units. Submit your revised request for a new quote before accepting or paying.</Text>
           </View>}
-          {quote && (paymentConfirmed || (same(areas, quote.areas) && intakeMatchesRequest)) && <View style={styles.card}>
+          {quoteStale && <View style={styles.errorNotice} accessibilityLiveRegion="polite">
+            <Text style={styles.errorText}>Your dashboard now has different active driver or equipment counts than this quote. The old price cannot be accepted or paid. {quote?.status === "quoted" ? "Use the updated-quote button above; we will check the current roster and send you a corrected price." : "Withdraw the accepted quote and ask us for a corrected price before checkout."}</Text>
+          </View>}
+          {quote && (paymentConfirmed || (same(areas, quote.areas) && intakeMatchesRequest && dqMatchesQuote)) && <View style={styles.card}>
             <Text style={styles.section}>{activeCoverage ? "Your original managed-support quote"
               : paymentConfirmed ? "Your paid managed-support plan" : "Your managed-support quote"}</Text>
             <Text style={styles.body}>{quote.scope}</Text>
             <Text style={styles.body}>Company: {quote.areas.company ? "included" : "self-managed"} · Driver: {quote.areas.drivers ? `${quote.counts.drivers} managed` : "self-managed"} · Fleet: {quote.areas.fleet ? `${quote.counts.trucks} trucks and ${quote.counts.trailers} trailers managed` : "self-managed"}</Text>
             {activeCoverage && <Text style={styles.small}>Current managed roster: {coverage?.managedUnitIds?.driverIds?.length || 0} drivers and {coverage?.managedUnitIds?.vehicleIds?.length || 0} trucks/trailers. New units are added only after we contact you, confirm the added monthly price, and approve them. Your original Company rate stays the same.</Text>}
-            {quote.areas.drivers && quote.counts.drivers === 0 && <Text style={styles.small}>Driver support has no enrolled drivers and no Driver charge in this quote. Ask us for an updated quote before adding managed drivers later.</Text>}
-            {quote.areas.fleet && quote.counts.trucks + quote.counts.trailers === 0 && <Text style={styles.small}>Fleet support has no enrolled vehicles and no Fleet charge in this quote. Ask us for an updated quote before adding managed equipment later.</Text>}
-            <Text style={styles.summary}>${quote.price.firstYearMonthly}/month in year one</Text>
-            <Text style={styles.body}>${quote.price.renewalMonthly}/month from year two. {quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime > 0 ? `$${quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime} in one-time charges at checkout.` : "No one-time charges."}</Text>
-            <Text style={styles.small}>Your app subscription is billed separately at $2/month plus $1 per active driver. {quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."} {paymentConfirmed ? "Service starts after we confirm setup." : `Quote expires ${new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.`} You can end managed support in Settings at the end of a paid period; your app access and records continue. There is no early termination charge.</Text>
+            {quote.areas.drivers && quote.counts.drivers === 0 && <Text style={styles.small}>No drivers are included in managed support or charged for it now. If you add a driver later, we will contact you before adding ${MANAGED_PRICING.driverMonthly}/month in managed support for that driver. Your regular app driver charge is separate.</Text>}
+            {quote.areas.fleet && quote.counts.trucks + quote.counts.trailers === 0 && <Text style={styles.small}>No trucks or trailers are included in managed support or charged for it now. If you add equipment later, we will contact you before adding $1/month in managed support for each approved unit.</Text>}
+            <Text style={styles.summary}>${quote.price.firstYearMonthly}/month for managed support in year one</Text>
+            <Text style={styles.body}>${quote.price.renewalMonthly}/month for managed support from year two. {quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime > 0 ? `$${quote.price.fleetOnlyOnboardingOneTime + quote.price.dqFileOneTime} in one-time charges at checkout.` : "No one-time charges."}</Text>
+            {quote.signupQuote && quote.appMonthly != null && <Text style={styles.summary}>One checkout: ${quote.appMonthly + quote.price.firstYearMonthly}/month for app and managed support</Text>}
+            <Text style={styles.small}>{quote.signupQuote
+              ? `App: $${quote.appMonthly ?? "?"}/month, including $1 per quoted active driver. Managed signup has no free trial. Both services appear in one Stripe checkout.`
+              : `Your app subscription is billed separately at $2/month plus $1 per active driver. ${quote.appDriverIncrease == null ? "Ask us to confirm whether this older quote adds app Driver charges before accepting." : quote.appDriverIncrease > 0 ? `This quote adds ${quote.appDriverIncrease} driver${quote.appDriverIncrease === 1 ? "" : "s"} after payment, increasing the app charge by $${quote.appDriverIncrease}/month.` : "No new app Driver charge is included in this setup."}`}
+              {paymentConfirmed ? " Service starts after we confirm setup." : ` Quote expires ${new Date(quote.expiresAtMillis).toLocaleDateString()}. Service starts only after payment and our setup confirmation.`} You can end managed support in Settings at the end of a paid period; your app access and records continue. There is no early termination charge.</Text>
             {quote.appDriverIncrease == null && <Pressable accessibilityRole="link"
               onPress={() => void Linking.openURL("mailto:aaron@weheartpaperwork.com?subject=Updated%20managed%20support%20quote")}>
               <Text style={styles.link}>Ask for an updated quote ›</Text>
             </Pressable>}
-            {quote.status === "quoted" && <Pressable accessibilityRole="button" disabled={saving || quote.appDriverIncrease == null}
-              onPress={() => void acceptQuote()} style={[styles.button, (saving || quote.appDriverIncrease == null) && styles.disabled]}>
-              <Text style={styles.buttonText}>{quote.appDriverIncrease == null ? "Updated quote required" : "Accept quote"}</Text>
+            {quote.status === "quoted" && <Pressable accessibilityRole="button" disabled={saving || quoteStale || quote.appDriverIncrease == null}
+              onPress={() => void acceptQuote()} style={[styles.button, (saving || quoteStale || quote.appDriverIncrease == null) && styles.disabled]}>
+              <Text style={styles.buttonText}>{quoteStale || quote.appDriverIncrease == null ? "Updated quote required" : "Accept quote"}</Text>
             </Pressable>}
-            {quote.status === "accepted" && <Pressable accessibilityRole="button" disabled={saving || quote.appDriverIncrease == null}
-              onPress={() => void openManagedCheckout()} style={[styles.button, (saving || quote.appDriverIncrease == null) && styles.disabled]}>
-              <Text style={styles.buttonText}>{quote.appDriverIncrease == null ? "Updated quote required" : "Continue to secure checkout"}</Text>
+            {quote.status === "accepted" && <Pressable accessibilityRole="button" disabled={saving || quoteStale || quote.appDriverIncrease == null}
+              onPress={() => void openManagedCheckout()} style={[styles.button, (saving || quoteStale || quote.appDriverIncrease == null) && styles.disabled]}>
+              <Text style={styles.buttonText}>{quoteStale || quote.appDriverIncrease == null ? "Updated quote required" : "Continue to secure checkout"}</Text>
             </Pressable>}
             {quote.status === "accepted" && <Pressable accessibilityRole="button" disabled={saving}
               onPress={() => void withdrawQuote()} style={[styles.contactButton, saving && styles.disabled]}>
@@ -423,10 +539,10 @@ export default function ManagedTrackingChoices() {
           </View>
           {!paymentConfirmed && <View style={styles.card}>
             <Text style={styles.section}>Before service starts</Text>
-            <Text style={styles.body}>1. We review your request and send a written scope and exact first-year and ongoing price by email.</Text>
+            <Text style={styles.body}>1. {hasAppAccess ? "We review your request and send a written scope and exact first-year and ongoing price by email." : "You review the selected areas, listed units and exact app-plus-managed price on this page."}</Text>
             <Text style={styles.body}>2. You accept the exact quote and complete secure Stripe checkout on this page.</Text>
             <Text style={styles.body}>3. After payment is confirmed, we add any quoted missing units, verify their dates and app billing, then activate the selected areas. Your dashboard shows the start date and who manages each area.</Text>
-            <Text style={styles.small}>Your current app subscription and checkout continue unchanged. For help, email aaron@weheartpaperwork.com.</Text>
+            <Text style={styles.small}>{hasAppAccess ? "Your current app subscription and checkout continue unchanged." : "Your app and managed support begin with one checkout; there is no managed signup trial."} For help, email aaron@weheartpaperwork.com.</Text>
           </View>}
         </>}
       </>}
@@ -466,4 +582,6 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   notice: { padding: 14, borderRadius: 10, backgroundColor: "#EAF3DE", marginBottom: 15 },
   noticeText: { color: "#27500A", lineHeight: 21 },
+  errorNotice: { padding: 14, borderRadius: 10, backgroundColor: "#FDEDE8", marginBottom: 15 },
+  errorText: { color: "#8C2518", lineHeight: 21, fontWeight: "700" },
 });

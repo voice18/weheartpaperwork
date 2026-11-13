@@ -1,4 +1,5 @@
 import {
+  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -59,9 +60,13 @@ export default function DashboardHeader({
         </View>
 
         <TouchableOpacity
-          onPress={() =>
-            router.push("/(app)/settings")
-          }
+          onPress={() => {
+            if (Platform.OS === "web") {
+              window.location.assign("/settings");
+              return;
+            }
+            router.push("/(app)/settings");
+          }}
           accessibilityRole="button"
           accessibilityLabel="Open settings"
           activeOpacity={0.55}

@@ -16,6 +16,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/carriers/$(carrierId)).data.get("deletingAccount", false) != true;
     }
 
+    function notEnrolledManagedUnit(carrierId, field, unitId) {
+      let path = /databases/$(database)/documents/managedServiceCoverage/$(carrierId);
+      return !exists(path)
+        || get(path).data.get("status", "") != "active"
+        || !(unitId in get(path).data.get("managedUnitIds", {}).get(field, []));
+    }
+
     function allowedCarrierCreate() {
       return request.resource.data.keys().hasOnly([
         "companyName",
@@ -87,7 +94,9 @@ service cloud.firestore {
 
       match /drivers/{driverId} {
         allow read: if ownsCarrier(carrierId);
-        allow write: if carrierAcceptsWrites(carrierId);
+        allow create, update: if carrierAcceptsWrites(carrierId);
+        allow delete: if carrierAcceptsWrites(carrierId)
+          && notEnrolledManagedUnit(carrierId, "driverIds", driverId);
 
         match /complianceRecords/{requirementId} {
           allow read: if ownsCarrier(carrierId);
@@ -112,7 +121,9 @@ service cloud.firestore {
 
       match /vehicles/{vehicleId} {
         allow read: if ownsCarrier(carrierId);
-        allow write: if carrierAcceptsWrites(carrierId);
+        allow create, update: if carrierAcceptsWrites(carrierId);
+        allow delete: if carrierAcceptsWrites(carrierId)
+          && notEnrolledManagedUnit(carrierId, "vehicleIds", vehicleId);
 
         match /complianceRecords/{requirementId} {
           allow read: if ownsCarrier(carrierId);

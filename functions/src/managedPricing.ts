@@ -1,7 +1,7 @@
 export const MANAGED_PRICING = {
   companyFirstYearMonthly: 37,
   companyRenewalMonthly: 29,
-  driverMonthly: 13,
+  driverMonthly: 10,
   truckMonthly: 1,
   trailerMonthly: 1,
   fleetOnlyOnboardingOneTime: 40,
@@ -40,4 +40,16 @@ export function calculateManagedPrice(areas: ManagedAreas, counts: ManagedCounts
       ? MANAGED_PRICING.fleetOnlyOnboardingOneTime : 0,
     dqFileOneTime: counts.dqFiles * MANAGED_PRICING.dqFileOneTime,
   };
+}
+
+/** A checkout must use the same rates that were shown when its quote was prepared. */
+export function quoteUsesCurrentManagedRates(row: any): boolean {
+  try {
+    const expected = calculateManagedPrice({
+      company: row?.areas?.company === true,
+      drivers: row?.areas?.drivers === true,
+      fleet: row?.areas?.fleet === true,
+    }, row?.counts);
+    return Object.entries(expected).every(([key, value]) => row?.price?.[key] === value);
+  } catch { return false; }
 }

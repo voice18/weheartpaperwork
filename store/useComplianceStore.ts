@@ -27,24 +27,13 @@ import {
   followingIftaQuarterDue,
   iftaQuarterEndFromDueDate,
   nextIftaQuarterDue,
+  complianceFixedCalendarDue,
 } from "../lib/requirements";
 
 function fixedCalendarDueDate(
   reqId: RequirementId
 ): string | null {
-  const year = new Date().getFullYear();
-
-  switch (reqId) {
-    case "tax2290":
-      return `${year}-08-31`;
-
-    case "ucr":
-    case "ifta":
-      return `${year}-12-31`;
-
-    default:
-      return null;
-  }
+  return complianceFixedCalendarDue(reqId);
 }
 
 const BUILT_IN_REQUIREMENT_IDS: RequirementId[] = [

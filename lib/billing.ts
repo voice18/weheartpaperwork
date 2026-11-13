@@ -10,6 +10,7 @@ export type BillingStatus =
 export type CarrierBilling = {
   status: BillingStatus;
   trialEndsAt?: Timestamp | null;
+  hasUsedTrial?: boolean;
   currentPeriodEnd?: Timestamp | null;
 
   stripeCustomerId?: string | null;

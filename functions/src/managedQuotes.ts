@@ -3,9 +3,11 @@ import { randomUUID } from "node:crypto";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import Stripe from "stripe";
-import { calculateManagedPrice, ManagedAreas, ManagedCounts, MANAGED_PRICING } from "./managedPricing";
+import { calculateManagedPrice, ManagedAreas, ManagedCounts, MANAGED_PRICING, quoteUsesCurrentManagedRates } from "./managedPricing";
 import { managedIntake } from "./managedIntake";
 import { managedRoster } from "./managedRoster";
+import { managedContact } from "./managedContact";
+import { requireManagedSupportAvailable } from "./managedRollout";
 
 const stripeSecretKey = defineSecret("STRIPE_SECRET_KEY");
 const activeStripeStatuses = new Set(["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]);
@@ -24,17 +26,17 @@ function returnOrigin(candidate: unknown): string {
   } catch { /* Ignore invalid return origins. */ }
   return fallback;
 }
-function managedItems(row: Record<string, any>, renewal = false): Stripe.Checkout.SessionCreateParams.LineItem[] {
+export function managedItems(row: Record<string, any>, renewal = false): Stripe.Checkout.SessionCreateParams.LineItem[] {
   const selected = areas(row.areas);
   const counts = row.counts as ManagedCounts;
   const items: Stripe.Checkout.SessionCreateParams.LineItem[] = [];
   const monthly = (name: string, amount: number, quantity: number) => {
     if (quantity > 0) items.push({ price_data: { currency: "usd", unit_amount: amount * 100,
-      recurring: { interval: "month" }, product_data: { name } }, quantity });
+      recurring: { interval: "month" }, product_data: { name, metadata: { serviceKind: "managed" } } }, quantity });
   };
   const once = (name: string, amount: number, quantity: number) => {
     if (quantity > 0) items.push({ price_data: { currency: "usd", unit_amount: amount * 100,
-      product_data: { name } }, quantity });
+      product_data: { name, metadata: { serviceKind: "managed" } } }, quantity });
   };
   if (selected.company) monthly("Managed Company compliance", renewal
     ? MANAGED_PRICING.companyRenewalMonthly : MANAGED_PRICING.companyFirstYearMonthly, 1);
@@ -75,10 +77,21 @@ function safeQuote(snapshot: FirebaseFirestore.DocumentSnapshot) {
     quoteId: row.quoteId ?? null, status: row.status ?? null,
     areas: areas(row.areas), counts: row.counts ?? null, price: row.price ?? null,
     appDriverIncrease: Number.isSafeInteger(row.appDriverIncrease) ? row.appDriverIncrease : null,
+    signupQuote: row.signupQuote === true,
+    appMonthly: Number.isSafeInteger(row.appMonthly) ? row.appMonthly : null,
     scope: row.scope ?? "", requestRevision: row.requestRevision ?? null,
     expiresAtMillis: row.expiresAt?.toMillis?.() ?? null,
     acceptedAtMillis: row.acceptedAt?.toMillis?.() ?? null,
   };
+}
+
+export function blocksAppOnlyCheckoutForManagedSignup(
+  quote: { signupQuote?: unknown; status?: unknown; requestRevision?: unknown },
+  request: { status?: unknown; revision?: unknown },
+): boolean {
+  const pending = ["quoted", "accepted", "paid_awaiting_start", "active"];
+  return quote.signupQuote === true && pending.includes(String(quote.status)) &&
+    pending.includes(String(request.status)) && quote.requestRevision === request.revision;
 }
 export const getManagedServiceQuote = onCall({ region: "us-central1" }, async request => {
   if (!request.auth?.uid) throw new HttpsError("unauthenticated", "Sign in to continue.");
@@ -92,9 +105,82 @@ export const getManagedServiceQuote = onCall({ region: "us-central1" }, async re
     && ["quoted", "accepted", "paid_awaiting_start", "active"].includes(String(serviceRequest.data()?.status))
     ? result : null };
 });
+
+/** An exact standard quote before the first app checkout. No subscription is created here. */
+export const prepareManagedSignupQuote = onCall({ region: "us-central1" }, async request => {
+  const id = request.auth?.uid;
+  if (!id) throw new HttpsError("unauthenticated", "Sign in to continue.");
+  await requireManagedSupportAvailable(id);
+  const selected = areas(request.data?.areas);
+  if (!selected.company && !selected.drivers && !selected.fleet)
+    throw new HttpsError("invalid-argument", "Choose at least one area for managed support.");
+  const contact = managedContact(request.data ?? {});
+  let intake;
+  try { intake = managedIntake(request.data?.intake, selected); }
+  catch (error) { throw new HttpsError("invalid-argument", error instanceof Error ? error.message : "Check the listed units."); }
+  const dqFiles = request.data?.dqFiles ?? 0;
+  if (!Number.isSafeInteger(dqFiles) || dqFiles < 0 || dqFiles > intake.drivers.length)
+    throw new HttpsError("invalid-argument", "Choose a DQ-file count no greater than the listed driver count.");
+  const db = admin.firestore();
+  const carrierRef = db.collection("carriers").doc(id);
+  const requestRef = db.collection("managedServiceRequests").doc(id);
+  const quoteRef = db.collection("managedServiceQuotes").doc(id);
+  const [carrier, currentRequest, oldQuote, drivers, vehicles] = await Promise.all([
+    carrierRef.get(), requestRef.get(), quoteRef.get(), carrierRef.collection("drivers").get(), carrierRef.collection("vehicles").get(),
+  ]);
+  const companyName = String(carrier.data()?.companyName || "").trim();
+  if (!carrier.exists || carrier.data()?.deletingAccount === true || !companyName ||
+      carrier.data()?.onboardingComplete !== true || carrier.data()?.businessUseConfirmed !== true)
+    throw new HttpsError("failed-precondition", "Complete company setup before choosing managed support.");
+  if (["active", "trialing"].includes(String(carrier.data()?.billing?.status)))
+    throw new HttpsError("failed-precondition", "This signup quote is only for a new app subscription.");
+  if (["accepted", "paid_awaiting_start", "active"].includes(String(oldQuote.data()?.status)))
+    throw new HttpsError("failed-precondition", "A managed quote is already in progress.");
+  let roster;
+  try { roster = managedRoster(id, selected, intake,
+    drivers.docs.map(row => ({ id: row.id, data: row.data() })),
+    vehicles.docs.map(row => ({ id: row.id, data: row.data() }))); }
+  catch (error) { throw new HttpsError("failed-precondition", error instanceof Error ? error.message : "Review the unit list."); }
+  const counts: ManagedCounts = { drivers: roster.drivers, trucks: roster.trucks,
+    trailers: roster.trailers, dqFiles };
+  let price;
+  try { price = calculateManagedPrice(selected, counts); }
+  catch { throw new HttpsError("invalid-argument", "The unit counts do not match the selected areas."); }
+  if (price.firstYearMonthly === 0)
+    throw new HttpsError("failed-precondition", "List at least one active driver or vehicle for Driver-only or Fleet-only support.");
+  const quoteId = randomUUID();
+  const revision = Number(currentRequest.data()?.revision || 0) + 1;
+  const expiresAt = admin.firestore.Timestamp.fromMillis(Date.now() + 14 * 86400000);
+  const scope = `Managed ${[selected.company && "Company", selected.drivers && "Driver", selected.fleet && "Fleet"]
+    .filter(Boolean).join(", ")} deadlines for the active units listed in this quote. We prepare instructions, follow up, and update tracking; you complete filings and pay third-party fees.`;
+  const appMonthly = 2 + drivers.docs.filter(row => row.data().status !== "inactive").length + roster.newDrivers.length;
+  await db.runTransaction(async tx => {
+    const [latestCarrier, latestQuote, latestRequest] = await Promise.all([
+      tx.get(carrierRef), tx.get(quoteRef), tx.get(requestRef),
+    ]);
+    if (!latestCarrier.exists || latestCarrier.data()?.deletingAccount === true ||
+        ["active", "trialing"].includes(String(latestCarrier.data()?.billing?.status)) ||
+        latestRequest.data()?.revision !== currentRequest.data()?.revision ||
+        ["accepted", "paid_awaiting_start", "active"].includes(String(latestQuote.data()?.status)))
+      throw new HttpsError("aborted", "The account changed. Refresh and review before quoting.");
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    tx.set(requestRef, { carrierId: id, companyName, accountEmail: String(request.auth?.token.email || ""),
+      ...contact, intake, textConsentAt: contact.textPermission ? now : null,
+      areas: selected, status: "quoted", revision, submittedAt: now, updatedAt: now,
+      signupQuote: true }, { merge: true });
+    tx.set(quoteRef, { quoteId, carrierId: id, companyName, areas: selected, counts,
+      units: { driverIds: roster.driverIds, vehicleIds: roster.vehicleIds },
+      appDriverIncrease: roster.newDrivers.length, appMonthly, price, scope, status: "quoted", signupQuote: true,
+      requestRevision: revision, expiresAt, createdAt: now, createdBy: id });
+    tx.create(quoteRef.collection("events").doc(), { type: "signup_quoted", quoteId, actor: id, createdAt: now });
+  });
+  return { quoteId, price, counts, appMonthly,
+    expiresAtMillis: expiresAt.toMillis() };
+});
 export const prepareManagedServiceQuote = onCall({ region: "us-central1" }, async request => {
   requireOwner(request.auth);
   const id = carrierId(request.data?.carrierId);
+  await requireManagedSupportAvailable(id);
   const scope = typeof request.data?.scope === "string" ? request.data.scope.trim() : "";
   if (scope.length < 20 || scope.length > 1200)
     throw new HttpsError("invalid-argument", "Describe the service scope in 20–1200 characters.");
@@ -148,8 +234,9 @@ export const prepareManagedServiceQuote = onCall({ region: "us-central1" }, asyn
     if (latestRequest.data()?.revision !== currentRequest.data()?.revision ||
       !same(areas(latestRequest.data()?.areas), selected) || latestCoverage.data()?.status === "active")
       throw new HttpsError("aborted", "The request changed. Refresh before preparing a quote.");
-    if (["paid_awaiting_start", "active"].includes(String(oldQuote.data()?.status)) ||
-        (oldQuote.data()?.status === "accepted" && oldQuote.data()?.expiresAt?.toMillis?.() > Date.now()))
+    if (oldQuote.data()?.requestRevision === latestRequest.data()?.revision &&
+        (["paid_awaiting_start", "active"].includes(String(oldQuote.data()?.status)) ||
+        (oldQuote.data()?.status === "accepted" && oldQuote.data()?.expiresAt?.toMillis?.() > Date.now())))
       throw new HttpsError("failed-precondition", "An accepted or paid quote cannot be replaced.");
     tx.set(quoteRef, { quoteId, carrierId: id, companyName: carrier.data()?.companyName ?? "Company",
       areas: selected, counts, units, appDriverIncrease: roster.newDrivers.length,
@@ -174,6 +261,7 @@ export const prepareManagedServiceQuote = onCall({ region: "us-central1" }, asyn
 export const acceptManagedServiceQuote = onCall({ region: "us-central1" }, async request => {
   const id = request.auth?.uid;
   if (!id) throw new HttpsError("unauthenticated", "Sign in to continue.");
+  await requireManagedSupportAvailable(id);
   const quoteId = request.data?.quoteId;
   if (typeof quoteId !== "string" || !/^[a-f0-9-]{36}$/i.test(quoteId))
     throw new HttpsError("invalid-argument", "Choose a valid quote.");
@@ -188,6 +276,8 @@ export const acceptManagedServiceQuote = onCall({ region: "us-central1" }, async
       throw new HttpsError("failed-precondition", "This quote is no longer available. Ask us for an updated quote.");
     if (!Number.isSafeInteger(row.appDriverIncrease))
       throw new HttpsError("failed-precondition", "Ask us for an updated quote that shows any app Driver charge change.");
+    if (!quoteUsesCurrentManagedRates(row))
+      throw new HttpsError("failed-precondition", "Managed support pricing changed. Withdraw this quote and request a new one before checkout.");
     if (!row.expiresAt || row.expiresAt.toMillis() <= Date.now())
       throw new HttpsError("failed-precondition", "This quote has expired. Ask us for an updated quote.");
     const now = admin.firestore.FieldValue.serverTimestamp();
@@ -201,6 +291,7 @@ export const acceptManagedServiceQuote = onCall({ region: "us-central1" }, async
 export const createManagedCheckoutSession = onCall({ region: "us-central1", secrets: [stripeSecretKey] }, async request => {
   const id = request.auth?.uid;
   if (!id) throw new HttpsError("unauthenticated", "Sign in to continue.");
+  await requireManagedSupportAvailable(id);
   const quoteId = request.data?.quoteId;
   if (typeof quoteId !== "string" || !/^[a-f0-9-]{36}$/i.test(quoteId))
     throw new HttpsError("invalid-argument", "Choose a valid quote.");
@@ -216,6 +307,8 @@ export const createManagedCheckoutSession = onCall({ region: "us-central1", secr
     throw new HttpsError("failed-precondition", "This quote is no longer ready for checkout.");
   if (!Number.isSafeInteger(row.appDriverIncrease))
     throw new HttpsError("failed-precondition", "Ask us for an updated quote that shows any app Driver charge change.");
+  if (!quoteUsesCurrentManagedRates(row))
+    throw new HttpsError("failed-precondition", "Managed support pricing changed. Withdraw this quote and request a new one before checkout.");
   if (row.expiresAt.toMillis() - Date.now() < 31 * 60 * 1000)
     throw new HttpsError("failed-precondition", "This quote is about to expire. Ask us for a new quote.");
   if (!carrier.exists || carrier.data()?.deletingAccount === true ||
@@ -350,7 +443,7 @@ export async function handleManagedCheckout(db: FirebaseFirestore.Firestore, str
   const [quote, serviceRequest, subscription] = await Promise.all([
     quoteRef.get(), requestRef.get(), stripe.subscriptions.retrieve(subscriptionId),
   ]);
-  if (subscription.metadata.serviceKind !== "managed" || subscription.metadata.quoteId !== quoteId ||
+  if (!["managed", "app_with_managed"].includes(subscription.metadata.serviceKind) || subscription.metadata.quoteId !== quoteId ||
       subscription.metadata.carrierId !== id) throw new Error("Managed subscription metadata mismatch.");
   if (quote.data()?.quoteId !== quoteId || quote.data()?.checkoutSessionId !== session.id ||
       !["accepted", "paid_awaiting_start", "active"].includes(String(quote.data()?.status)))
@@ -360,7 +453,49 @@ export async function handleManagedCheckout(db: FirebaseFirestore.Firestore, str
     throw new Error(`Managed subscription is ${subscription.status}; await payment confirmation.`);
   if (quote.data()?.status === "accepted" && serviceRequest.data()?.revision !== quote.data()?.requestRevision)
     throw new Error("Customer changed scope before payment. Requires owner review.");
+  if (quote.data()?.signupQuote === true) {
+    const carrierRef = db.collection("carriers").doc(id);
+    const [driverRows, vehicleRows] = await Promise.all([
+      carrierRef.collection("drivers").get(), carrierRef.collection("vehicles").get(),
+    ]);
+    const selected = areas(quote.data()?.areas);
+    const roster = managedRoster(id, selected,
+      managedIntake(serviceRequest.data()?.intake, selected),
+      driverRows.docs.map(row => ({ id: row.id, data: row.data() })),
+      vehicleRows.docs.map(row => ({ id: row.id, data: row.data() })));
+    if (JSON.stringify(roster.driverIds) !== JSON.stringify(quote.data()?.units?.driverIds) ||
+        JSON.stringify(roster.vehicleIds) !== JSON.stringify(quote.data()?.units?.vehicleIds) ||
+        roster.drivers !== quote.data()?.counts?.drivers ||
+        roster.trucks !== quote.data()?.counts?.trucks ||
+        roster.trailers !== quote.data()?.counts?.trailers)
+      throw new Error("Paid managed signup roster differs from the accepted quote. Requires owner review.");
+    await db.runTransaction(async tx => {
+      const [latestQuote, latestRequest, ...existingUnits] = await Promise.all([
+        tx.get(quoteRef), tx.get(requestRef),
+        ...roster.newDrivers.map(row => tx.get(carrierRef.collection("drivers").doc(row.id))),
+        ...roster.newVehicles.map(row => tx.get(carrierRef.collection("vehicles").doc(row.id))),
+      ]);
+      if (latestQuote.data()?.quoteId !== quoteId || latestQuote.data()?.checkoutSessionId !== session.id ||
+          latestRequest.data()?.revision !== latestQuote.data()?.requestRevision ||
+          !["accepted", "paid_awaiting_start", "active"].includes(String(latestQuote.data()?.status)))
+        throw new Error("Managed signup changed during payment processing.");
+      if (existingUnits.some(unit => unit.exists))
+        throw new Error("A quoted unit was changed during payment processing. Requires owner review.");
+      for (const row of roster.newDrivers) tx.create(carrierRef.collection("drivers").doc(row.id), {
+        ...row.row, status: "active", source: "managed_signup", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      for (const row of roster.newVehicles) tx.create(carrierRef.collection("vehicles").doc(row.id), {
+        ...row.row, status: "active", source: "managed_signup", createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      if (latestRequest.data()?.intakeUnitsConfirmedRevision !== latestRequest.data()?.revision)
+        tx.update(requestRef, { intakeUnitsConfirmedRevision: latestRequest.data()?.revision,
+          intakeUnitsAdded: { drivers: Number(latestQuote.data()?.appDriverIncrease || 0),
+            vehicles: roster.newVehicles.length }, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    });
+  }
   if (areas(quote.data()?.areas).company) await ensureManagedRenewalSchedule(stripe, subscription, quoteId);
+  const managedAmount = await managedMonthlyAmountCents(stripe, subscription);
   await db.runTransaction(async tx => {
     const [latestQuote, latestRequest] = await Promise.all([tx.get(quoteRef), tx.get(requestRef)]);
     if (latestQuote.data()?.quoteId !== quoteId || latestQuote.data()?.checkoutSessionId !== session.id)
@@ -381,7 +516,7 @@ export async function handleManagedCheckout(db: FirebaseFirestore.Firestore, str
     }
     tx.set(db.collection("managedServiceBilling").doc(id), {
       quoteId, stripeSubscriptionId: subscription.id, stripeCustomerId: typeof session.customer === "string" ? session.customer : session.customer?.id,
-      status: subscription.status, monthlyAmountCents: managedMonthlyAmountCents(subscription),
+      status: subscription.status, monthlyAmountCents: managedAmount,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     }, { merge: true });
   });
@@ -412,12 +547,12 @@ async function ensureManagedRenewalSchedule(stripe: Stripe, subscription: Stripe
   await stripe.subscriptionSchedules.update(schedule.id, { end_behavior: "release", phases: [
     { start_date: schedule.phases[0].start_date, duration: { interval: "month", interval_count: 12 }, items: currentItems },
     { duration: { interval: "month", interval_count: 1 }, items: nextItems,
-      metadata: { serviceKind: "managed", quoteId } },
+      metadata: { ...subscription.metadata, serviceKind: subscription.metadata.serviceKind, quoteId } },
   ] }, { idempotencyKey: `managed_schedule_phases_${quoteId}` });
 }
 
-export async function syncManagedSubscription(db: FirebaseFirestore.Firestore, subscription: Stripe.Subscription): Promise<void> {
-  if (subscription.metadata.serviceKind !== "managed") return;
+export async function syncManagedSubscription(db: FirebaseFirestore.Firestore, stripe: Stripe, subscription: Stripe.Subscription): Promise<void> {
+  if (!["managed", "app_with_managed"].includes(subscription.metadata.serviceKind)) return;
   const id = subscription.metadata.carrierId;
   if (!id || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) throw new Error("Managed subscription lacks company ID.");
   const carrier = await db.collection("carriers").doc(id).get();
@@ -425,27 +560,85 @@ export async function syncManagedSubscription(db: FirebaseFirestore.Firestore, s
   const ref = db.collection("managedServiceBilling").doc(id);
   const existing = await ref.get();
   if (existing.exists && existing.data()?.stripeSubscriptionId !== subscription.id) return;
-  const scheduledEnd = subscription.cancel_at_period_end ? managedPeriodEnd(subscription) : subscription.cancel_at;
+  const monthlyAmountCents = await managedMonthlyAmountCents(stripe, subscription);
+  let scheduledEnd = subscription.cancel_at_period_end ? managedPeriodEnd(subscription) : subscription.cancel_at;
+  if (subscription.metadata.serviceKind === "app_with_managed" && subscription.schedule) {
+    const scheduleId = typeof subscription.schedule === "string" ? subscription.schedule : subscription.schedule.id;
+    const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+    const appPrices = new Set([subscription.metadata.appCompanyPriceId, subscription.metadata.appDriverPriceId]);
+    const appOnlyPhase = schedule.phases.find(phase => phase.start_date > Math.floor(Date.now() / 1000) &&
+      phase.items.length > 0 && phase.items.every(item => appPrices.has(
+        typeof item.price === "string" ? item.price : item.price.id)));
+    if (appOnlyPhase) scheduledEnd = appOnlyPhase.start_date;
+  }
+  const managedStatus = monthlyAmountCents === 0 && subscription.metadata.serviceKind === "app_with_managed"
+    ? "ended" : subscription.status;
   await ref.set({ quoteId: subscription.metadata.quoteId, stripeSubscriptionId: subscription.id,
-    status: subscription.status, monthlyAmountCents: managedMonthlyAmountCents(subscription),
-    cancelAtPeriodEnd: Boolean(scheduledEnd),
+    status: managedStatus, monthlyAmountCents,
+    cancelAtPeriodEnd: Boolean(scheduledEnd && monthlyAmountCents > 0),
     cancelAt: scheduledEnd ? admin.firestore.Timestamp.fromMillis(scheduledEnd * 1000) : null,
     updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true });
-  if (["canceled", "unpaid", "incomplete_expired"].includes(subscription.status)) {
+  if (["canceled", "unpaid", "incomplete_expired", "ended"].includes(managedStatus)) {
     const coverageRef = db.collection("managedServiceCoverage").doc(id);
     const coverage = await coverageRef.get();
     if (coverage.data()?.status === "active") await coverageRef.update({ status: "paused",
       pauseReason: "Managed subscription is no longer payable", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
     const requestRef = db.collection("managedServiceRequests").doc(id);
     const serviceRequest = await requestRef.get();
-    if (serviceRequest.data()?.status === "end_scheduled" || serviceRequest.data()?.endScheduledAt) await requestRef.update({ status: "ended",
-      updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    if (serviceRequest.data()?.status === "end_scheduled" || serviceRequest.data()?.endScheduledAt ||
+        (["paid_awaiting_start", "active"].includes(String(serviceRequest.data()?.status)) &&
+          serviceRequest.data()?.signupQuote === true))
+      await requestRef.update({ status: "ended", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+    const quoteRef = db.collection("managedServiceQuotes").doc(id);
+    const quote = await quoteRef.get();
+    if (quote.data()?.stripeSubscriptionId === subscription.id &&
+        ["paid_awaiting_start", "active"].includes(String(quote.data()?.status)))
+      await quoteRef.update({ status: "ended", updatedAt: admin.firestore.FieldValue.serverTimestamp() });
   }
 }
 
-function managedMonthlyAmountCents(subscription: Stripe.Subscription): number {
-  return subscription.items.data.reduce((total, item) =>
+export async function scheduleCombinedManagedEnd(stripe: Stripe, current: Stripe.Subscription): Promise<number> {
+  const appPrices = new Set([current.metadata.appCompanyPriceId, current.metadata.appDriverPriceId]);
+  const appItems = current.items.data.filter(item => appPrices.has(item.price.id));
+  if (!current.metadata.appCompanyPriceId || !appItems.some(item => item.price.id === current.metadata.appCompanyPriceId))
+    throw new HttpsError("failed-precondition", "The app billing item is missing. Contact support before ending managed support.");
+  const periodEnd = managedPeriodEnd(current);
+  let schedule: Stripe.SubscriptionSchedule;
+  if (current.schedule) {
+    const scheduleId = typeof current.schedule === "string" ? current.schedule : current.schedule.id;
+    schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+  } else {
+    schedule = await stripe.subscriptionSchedules.create({ from_subscription: current.id },
+      { idempotencyKey: `combined_end_schedule_${current.id}` });
+  }
+  if (schedule.status !== "active" || !schedule.current_phase)
+    throw new HttpsError("failed-precondition", "The subscription schedule is unavailable. Contact support.");
+  const alreadyScheduled = schedule.phases.find(phase => phase.start_date === periodEnd &&
+    phase.items.length > 0 && phase.items.every(item => appPrices.has(
+      typeof item.price === "string" ? item.price : item.price.id)));
+  if (alreadyScheduled) return periodEnd;
+  await stripe.subscriptionSchedules.update(schedule.id, { end_behavior: "release", proration_behavior: "none",
+    phases: [
+      { start_date: schedule.current_phase.start_date, end_date: periodEnd,
+        items: current.items.data.map(item => ({ price: item.price.id, quantity: item.quantity ?? 1 })) },
+      { start_date: periodEnd, duration: { interval: "month", interval_count: 1 },
+        items: appItems.map(item => ({ price: item.price.id, quantity: item.quantity ?? 1 })) },
+    ],
+  }, { idempotencyKey: `combined_managed_end_${current.id}_${periodEnd}` });
+  return periodEnd;
+}
+
+async function managedMonthlyAmountCents(stripe: Stripe, subscription: Stripe.Subscription): Promise<number> {
+  if (subscription.metadata.serviceKind === "managed") return subscription.items.data.reduce((total, item) =>
     total + (item.price.unit_amount ?? 0) * (item.quantity ?? 1), 0);
+  let total = 0;
+  for (const item of subscription.items.data) {
+    const product = typeof item.price.product === "string"
+      ? await stripe.products.retrieve(item.price.product) : item.price.product;
+    if (!product.deleted && (product.metadata.serviceKind === "managed" || product.name.startsWith("Managed ")))
+      total += (item.price.unit_amount ?? 0) * (item.quantity ?? 1);
+  }
+  return total;
 }
 
 function managedPeriodEnd(subscription: Stripe.Subscription): number {
@@ -489,9 +682,9 @@ export const endMyManagedSupport = onCall({ region: "us-central1", secrets: [str
   const id = request.auth?.uid;
   if (!id) throw new HttpsError("unauthenticated", "Sign in to continue.");
   const db = admin.firestore();
-  const [carrier, billing, coverage, serviceRequest] = await Promise.all([
+  const [carrier, billing, serviceRequest] = await Promise.all([
     db.collection("carriers").doc(id).get(), db.collection("managedServiceBilling").doc(id).get(),
-    db.collection("managedServiceCoverage").doc(id).get(), db.collection("managedServiceRequests").doc(id).get(),
+    db.collection("managedServiceRequests").doc(id).get(),
   ]);
   if (!carrier.exists || carrier.data()?.deletingAccount === true)
     throw new HttpsError("failed-precondition", "Your company account is unavailable.");
@@ -500,21 +693,23 @@ export const endMyManagedSupport = onCall({ region: "us-central1", secrets: [str
     throw new HttpsError("failed-precondition", "There is no managed subscription to end.");
   const stripe = new Stripe(stripeSecretKey.value());
   const current = await stripe.subscriptions.retrieve(subscriptionId);
-  if (current.metadata.serviceKind !== "managed" || current.metadata.carrierId !== id ||
+  if (!["managed", "app_with_managed"].includes(current.metadata.serviceKind) || current.metadata.carrierId !== id ||
       (billing.data()?.quoteId && current.metadata.quoteId !== billing.data()?.quoteId))
     throw new HttpsError("failed-precondition", "Managed billing does not match this company.");
   if (!(["active", "trialing", "past_due"].includes(current.status)))
     throw new HttpsError("failed-precondition", "This managed subscription is not currently active.");
-  const { subscription: updated, cancelAt } = await scheduleManagedCancellation(stripe, current);
+  const combined = current.metadata.serviceKind === "app_with_managed";
+  const cancelAt = combined ? await scheduleCombinedManagedEnd(stripe, current)
+    : (await scheduleManagedCancellation(stripe, current)).cancelAt;
   const periodEndMillis = cancelAt * 1000;
-  await syncManagedSubscription(db, updated);
+  await syncManagedSubscription(db, stripe, await stripe.subscriptions.retrieve(current.id));
   const requestRef = db.collection("managedServiceRequests").doc(id);
   const mailRef = db.collection("mail").doc(`managed_customer_end_${subscriptionId}`);
   await db.runTransaction(async tx => {
     const mail = await tx.get(mailRef);
     const now = admin.firestore.FieldValue.serverTimestamp();
     tx.set(requestRef, { endScheduledAt: admin.firestore.Timestamp.fromMillis(periodEndMillis),
-      ...(coverage.data()?.status === "active" ? { status: "end_scheduled" } : {}), updatedAt: now }, { merge: true });
+      endAllServices: false, status: "end_scheduled", updatedAt: now }, { merge: true });
     if (mail.exists) return;
     tx.create(requestRef.collection("events").doc(), { type: "end_scheduled_by_customer", actor: id,
       cancelAt: admin.firestore.Timestamp.fromMillis(periodEndMillis), createdAt: now });
@@ -542,9 +737,11 @@ export const scheduleManagedServiceEnd = onCall({ region: "us-central1", secrets
   if (typeof subscriptionId !== "string") throw new HttpsError("failed-precondition", "No managed subscription exists.");
   const stripe = new Stripe(stripeSecretKey.value());
   const current = await stripe.subscriptions.retrieve(subscriptionId);
-  if (current.metadata.serviceKind !== "managed" || current.metadata.carrierId !== id)
+  if (!["managed", "app_with_managed"].includes(current.metadata.serviceKind) || current.metadata.carrierId !== id)
     throw new HttpsError("failed-precondition", "Managed subscription does not match this customer.");
-  const { subscription: updated } = await scheduleManagedCancellation(stripe, current);
+  const cancelAt = current.metadata.serviceKind === "app_with_managed"
+    ? await scheduleCombinedManagedEnd(stripe, current)
+    : (await scheduleManagedCancellation(stripe, current)).cancelAt;
   await db.runTransaction(async tx => {
     const latest = await tx.get(serviceRequest.ref);
     if (latest.data()?.status === "end_requested" && latest.data()?.revision === serviceRequest.data()?.revision) {
@@ -553,6 +750,6 @@ export const scheduleManagedServiceEnd = onCall({ region: "us-central1", secrets
         actor: request.auth!.uid, createdAt: admin.firestore.FieldValue.serverTimestamp() });
     }
   });
-  await syncManagedSubscription(db, updated);
-  return { status: "end_scheduled", cancelAtMillis: updated.cancel_at ? updated.cancel_at * 1000 : null };
+  await syncManagedSubscription(db, stripe, await stripe.subscriptions.retrieve(current.id));
+  return { status: "end_scheduled", cancelAtMillis: cancelAt * 1000 };
 });

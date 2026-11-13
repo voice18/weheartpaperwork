@@ -6,91 +6,23 @@
 
 import type { ComplianceRecord, RequirementId } from "./types";
 import type { CustomRequirementIntervalUnit } from "./types";
+import { complianceAddDays, complianceAddYears, complianceDaysFrom, complianceToday, complianceUsdotDue, complianceNextIftaQuarterDue, complianceFollowingIftaQuarterDue, complianceIftaQuarterEnd, complianceFixedCalendarDue } from "../functions/src/sharedComplianceDates";
 
 
 
 export const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 export const MONTH_MAP: Record<string, number> = {"1":0,"2":1,"3":2,"4":3,"5":4,"6":5,"7":6,"8":7,"9":8,"0":9};
 
-export function localDateString(date = new Date()): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-}
-export const daysFrom = (s: string | null, today = new Date()): number | null => {
-  if (!s) return null;
-
-  const [year, month, day] = s.split("-").map(Number);
-  if (!year || !month || !day) return null;
-  const dueUtc = Date.UTC(year, month - 1, day);
-  const dueCheck = new Date(dueUtc);
-  if (
-    dueCheck.getUTCFullYear() !== year ||
-    dueCheck.getUTCMonth() !== month - 1 ||
-    dueCheck.getUTCDate() !== day
-  ) return null;
-  const todayUtc = Date.UTC(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate()
-  );
-
-  // Compare calendar dates rather than local-midnight timestamps. This keeps
-  // the dashboard stable across 23-hour and 25-hour daylight-saving days and
-  // matches the UTC calendar arithmetic used by the notification service.
-  return Math.round((dueUtc - todayUtc) / 86400000);
-};
+export function localDateString(date = new Date()): string { return complianceToday(date); }
+export const daysFrom = (s: string | null, today = new Date()): number | null =>
+  complianceDaysFrom(s, complianceToday(today));
 
 export const fmtDate = (s: string | null): string =>
   s ? new Date(s + "T00:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }) : "—";
 
-export const addYears = (
-  s: string,
-  y: number
-): string => {
-  const match =
-    /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+export const addYears = complianceAddYears;
 
-  if (!match) {
-    return "";
-  }
-
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-
-  const targetYear = year + y;
-
-  const lastDayOfTargetMonth =
-    new Date(
-      targetYear,
-      month,
-      0
-    ).getDate();
-
-  const targetDay = Math.min(
-    day,
-    lastDayOfTargetMonth
-  );
-
-  return (
-    `${targetYear}-` +
-    `${String(month).padStart(2, "0")}-` +
-    `${String(targetDay).padStart(2, "0")}`
-  );
-};
-
-export const addDays = (s: string, n: number): string => {
-  const d = new Date(s + "T00:00:00");
-
-  if (Number.isNaN(d.getTime())) return "";
-
-  d.setDate(d.getDate() + n);
-
-  return localDateString(d);
-};
+export const addDays = complianceAddDays;
 
 export function addInterval(
   dateString: string,
@@ -154,50 +86,21 @@ export const eoy = (): string => {
 };
 
 export function nextIftaQuarterDue(referenceDate = localDateString()): string {
-  const [year] = referenceDate.split("-").map(Number);
-  const candidates = [
-    `${year}-04-30`,
-    `${year}-07-31`,
-    `${year}-10-31`,
-    `${year + 1}-01-31`,
-  ];
-
-  return candidates.find(date => date >= referenceDate) || `${year + 1}-04-30`;
+  return complianceNextIftaQuarterDue(referenceDate);
 }
 
 export function followingIftaQuarterDue(currentDueDate: string): string {
-  const [year, month] = currentDueDate.split("-").map(Number);
-
-  if (month === 1) return `${year}-04-30`;
-  if (month === 4) return `${year}-07-31`;
-  if (month === 7) return `${year}-10-31`;
-  return `${year + 1}-01-31`;
+  return complianceFollowingIftaQuarterDue(currentDueDate) || "";
 }
 
 export function iftaQuarterEndFromDueDate(dueDate: string): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dueDate);
-  if (!match) return null;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-
-  if (month === 4) return `${year}-03-31`;
-  if (month === 7) return `${year}-06-30`;
-  if (month === 10) return `${year}-09-30`;
-  if (month === 1) return `${year - 1}-12-31`;
-  return null;
+  return complianceIftaQuarterEnd(dueDate);
 }
+export { complianceFixedCalendarDue };
 
 // ── USDOT due date calculator ─────────────────────────────────────────────────
 export function calcUsdotDue(usdot: string): string | null {
-  const raw = usdot.replace(/\D/g, "");
-  if (raw.length < 2) return null;
-  const pen = raw[raw.length - 2], last = raw[raw.length - 1];
-  const isOdd = parseInt(pen) % 2 !== 0;
-  const mo = MONTH_MAP[last] ?? 0;
-  const yr = new Date().getFullYear();
-  const ty = isOdd ? (yr % 2 !== 0 ? yr : yr + 1) : (yr % 2 === 0 ? yr : yr + 1);
-  const ld = new Date(ty, mo + 1, 0).getDate();
-  return `${ty}-${String(mo+1).padStart(2,"0")}-${String(ld).padStart(2,"0")}`;
+  return complianceUsdotDue(usdot);
 }
 export type RequirementDateMode =
   | "fixed-calendar"
@@ -242,30 +145,24 @@ export function calculateNextDue(reqId: string, enteredDate: string): string | n
   if (Number.isNaN(d.getTime())) return null;
 
   if (reqId === "tax2290") {
-  const today = new Date();
-  const year = today.getFullYear();
-  
-  const thisYearDue = new Date(`${year}-08-31T00:00:00`);
-  const dueYear = today > thisYearDue ? year + 1 : year;
+  const current = complianceToday();
+  const year = Number(current.slice(0, 4));
+  const dueYear = current > `${year}-08-31` ? year + 1 : year;
   return `${dueYear}-08-31`;
 }
 
 if (reqId === "ucr") {
-  const today = new Date();
-  const year = today.getFullYear();
-  const thisYearDue = new Date(`${year}-12-31T00:00:00`);
-
-  const dueYear = today > thisYearDue ? year + 1 : year;
+  const current = complianceToday();
+  const year = Number(current.slice(0, 4));
+  const dueYear = current > `${year}-12-31` ? year + 1 : year;
 
   return `${dueYear}-12-31`;
 }
 
 if (reqId === "ifta") {
-  const today = new Date();
-  const year = today.getFullYear();
-  const thisYearDue = new Date(`${year}-12-31T00:00:00`);
-
-  const dueYear = today > thisYearDue ? year + 1 : year;
+  const current = complianceToday();
+  const year = Number(current.slice(0, 4));
+  const dueYear = current > `${year}-12-31` ? year + 1 : year;
 
   return `${dueYear}-12-31`;
 }
@@ -276,8 +173,7 @@ if (reqId === "ifta-quarterly") {
 
 
   if (reqId === "fmcsa-portal") {
-    d.setDate(d.getDate() + 90);
-    return d.toISOString().split("T")[0];
+    return addDays(enteredDate, 90);
   }
 
   return enteredDate;
@@ -288,7 +184,7 @@ export function buildReqs(
 ): Requirement[] {
   const c  = compliance;
   const ud = calcUsdotDue(usdotNumber);
-  const currentYear = new Date().getFullYear();
+  const currentYear = Number(complianceToday().slice(0, 4));
   const tax2290DefaultDue = `${currentYear}-08-31`;
   const yearEndDefaultDue = `${currentYear}-12-31`;
   const iftaQuarterlyDefaultDue = nextIftaQuarterDue();

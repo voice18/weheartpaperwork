@@ -4,6 +4,7 @@ import { OWNER_EMAIL } from "./ownerNotifications";
 import { contactChanged, managedContact } from "./managedContact";
 import { managedIntake } from "./managedIntake";
 import { managedRoster } from "./managedRoster";
+import { requireManagedSupportAvailable } from "./managedRollout";
 
 type Areas = { company: boolean; drivers: boolean; fleet: boolean };
 const PENDING = new Set(["requested", "change_requested", "end_requested", "contacted", "quoted", "accepted"]);
@@ -30,6 +31,7 @@ export const submitManagedServiceRequest = onCall({ region: "us-central1" }, asy
   const action = request.data?.action;
   if (action !== "request" && action !== "withdraw" && action !== "contact")
     throw new HttpsError("invalid-argument", "Choose a valid request action.");
+  if (action === "request") await requireManagedSupportAvailable(uid);
   const selected = areas(request.data?.areas);
   const db = admin.firestore();
   const carrierRef = db.collection("carriers").doc(uid);
@@ -112,6 +114,42 @@ export const submitManagedServiceRequest = onCall({ region: "us-central1" }, asy
       ? any(selected) ? "change_requested" : "end_requested"
       : "requested";
     const intakeChanged = JSON.stringify(before.intake || { drivers: [], vehicles: [] }) !== JSON.stringify(intake);
+    if (request.data?.rosterChanged === true && before.status === "quoted" &&
+        quote.data()?.status === "quoted" && quote.data()?.requestRevision === before.revision &&
+        same(selected, previousAreas) && !intakeChanged) {
+      const [driverRows, vehicleRows] = await Promise.all([
+        tx.get(carrierRef.collection("drivers")), tx.get(carrierRef.collection("vehicles")),
+      ]);
+      let roster;
+      try {
+        roster = managedRoster(uid, selected, intake,
+          driverRows.docs.map(row => ({ id: row.id, data: row.data() })),
+          vehicleRows.docs.map(row => ({ id: row.id, data: row.data() })));
+      } catch (error) {
+        throw new HttpsError("failed-precondition", error instanceof Error ? error.message : "Review the dashboard records before requoting.");
+      }
+      const oldUnits = quote.data()?.units ?? {};
+      if (JSON.stringify(roster.driverIds) === JSON.stringify(oldUnits.driverIds) &&
+          JSON.stringify(roster.vehicleIds) === JSON.stringify(oldUnits.vehicleIds) &&
+          roster.drivers === quote.data()?.counts?.drivers &&
+          roster.trucks === quote.data()?.counts?.trucks &&
+          roster.trailers === quote.data()?.counts?.trailers)
+        return { status: "already-pending" };
+      const revision = Number(before.revision || 0) + 1;
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      tx.update(quoteRef, { status: "superseded", supersededAt: now });
+      tx.set(requestRef, { status: "requested", revision, ...contact, updatedAt: now,
+        intakeUnitsConfirmedRevision: null, intakeUnitsAdded: null }, { merge: true });
+      tx.create(requestRef.collection("events").doc(), { type: "roster_update_requested", revision,
+        drivers: roster.drivers, trucks: roster.trucks, trailers: roster.trailers, createdAt: now });
+      tx.create(db.collection("mail").doc(`managed_roster_update_${uid}_${revision}`), {
+        to: [OWNER_EMAIL], category: "managed_service_request", managedServiceCarrierId: uid,
+        message: { subject: `Managed quote needs a new roster: ${String(carrier.data()?.companyName || "Company")}`,
+          text: `The customer changed active dashboard records after the managed quote.\n\nCompany: ${String(carrier.data()?.companyName || "Company")}\nAccount: ${String(request.auth?.token.email || "Unavailable")}\nCurrent active roster: ${roster.drivers} drivers, ${roster.trucks} trucks, ${roster.trailers} trailers.\n\nThe old quote was superseded. Prepare a corrected quote in the owner workspace before the customer accepts or pays.` },
+        createdAt: now,
+      });
+      return { status: "roster-update-requested" };
+    }
     if (PENDING.has(String(before.status)) && same(selected, previousAreas)
       && !contactChanged(before, contact) && !intakeChanged)
       return { status: "already-pending" };
@@ -153,10 +191,14 @@ export const listManagedServiceRequests = onCall({ region: "us-central1" }, asyn
     .where("status", "in", ["requested", "change_requested", "end_requested", "end_scheduled", "contacted", "quoted", "accepted", "paid_awaiting_start"]).get();
   const requests = await Promise.all(snapshot.docs.map(async row => {
     const value = row.data();
-    const [carrier, quote] = await Promise.all([
+    const [carrier, quote, managedBilling] = await Promise.all([
       db.collection("carriers").doc(row.id).get(),
       db.collection("managedServiceQuotes").doc(row.id).get(),
+      db.collection("managedServiceBilling").doc(row.id).get(),
     ]);
+    const managedEndScheduled = Boolean(managedBilling.data()?.cancelAtPeriodEnd || managedBilling.data()?.cancelAt);
+    const effectiveStatus = managedEndScheduled && ["paid_awaiting_start", "end_requested", "end_scheduled"].includes(String(value.status))
+      ? "end_scheduled" : String(value.status || "requested");
     return { carrierId: row.id, companyName: String(value.companyName || "Unnamed company"),
       accountEmail: String(value.accountEmail || ""),
       preferredEmail: String(value.preferredEmail || ""),
@@ -165,13 +207,17 @@ export const listManagedServiceRequests = onCall({ region: "us-central1" }, asyn
       textPermission: typeof value.textPermission === "boolean" ? value.textPermission : null,
       quote: quote.exists && quote.data()?.requestRevision === value.revision
         ? { status: quote.data()?.status ?? null, scope: quote.data()?.scope ?? "",
-          price: quote.data()?.price ?? null, counts: quote.data()?.counts ?? null } : null,
+          price: quote.data()?.price ?? null, counts: quote.data()?.counts ?? null,
+          signupQuote: quote.data()?.signupQuote === true,
+          appMonthly: Number.isSafeInteger(quote.data()?.appMonthly) ? quote.data()?.appMonthly : null } : null,
       billingStatus: value.billingStatus ?? null,
+      managedEndScheduled,
+      appEndScheduled: Boolean(carrier.data()?.billing?.cancelAt || carrier.data()?.billing?.cancelAtPeriodEnd),
       intake: value.intake || { drivers: [], vehicles: [] },
       intakeUnitsConfirmedRevision: Number.isSafeInteger(value.intakeUnitsConfirmedRevision)
         ? value.intakeUnitsConfirmedRevision : null,
       intakeUnitsAdded: value.intakeUnitsAdded || null,
-      revision: Number(value.revision || 0), areas: areas(value.areas), status: String(value.status || "requested"),
+      revision: Number(value.revision || 0), areas: areas(value.areas), status: effectiveStatus,
       updatedAtMillis: value.updatedAt?.toMillis?.() ?? null };
   }));
   requests.sort((a, b) => (b.updatedAtMillis || 0) - (a.updatedAtMillis || 0));

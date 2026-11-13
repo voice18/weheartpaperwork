@@ -25,6 +25,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import DashboardHeader from "../../../components/dashboard/DashboardHeader";
 import IPhoneAppCard from "../../../components/IPhoneAppCard";
 import ManagedCoverageNotice, { ManagedCoverage } from "../../../components/dashboard/ManagedCoverageNotice";
+import { useManagedSupportAvailability } from "../../../lib/useManagedSupportAvailability";
 import SignalCards from "../../../components/dashboard/SignalCards";
 import RequirementRow from "../../../components/dashboard/RequirementRow";
 import CompanyRequirements from "../../../components/dashboard/CompanyRequirements";
@@ -45,6 +46,7 @@ import { auth, db } from "../../../lib/firebase";
 
 
 export default function DashboardScreen() {
+  const managedAvailable = useManagedSupportAvailability();
   const insets = useSafeAreaInsets();
   const [, setCalendarDay] = useState(() => new Date().toDateString());
 
@@ -260,7 +262,7 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
             {row.type === "date_updated" && row.nextDueDate ? " · Next due " + row.nextDueDate : ""}
           </Text>)}
         </View>}
-      {Platform.OS === "web" && tab === "overview" && <TouchableOpacity
+      {Platform.OS === "web" && tab === "overview" && (managedAvailable === true || managedCoverage?.status === "active") && <TouchableOpacity
         onPress={() => router.push("/(app)/managed-tracking" as any)}
         style={{ backgroundColor: "#F2F7EB", borderColor: "#B8CBA7", borderWidth: 1,
           borderRadius: 12, padding: 15, marginBottom: 16 }}>
@@ -558,7 +560,8 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
       unmanagedCount={managedCoverage?.managedUnitIds?.driverIds
         ? drivers.filter(driver => driver.status !== "inactive" &&
           !managedCoverage.managedUnitIds!.driverIds!.includes(driver.id)).length : 0} />
-    <DriversPanel />
+    <DriversPanel managedUnitIds={managedCoverage?.status === "active"
+      ? managedCoverage.managedUnitIds?.driverIds : []} />
   </>
 ) : (
   <>
@@ -566,7 +569,8 @@ const allTrackedReqs = [...allReqs, ...vehicleReqs];
       unmanagedCount={managedCoverage?.managedUnitIds?.vehicleIds
         ? vehicles.filter(vehicle => vehicle.status !== "inactive" &&
           !managedCoverage.managedUnitIds!.vehicleIds!.includes(vehicle.id)).length : 0} />
-    <FleetPanel />
+    <FleetPanel managedUnitIds={managedCoverage?.status === "active"
+      ? managedCoverage.managedUnitIds?.vehicleIds : []} />
   </>
 )}
  </KeyboardAwareScrollView>

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   StyleSheet,
   Text,
   View,
@@ -24,6 +25,7 @@ import {
   CarrierBilling,
   hasBillingAccess,
 } from "../../lib/billing";
+import { rememberOwnerReturn } from "../../lib/ownerReturn";
 
 export default function AppLayout() {
   const pathname = usePathname();
@@ -56,6 +58,14 @@ export default function AppLayout() {
 
       setIsAuthenticated(true);
       setBillingLoaded(false);
+
+      // Owner authorization is enforced by the workspace using ownerAdmin.
+      // Do not require a customer subscription merely to reach that check.
+      if (Platform.OS === "web" && window.location.pathname === "/owner-managed") {
+        setBilling(null);
+        setBillingLoaded(true);
+        return;
+      }
 
       const carrierRef = doc(
         db,
@@ -117,9 +127,14 @@ export default function AppLayout() {
   }
 
   if (!isAuthenticated) {
-    router.replace("/(auth)/login");
+    if (Platform.OS === "web" && pathname === "/owner-managed") rememberOwnerReturn();
+    router.replace(pathname === "/owner-managed"
+      ? { pathname: "/(auth)/login", params: { returnTo: "/owner-managed" } }
+      : "/(auth)/login");
     return;
   }
+
+  if (Platform.OS === "web" && pathname === "/owner-managed") return;
 
   const hasAccess =
     hasBillingAccess(billing);
@@ -128,11 +143,15 @@ const isSubscriptionPage =
   pathname.endsWith(
     "/subscription-required"
   );
+const isFirstSignup = Platform.OS === "web" && !billing?.status &&
+  billing?.hasUsedTrial !== true && !billing?.trialEndsAt;
+const isSignupPage = isFirstSignup &&
+  (pathname.endsWith("/service-choice") || pathname.endsWith("/managed-tracking") || isSubscriptionPage);
 
 if (!hasAccess) {
-  if (!isSubscriptionPage) {
+  if (!isSubscriptionPage && !isSignupPage) {
     router.replace(
-      "/(app)/subscription-required"
+      isFirstSignup ? "/(app)/service-choice" : "/(app)/subscription-required"
     );
   }
 

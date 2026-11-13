@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { httpsCallable } from "firebase/functions";
-import { getIdTokenResult } from "firebase/auth";
+import { getIdTokenResult, onAuthStateChanged, signOut } from "firebase/auth";
 import { useRouter } from "expo-router";
 import Head from "expo-router/head";
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { auth, db, functions } from "../../lib/firebase";
 import { MANAGED_PRICING } from "../../lib/managedPricing";
+import { formatDateInput, inputToIso, isoToInput } from "../../lib/dateUtils";
+import { rememberOwnerReturn } from "../../lib/ownerReturn";
 import { collection, onSnapshot } from "firebase/firestore";
 
 type Areas = { company: boolean; drivers: boolean; fleet: boolean };
@@ -20,20 +22,23 @@ type Summary = { carrierId: string; companyName: string; billingStatus: string |
   counts: Counts; itemCount: number; pendingCustomCount: number; highlights: Highlights };
 type Item = { key: string; area: string; label: string; dueDate: string | null; days: number | null;
   issue: string | null; status: string; note: string | null;
-  sourceVersion: string | null; sourceInputDate: string | null };
+  sourceVersion: string | null; sourceInputDate: string | null; dqChecks?: Record<string, boolean | string> };
+type CompletionHistory = { itemKey: string; records: { id: string; completionDate: string | null;
+  previousDueDate: string | null; nextDueDate: string | null; completedAtMillis: number }[] };
 type Detail = Omit<Summary, "itemCount" | "pendingCustomCount"> & {
   stagingDemo?: boolean;
   coverage: Summary["coverage"] & { consentReference?: string };
-  items: Item[]; pendingCustom: { id: string; name: string; reason: string; kind?: "unit";
+  items: Item[]; pendingCustom: { id: string; name: string; reason: string; kind?: "unit" | "removal";
     collectionId?: "drivers" | "vehicles"; unitType?: "driver" | "truck" | "trailer" }[];
   managedStripeSubscriptionId?: string | null;
   managedBillingStatus?: string | null;
   selfManagedUnitCounts?: { drivers: number; vehicles: number };
   history: { id: string; type: string; itemKey: string | null; itemLabel: string | null; note: string | null; createdAtMillis: number | null }[];
+  completionHistory: CompletionHistory[];
 };
 type ServiceRequest = { carrierId: string; companyName: string; accountEmail: string;
   preferredEmail: string; preferredPhone: string; accountPhone: string; textPermission: boolean | null;
-  billingStatus: string | null; areas: Areas; status: string; revision: number; updatedAtMillis: number | null;
+  billingStatus: string | null; appEndScheduled?: boolean; managedEndScheduled?: boolean; areas: Areas; status: string; revision: number; updatedAtMillis: number | null;
   intakeUnitsConfirmedRevision?: number | null;
   intakeUnitsAdded?: { drivers: number; vehicles: number } | null;
   intake?: { drivers: { name: string; cdlNumber: string; cdlClass: string; cdlState: string;
@@ -42,6 +47,7 @@ type ServiceRequest = { carrierId: string; companyName: string; accountEmail: st
       registrationExpiration: string; inspectionExpiration: string }[] };
   quote?: { status: string; scope: string; price: { firstYearMonthly: number;
     renewalMonthly: number; fleetOnlyOnboardingOneTime: number; dqFileOneTime: number };
+    signupQuote?: boolean; appMonthly?: number | null;
     counts: { drivers: number; trucks: number; trailers: number; dqFiles: number } } | null };
 type Candidate = { carrierId: string; companyName: string; billingStatus: string | null; coverage?: {
   status?: string; areas?: Areas; effectiveDate?: string; consentReference?: string } | null;
@@ -53,12 +59,28 @@ const QUEUE_FILTERS: { key: QueueFilter; label: string }[] = [
   { key: "waiting", label: "Waiting" }, { key: "all", label: "All active" },
 ];
 function matchesQueue(item: Item, filter: QueueFilter): boolean {
+  if (item.status === "completed" || item.status === "not_applicable") return filter === "all";
   if (filter === "overdue") return item.days !== null && item.days < 0;
   if (filter === "due30") return item.days !== null && item.days >= 0 && item.days <= 30;
   if (filter === "due90") return item.days !== null && item.days >= 31 && item.days <= 90;
   if (filter === "needsInfo") return item.issue !== null || item.status === "needs_review";
   if (filter === "waiting") return item.status === "waiting_on_customer";
   return true;
+}
+function urgency(item: Item): { label: string; rank: number; color: string } {
+  if (item.status === "not_applicable") return { label: "DOES NOT APPLY", rank: 7, color: "#5F5D57" };
+  if (item.status === "completed") return { label: "COMPLETED", rank: 6, color: "#476E23" };
+  if (item.days !== null && item.days < 0)
+    return { label: "OVERDUE", rank: 0, color: "#9C2F24" };
+  if (item.days !== null && item.days <= 30)
+    return { label: "NEXT 30 DAYS", rank: 1, color: "#A35B10" };
+  if (item.status === "needs_review" || item.issue)
+    return { label: "NEEDS INFORMATION", rank: 2, color: "#A35B10" };
+  if (item.status === "waiting_on_customer")
+    return { label: "WAITING ON CUSTOMER", rank: 3, color: "#5F5D57" };
+  if (item.days !== null && item.days <= 90)
+    return { label: "31–90 DAYS", rank: 4, color: "#476E23" };
+  return { label: "LATER", rank: 5, color: "#476E23" };
 }
 function queueHighlights(items: Item[], pendingCustom: Detail["pendingCustom"]): Highlights {
   const first = (match: (item: Item) => boolean): Highlight | null => {
@@ -149,11 +171,22 @@ function editableDate(item: Item): boolean {
   if (item.key.startsWith("fleet:") || item.key.startsWith("custom:")) return true;
   return ["company:mcs150", "company:irp", "company:insurance", "company:drug", "company:fmcsa-portal"].includes(item.key);
 }
+const OWNER_COMPLETION_IDS = ["tax2290", "ucr", "ifta", "ifta-quarterly", "boc3"];
+const DQ_CHECKS: { field: string; label: string; status?: boolean }[] = [
+  { field: "employmentApplicationOnFile", label: "Employment application" },
+  { field: "initialMvrOnFile", label: "Initial 3-year MVR(s)" },
+  { field: "roadTestOnFile", label: "Road test certificate or equivalent" },
+  { field: "preEmploymentClearinghouseQueryComplete", label: "Pre-employment Clearinghouse query" },
+  { field: "preEmploymentDrugTestComplete", label: "Pre-employment drug test or exception" },
+  { field: "previousEmployerInvestigationComplete", label: "Previous employer investigation" },
+  { field: "speStatus", label: "SPE or medical variance", status: true },
+  { field: "lcvStatus", label: "LCV qualification", status: true },
+];
 function dateInputLabel(item: Item): string {
   if (item.key.endsWith(":mvr")) return "Date of last MVR review";
   if (item.key.endsWith(":clearinghouse")) return "Date of last Clearinghouse query";
   if (item.key === "company:fmcsa-portal") return "Date of last FMCSA Portal update";
-  return "Next due or expiration date (YYYY-MM-DD)";
+  return "Next due or expiration date (MM-DD-YYYY)";
 }
 export default function OwnerManaged() {
   const router = useRouter();
@@ -191,13 +224,26 @@ export default function OwnerManaged() {
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
   const [unitAgreements, setUnitAgreements] = useState<Record<string, string>>({});
   const [itemDates, setItemDates] = useState<Record<string, string>>({});
+  const [completionDates, setCompletionDates] = useState<Record<string, string>>({});
+  const [itemFeedback, setItemFeedback] = useState<Record<string, string>>({});
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [busyItem, setBusyItem] = useState<string | null>(null);
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) { setOwnerAccess("denied"); return; }
-    void getIdTokenResult(user, true).then(token =>
-      setOwnerAccess(token.claims.ownerAdmin === true ? "allowed" : "denied"))
-      .catch(() => setOwnerAccess("error"));
+    let generation = 0;
+    return onAuthStateChanged(auth, user => {
+      const current = ++generation;
+      setOwnerAccess("checking");
+      setRequests([]);
+      setAccounts([]);
+      setCompanies([]);
+      setDetail(null);
+      setCandidate(null);
+      detailId.current = null;
+      if (!user) { setOwnerAccess("denied"); return; }
+      void getIdTokenResult(user, true).then(token => {
+        if (current === generation) setOwnerAccess(token.claims.ownerAdmin === true ? "allowed" : "denied");
+      }).catch(() => { if (current === generation) setOwnerAccess("error"); });
+    });
   }, []);
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -205,7 +251,7 @@ export default function OwnerManaged() {
       const result = await call<{ accounts: Summary[] }>("listManagedServiceAccounts", {});
       setAccounts(result.accounts);
       setMessage("");
-    } catch (error) { setMessage(errorText(error)); }
+    } catch (error) { setAccounts([]); setMessage(errorText(error)); }
     finally { setLoading(false); }
   }, []);
   const loadCompanies = useCallback(async (cursor: string | null = null) => {
@@ -227,6 +273,7 @@ export default function OwnerManaged() {
       const result = await call<{ requests: ServiceRequest[] }>("listManagedServiceRequests", {});
       setRequests(result.requests);
     } catch (error) {
+      setRequests([]);
       setRequestError(errorText(error) === "internal"
         ? "The request service could not load. Try Refresh; if it continues, check the staging function logs."
         : errorText(error));
@@ -240,11 +287,14 @@ export default function OwnerManaged() {
     setWorking(true);
     try {
       const result = await call<Detail>("getManagedServiceAccount", { carrierId });
+      const sameCompany = detailId.current === result.carrierId;
       detailId.current = result.carrierId;
       setDetail(result);
+      setExpandedItems(previous => sameCompany ? previous : {});
+      if (!sameCompany) setCompletionDates({});
       setCandidate(null);
       setShowSetup(setup);
-      setItemDates(Object.fromEntries(result.items.map(item => [item.key, item.sourceInputDate || ""])));
+      setItemDates(Object.fromEntries(result.items.map(item => [item.key, isoToInput(item.sourceInputDate || "")])));
       setAccounts(previous => previous.map(row => row.carrierId === result.carrierId
         ? { ...row, counts: result.counts, itemCount: result.items.length,
           pendingCustomCount: result.pendingCustom.length,
@@ -274,7 +324,20 @@ export default function OwnerManaged() {
       });
       setUnitAgreements(previous => ({ ...previous, [key]: "" }));
       await open(detail.carrierId);
-      setMessage(`${row.name} is now in managed coverage. The existing Company rate was not changed.`);
+      setMessage(`${row.name} is now in managed coverage. Stripe will add the unit rate at the next billing cycle; the Company rate did not change.`);
+    } catch (error) { setMessage(errorText(error)); }
+    finally { setBusyItem(null); }
+  };
+  const removeUnit = async (row: Detail["pendingCustom"][number]) => {
+    if (!detail || !row.collectionId) return;
+    const key = row.collectionId + ":" + row.id;
+    setBusyItem(key);
+    try {
+      await call("removeInactiveManagedUnit", {
+        carrierId: detail.carrierId, collectionId: row.collectionId, unitId: row.id,
+      });
+      await open(detail.carrierId);
+      setMessage("Managed coverage and the next monthly charge were reduced. Confirm the next invoice in Stripe.");
     } catch (error) { setMessage(errorText(error)); }
     finally { setBusyItem(null); }
   };
@@ -301,7 +364,7 @@ export default function OwnerManaged() {
             : previous.filter(v => v.carrierId !== carrierId));
           if (detailId.current === carrierId) {
             setDetail(result);
-            setItemDates(Object.fromEntries(result.items.map(item => [item.key, item.sourceInputDate || ""])));
+            setItemDates(Object.fromEntries(result.items.map(item => [item.key, isoToInput(item.sourceInputDate || "")])));
             setItemNotes({});
             setMessage(previous => previous.startsWith("Verified date saved")
               ? previous : "Company data refreshed. Review current dates before logging work.");
@@ -409,10 +472,6 @@ export default function OwnerManaged() {
   const save = async (status: "draft" | "active" | "paused") => {
     const carrierId = detail?.carrierId || candidate?.carrierId;
     if (!carrierId) return;
-    if (status === "active" && consentReference.trim().length < 8) {
-      setMessage("Before activating, enter where the customer agreed to the managed scope.");
-      return;
-    }
     setWorking(true);
     try {
       await call("saveManagedServiceCoverage", { carrierId, status, areas, effectiveDate, consentReference });
@@ -428,35 +487,133 @@ export default function OwnerManaged() {
   const record = async (item: Item, status: string) => {
     if (!detail) return;
     const note = (itemNotes[item.key] || "").trim();
-    if (note.length < 3) { setMessage("Add a note to this item before logging an action."); return; }
+    if (note.length < 3) {
+      setItemFeedback(previous => ({ ...previous, [item.key]: "Add a work note of at least 3 characters above, then select the action again. No action was saved." }));
+      return;
+    }
     setBusyItem(item.key);
     try {
       await call("updateManagedServiceWork", { carrierId: detail.carrierId, itemKey: item.key,
         status, note, sourceVersion: item.sourceVersion });
       setItemNotes(previous => ({ ...previous, [item.key]: "" }));
       await open(detail.carrierId);
-    } catch (error) { await open(detail.carrierId); setMessage(errorText(error)); }
+      setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+      setItemFeedback(previous => ({ ...previous, [item.key]: "Work action saved. It appears in Action history below; this button does not send a message." }));
+    } catch (error) {
+      await open(detail.carrierId);
+      setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+      setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) }));
+    }
     finally { setBusyItem(null); }
   };
   const saveDeadline = async (item: Item) => {
     if (!detail) return;
     const note = (itemNotes[item.key] || "").trim();
-    const inputDate = (itemDates[item.key] || "").trim();
-    if (note.length < 8) { setMessage("Record where you verified the date."); return; }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(inputDate)) {
-      setMessage("Enter a date as YYYY-MM-DD."); return;
+    const inputDate = inputToIso((itemDates[item.key] || "").trim());
+    if (!inputDate) {
+      setItemFeedback(previous => ({ ...previous, [item.key]: "Enter a valid date as MM-DD-YYYY." }));
+      return;
     }
+    if (note.length < 8) {
+      setItemFeedback(previous => ({ ...previous, [item.key]: "Add a note of at least 8 characters naming where you verified this date." }));
+      return;
+    }
+    setItemFeedback(previous => ({ ...previous, [item.key]: "Saving verified date…" }));
     setBusyItem(item.key);
     try {
       const outcome = await call<{ saved: boolean }>("saveManagedServiceDeadline", { carrierId: detail.carrierId,
         itemKey: item.key, inputDate, note, sourceVersion: item.sourceVersion });
       setItemNotes(previous => ({ ...previous, [item.key]: "" }));
       await open(detail.carrierId);
-      setMessage(outcome.saved ? "Verified date saved to the customer's dashboard." : "This date was already on the customer's dashboard.");
+      setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+      setItemFeedback(previous => ({ ...previous, [item.key]: outcome.saved
+        ? "Saved to the customer's dashboard. The current app date below should now match."
+        : "This date was already on the customer's dashboard. No change was needed." }));
     } catch (error) {
       await open(detail.carrierId);
-      setMessage(errorText(error));
+      setItemDates(previous => ({ ...previous, [item.key]: isoToInput(inputDate) }));
+      setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+      setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) }));
     } finally { setBusyItem(null); }
+  };
+  const completeCompany = async (item: Item) => {
+    if (!detail || busyItem) return;
+    const note = (itemNotes[item.key] || "").trim();
+    const completionDate = inputToIso((completionDates[item.key] || isoToInput(currentDate)).trim());
+    if (note.length < 8 || !completionDate) {
+      setItemFeedback(previous => ({ ...previous, [item.key]: "Enter the completion date and a note of at least 8 characters naming the confirming document or source." }));
+      return;
+    }
+    const perform = async () => {
+      setBusyItem(item.key);
+      try {
+        await call("completeManagedCompanyRequirement", { carrierId: detail.carrierId,
+          requirementId: item.key.slice(8), completionDate, note, sourceVersion: item.sourceVersion });
+        setItemNotes(previous => ({ ...previous, [item.key]: "" }));
+        setCompletionDates(previous => ({ ...previous, [item.key]: "" }));
+        await open(detail.carrierId);
+        setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+        setItemFeedback(previous => ({ ...previous, [item.key]: "Completion saved to the customer's dashboard and history." }));
+      } catch (error) { await open(detail.carrierId); setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
+      finally { setBusyItem(null); }
+    };
+    await perform();
+  };
+  const setCompanyApplicable = async (item: Item, applicable: boolean) => {
+    if (!detail || busyItem) return;
+    const perform = async () => {
+      setBusyItem(item.key);
+      try {
+        await call("setManagedCompanyApplicable", { carrierId: detail.carrierId,
+          requirementId: item.key.slice(8), applicable, sourceVersion: item.sourceVersion });
+        await open(detail.carrierId);
+        setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+        setItemFeedback(previous => ({ ...previous, [item.key]: applicable
+          ? "Requirement is active again on the customer's dashboard."
+          : "Marked as not applicable on the customer's dashboard; it is excluded from urgent counts." }));
+      } catch (error) { await open(detail.carrierId); setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
+      finally { setBusyItem(null); }
+    };
+    await perform();
+  };
+  const updateDq = async (item: Item, field: string, value: boolean | string) => {
+    if (!detail || busyItem) return;
+    const note = (itemNotes[item.key] || "").trim();
+    if (note.length < 8) { setItemFeedback(previous => ({ ...previous, [item.key]: "Note the document or source used to verify this DQ check (at least 8 characters)." })); return; }
+    setBusyItem(item.key);
+    try {
+      await call("updateManagedDqCheck", { carrierId: detail.carrierId,
+        driverId: item.key.split(":")[1], field, value, note, sourceVersion: item.sourceVersion });
+      await open(detail.carrierId);
+      setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+      setItemFeedback(previous => ({ ...previous, [item.key]: "DQ check updated on the customer's driver file. The file shows complete when all eight checks are confirmed." }));
+    } catch (error) { await open(detail.carrierId); setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
+    finally { setBusyItem(null); }
+  };
+  const deleteCompletion = (item: Item, record: CompletionHistory["records"][number], newest: boolean) => {
+    if (!detail || busyItem) return;
+    const message = newest
+      ? "Delete this completion record? If its result is still the current deadline, the previous date will be restored. This cannot be undone."
+      : "Delete this older completion record? The current deadline will not change. This cannot be undone.";
+    const perform = async () => {
+      if (!detail) return;
+      setBusyItem(item.key);
+      try {
+        const result = await call<{ restoredDeadline: boolean }>("deleteManagedComplianceHistoryRecord", {
+          carrierId: detail.carrierId, itemKey: item.key, recordId: record.id,
+        });
+        await open(detail.carrierId);
+        setExpandedItems(previous => ({ ...previous, [item.key]: true }));
+        setItemFeedback(previous => ({ ...previous, [item.key]: result.restoredDeadline
+          ? "Completion deleted; the previous date was restored on the customer's dashboard."
+          : "Completion deleted; the customer's current date was left unchanged." }));
+      } catch (error) { setItemFeedback(previous => ({ ...previous, [item.key]: errorText(error) })); }
+      finally { setBusyItem(null); }
+    };
+    if (Platform.OS === "web") { if (window.confirm(message)) void perform(); }
+    else Alert.alert("Delete completion record?", message, [
+      { text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: () => void perform() },
+    ]);
   };
   const acceptCustom = async (customId: string) => {
     if (!detail) return;
@@ -516,31 +673,45 @@ export default function OwnerManaged() {
     <View style={styles.card}><Text style={styles.help}>{ownerAccess === "checking"
       ? "Checking owner access…"
       : ownerAccess === "error" ? "We could not verify owner access. Return to Settings and try again."
-      : "This staging account does not have owner access. Sign in with the staging owner account to review customer requests."}</Text></View>
+      : "This account does not have owner access."}</Text>
+      {ownerAccess === "denied" && <>
+        <Text style={styles.small}>Signed in as: {auth.currentUser?.email || "unknown account"}</Text>
+        <Button label="Switch to owner account" onPress={() => {
+          rememberOwnerReturn();
+          void signOut(auth).then(() => router.replace("/(auth)/login?returnTo=%2Fowner-managed" as any))
+            .catch(error => setMessage(errorText(error)));
+        }} />
+        {!!message && <Text style={styles.small}>{message}</Text>}
+      </>}
+    </View>
   </ScrollView>;
   return <><Head><title>Owner Managed Tracking | We Heart Paperwork</title><meta name="robots" content="noindex,nofollow" /></Head><ScrollView ref={scrollRef} style={styles.page} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Pressable onPress={() => router.replace("/(app)/settings")}><Text style={styles.back}>‹ Back to Settings</Text></Pressable>
+    <Pressable onPress={() => void signOut(auth).then(() => router.replace("/(auth)/login?returnTo=%2Fowner-managed" as any))
+      .catch(error => setMessage(errorText(error)))}><Text style={styles.back}>Sign out of owner tools</Text></Pressable>
     <Text style={styles.eyebrow}>OWNER TOOLS</Text>
     <Text style={styles.title}>Managed tracking</Text>
+    <Text style={styles.small}>Signed in as {auth.currentUser?.email || "owner account"}</Text>
     <Text style={styles.help}>A private work queue across the companies you support. Preparing a quote makes its price and scope visible to the customer. Production also emails the quote; staging does not. Payment goes through Stripe after the customer accepts.</Text>
-    <View style={styles.warning}><Text style={styles.warningText}>Start coverage only after the request shows “paid awaiting start.” The app subscription remains separate. Staging checkout requires Stripe test mode.</Text></View>
+    <View style={styles.warning}><Text style={styles.warningText}>Start coverage only after the request shows “paid awaiting start.” App access and managed support have distinct charges and controls. Staging checkout requires Stripe test mode.</Text></View>
     {!!message && <View style={styles.message}><Text style={styles.messageText}>{message}</Text></View>}
     <View style={styles.card}>
       <View style={styles.row}><Text style={styles.section}>Customer requests</Text>
         <Button label="Refresh" subtle onPress={() => void loadRequests()} disabled={working || requestLoading} /></View>
-      <Text style={styles.help}>Customers choose whole areas after app checkout. Review their dates, quantities, and scope; prepare a quote; then wait for the customer to accept and pay before activation.</Text>
+      <Text style={styles.help}>New customers can choose managed support during signup; existing customers can request it later. Review the paid status, selected areas, and quoted units before starting coverage.</Text>
       {requestLoading && <ActivityIndicator color="#27500A" />}
       {!!requestError && <Text style={styles.warningText}>{requestError}</Text>}
       {!requestLoading && !requestError && requests.length === 0 && <Text style={styles.help}>No requests are waiting for review.</Text>}
       {requests.map(row => <View key={row.carrierId} style={styles.item}>
         <Text style={styles.accountTitle}>{row.companyName}</Text>
-        <Text style={styles.small}>{REQUEST_STAGE[row.status] || row.status.replaceAll("_", " ")} · Requested: {(["company", "drivers", "fleet"] as (keyof Areas)[])
+        <Text style={styles.small}>{row.status === "end_scheduled" && row.appEndScheduled
+          ? "App access and managed billing ending at paid period end"
+          : REQUEST_STAGE[row.status] || row.status.replaceAll("_", " ")} · Requested: {(["company", "drivers", "fleet"] as (keyof Areas)[])
           .filter(key => row.areas[key]).map(key => AREA_LABEL[key]).join(", ") || "End managed support"}</Text>
         <ContactDetails contact={{ accountEmail: row.accountEmail,
           preferredEmail: row.preferredEmail, preferredPhone: row.preferredPhone,
           accountPhone: row.accountPhone, textPermission: row.textPermission }} />
         {(row.areas.drivers || row.areas.fleet) && <View style={styles.contactBox}>
-          <Text style={styles.small}>Customer intake · {row.intake?.drivers?.length || 0} drivers · {row.intake?.vehicles?.length || 0} units</Text>
+          <Text style={styles.small}>Customer intake · {row.intake?.drivers?.length || 0} {row.intake?.drivers?.length === 1 ? "driver" : "drivers"} · {row.intake?.vehicles?.length || 0} {row.intake?.vehicles?.length === 1 ? "unit" : "units"}</Text>
           {(row.intake?.drivers || []).map((driver, index) => <Text key={`d${index}`} style={styles.small}>
             Driver: {driver.name} · {driver.cdlState} CDL {driver.cdlNumber} · Class {driver.cdlClass}
             {driver.cdlExpiration ? ` · CDL expires ${driver.cdlExpiration}` : ""}
@@ -551,7 +722,13 @@ export default function OwnerManaged() {
             {vehicle.registrationExpiration ? ` · Registration expires ${vehicle.registrationExpiration}` : ""}
             {vehicle.inspectionExpiration ? ` · Inspection expires ${vehicle.inspectionExpiration}` : ""}
           </Text>)}
-          <Text style={styles.small}>Review these details and existing account records before quoting. Intake is information only; it does not add units or start billing. After payment, you can check the quoted units and add any missing records.</Text>
+          <Text style={styles.small}>{row.status === "end_scheduled"
+            ? row.appEndScheduled
+              ? "Both services are ending. Do not start coverage or add units from this request. The account and records remain until the customer deletes them."
+              : "Managed billing is ending. Do not start coverage or add units from this request. The app records remain available to the customer."
+            : row.status === "paid_awaiting_start" && row.intakeUnitsConfirmedRevision === row.revision
+              ? "Paid checkout added any missing quoted units. Review the names, dates, and billing before finishing setup; do not add them again."
+              : "Review these details and existing account records before quoting. Listing units does not add them or start billing. After payment, check the quoted units and add any missing records."}</Text>
           {row.status === "paid_awaiting_start" && !!(row.intake?.drivers?.length || row.intake?.vehicles?.length) && <>
             {row.intakeUnitsConfirmedRevision === row.revision ? <Text style={styles.small} accessibilityRole="alert">
               Quoted units checked. {row.intakeUnitsAdded?.drivers || 0} driver{row.intakeUnitsAdded?.drivers === 1 ? "" : "s"} and {row.intakeUnitsAdded?.vehicles || 0} vehicle{row.intakeUnitsAdded?.vehicles === 1 ? "" : "s"} added. Any matching records were left unchanged. Continue with paid company setup below.
@@ -566,8 +743,13 @@ export default function OwnerManaged() {
           </>}
         </View>}
         {row.quote && <View style={styles.contactBox}>
-          <Text style={styles.small}>Quote: {row.quote.status} · ${row.quote.price.firstYearMonthly}/month in year one,
+          <Text style={styles.small}>{row.status === "end_scheduled" ? "Original paid quote" : `Quote: ${row.quote.status}`} · ${row.quote.price.firstYearMonthly}/month in year one,
             then ${row.quote.price.renewalMonthly}/month · ${row.quote.price.fleetOnlyOnboardingOneTime + row.quote.price.dqFileOneTime} one-time</Text>
+          {row.quote.signupQuote && row.quote.appMonthly != null && <Text style={styles.small}>
+            {row.status === "end_scheduled" ? "Original signup total" : "First-time signup total"}: ${row.quote.appMonthly + row.quote.price.firstYearMonthly}/month in year one
+            (app ${row.quote.appMonthly} + managed ${row.quote.price.firstYearMonthly})
+            {row.status === "end_scheduled" && row.appEndScheduled ? ". Both services are now scheduled to end." : `; $${row.quote.appMonthly + row.quote.price.renewalMonthly}/month after Company setup ends, assuming the same active units.`}
+          </Text>}
           <Text style={styles.small}>Quoted units: {row.quote.counts.drivers} drivers, {row.quote.counts.trucks} trucks, {row.quote.counts.trailers} trailers, {row.quote.counts.dqFiles} DQ files</Text>
           <Text style={styles.small}>Scope: {row.quote.scope}</Text>
         </View>}
@@ -651,8 +833,13 @@ export default function OwnerManaged() {
       <View style={styles.row}><Text style={styles.section}>{detail.companyName} · managed work</Text>
         <Button label="Close company" subtle onPress={() => { detailId.current = null; setDetail(null); setShowSetup(false); }} />
       </View>
-      <Text style={styles.help}>Only {detail.companyName}'s items are shown here. Choose Next company or close this company to return to the queue.</Text>
+      <Text style={styles.help}>Showing all active managed requirements for {detail.companyName}. The work-list choice above only selects which companies to open. Choose Next company or close this company to return to that list.</Text>
       <ContactDetails contact={detail.contact} />
+      <View style={styles.overview}>
+        <Text style={styles.accountTitle}>At a glance · {detail.items.length} tracked requirements</Text>
+        <Text style={styles.small}>{detail.counts.overdue} overdue · {detail.counts.due30} due in 30 days · {Math.max(0, detail.counts.due90 - detail.counts.due30)} due in 31–90 days · {detail.counts.needsInfo} need information · {detail.counts.waiting} waiting on customer</Text>
+        <Text style={styles.small}>A requirement can appear in more than one count, such as overdue and waiting.</Text>
+      </View>
       {selectedQueueIndex >= 0 && <View style={styles.row}>
         <Text style={styles.small}>Company {selectedQueueIndex + 1} of {queueAccounts.length} in {QUEUE_FILTERS.find(row => row.key === queueFilter)?.label}</Text>
         {selectedQueueIndex > 0 && <Button label="Previous company" subtle
@@ -664,11 +851,11 @@ export default function OwnerManaged() {
         <Text style={styles.help}>This company has no work left in {QUEUE_FILTERS.find(row => row.key === queueFilter)?.label}. Continue with another company in this list.</Text>
         <Button label="Open next listed company ›" subtle onPress={() => void open(queueAccounts[0].carrierId)} disabled={working} />
       </View>}
-      <Text style={styles.help}>Open a public guide, send your message outside this app, then log what you did here. These buttons do not send email. Verified date changes here update the customer's dashboard. Customers confirm completed filings, reviews, and inspections in their app.</Text>
+      <Text style={styles.help}>Open a public guide, send your message outside this app, then log what you did here. These buttons do not send email. Verified date and Company completion changes here update the customer's dashboard. Customers confirm other completed reviews and inspections in their app.</Text>
       {!!(detail.selfManagedUnitCounts?.drivers || detail.selfManagedUnitCounts?.vehicles) &&
         <Text style={styles.help}>Outside managed coverage: {detail.selfManagedUnitCounts?.drivers || 0} self-managed drivers and {detail.selfManagedUnitCounts?.vehicles || 0} self-managed trucks/trailers. If the customer wants an area they did not select, prepare a separate scope and billing change before managing its units.</Text>}
-      {detail.pendingCustom.length > 0 && (queueFilter === "all" || queueFilter === "needsInfo") && <>
-        <Text style={styles.subheading}>New units and custom items awaiting review</Text>
+      {detail.pendingCustom.length > 0 && <>
+        <Text style={styles.subheading}>Unit changes and custom items awaiting review</Text>
         {detail.managedStripeSubscriptionId && <Text selectable style={styles.small}>Managed Stripe subscription: {detail.managedStripeSubscriptionId}</Text>}
         {detail.pendingCustom.map(row => <View key={row.id} style={styles.item}>
           <Text style={styles.accountTitle}>{row.name}</Text><Text style={styles.small}>{row.reason}</Text>
@@ -676,59 +863,110 @@ export default function OwnerManaged() {
             <Text style={styles.small}>No paid managed subscription is linked to this company. You can review the new unit here, but it cannot be enrolled in managed coverage yet.</Text>}
           {row.kind === "unit" && row.collectionId && detail.managedStripeSubscriptionId && <>
             <Text style={styles.small}>Added managed price: ${row.unitType === "driver" ? MANAGED_PRICING.driverMonthly
-              : row.unitType === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly}/month. The existing Company rate stays the same. Contact the customer first and record their agreement. Update this unit's recurring quantity in the managed Stripe subscription and every remaining schedule phase, with no proration. Then verify and enroll it here.</Text>
+              : row.unitType === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly}/month beginning at the next billing cycle. A newly active driver also adds the app's separate $1/month driver charge, whether or not managed support is selected. The existing Company rate stays the same. Contact the customer, confirm this exact added managed charge, and record where their agreement can be found. This action updates Stripe without a mid-cycle managed charge, checks future billing phases, and then enrolls the unit. No DQ-file setup fee is added here.</Text>
             <TextInput style={styles.input} value={unitAgreements[row.collectionId + ":" + row.id] || ""}
               onChangeText={value => setUnitAgreements(previous => ({ ...previous, [row.collectionId + ":" + row.id]: value }))}
               placeholder="Where the customer agreed to the added monthly charge" />
-            <Button label="Verify billing and enroll this unit" subtle
+            <Button label="Update billing and enroll approved unit" subtle
               onPress={() => void enrollUnit(row)} disabled={!!busyItem} />
           </>}
-          {row.kind !== "unit" && <TextInput style={styles.input} value={itemNotes["custom:" + row.id] || ""}
+          {row.kind === "removal" && row.collectionId && <>
+            <Text style={styles.small}>The unit is inactive, so its deadlines are no longer in the work queue. Its managed charge remains until this billing change succeeds. Review the customer's change, then remove the ${row.unitType === "driver" ? MANAGED_PRICING.driverMonthly : row.unitType === "trailer" ? MANAGED_PRICING.trailerMonthly : MANAGED_PRICING.truckMonthly}/month managed charge from the next billing cycle. No midcycle credit is created. The app subscription continues.</Text>
+            <Button label="Reduce billing and remove managed unit" subtle
+              onPress={() => void removeUnit(row)} disabled={!!busyItem || !detail.managedStripeSubscriptionId} />
+          </>}
+          {!row.kind && <TextInput style={styles.input} value={itemNotes["custom:" + row.id] || ""}
             onChangeText={value => setItemNotes(previous => ({ ...previous, ["custom:" + row.id]: value }))}
             placeholder="Where did you verify the filing due date?" multiline />}
-          {row.kind !== "unit" && !row.reason.startsWith("Recurring") && <Button label="Accept verified due date" subtle
+          {!row.kind && !row.reason.startsWith("Recurring") && <Button label="Accept verified due date" subtle
             onPress={() => void acceptCustom(row.id)} disabled={!!busyItem} />}
         </View>)}
       </>}
       {(["company", "drivers", "fleet"] as (keyof Areas)[]).map(area => {
-        const list = detail.items.filter(item => item.area === area && matchesQueue(item, queueFilter));
-        if (list.length === 0) return null;
+        if (!detail.coverage.areas[area]) return null;
+        const list = detail.items.filter(item => item.area === area).sort((a, b) =>
+          urgency(a).rank - urgency(b).rank || (a.days ?? Infinity) - (b.days ?? Infinity) || a.label.localeCompare(b.label));
         return <View key={area}><Text style={styles.subheading}>{AREA_LABEL[area]}</Text>
+          {list.length === 0 && <Text style={styles.help}>{area === "drivers" ? "No active managed driver requirements." : area === "fleet" ? "No active managed trucks or trailers." : "No open managed Company requirements."}</Text>}
           {list.map(item => <View key={item.key} style={styles.item}>
+            <Text style={[styles.urgency, { color: urgency(item).color }]}>{urgency(item).label}</Text>
             <Text style={styles.accountTitle}>{item.label}</Text>
-            <Text style={styles.small}>{item.dueDate ? "Due " + item.dueDate + " · " + (item.days! < 0 ? "Overdue" : item.days + " days left") : item.issue}
+            <Text style={styles.small}>{item.status === "not_applicable" ? "Not applicable · excluded from urgent counts" : item.status === "completed" ? item.key.endsWith(":dq") ? "All eight DQ checks confirmed" : "Completed · view completion history below" : item.dueDate ? "Due " + item.dueDate + " · " + (item.days! < 0 ? Math.abs(item.days!) + " days overdue" : item.days + " days left") : item.issue || "Date not set"}
               {" · "}{item.status.replaceAll("_", " ")}</Text>
+            <Button label={expandedItems[item.key] ? "Hide actions" : "Update or log work ›"} subtle
+              onPress={() => setExpandedItems(previous => ({ ...previous, [item.key]: !previous[item.key] }))} />
+            {expandedItems[item.key] && <>
             {!!item.note && <Text style={styles.small}>Last note: {item.note}</Text>}
-            {detail.coverage.status === "active" && editableDate(item) && <>
+            {item.key === "company:boc3" && <Text style={styles.help}>BOC-3 has no annual renewal. Confirm the filing from the customer's record, then mark it complete here. This updates their Company view.</Text>}
+            {item.key.endsWith(":dq") && <Text style={styles.help}>Verify each document or qualification before updating its check. These are the same eight checks shown in the customer's Driver view. Do not mark an item on file until the carrier confirms it.</Text>}
+            {detail.coverage.status === "active" && item.status !== "completed" && item.status !== "not_applicable" && editableDate(item) && <>
               <Text style={styles.label}>{dateInputLabel(item)}</Text>
               <TextInput style={styles.input} value={itemDates[item.key] || ""}
-                onChangeText={value => setItemDates(previous => ({ ...previous, [item.key]: value }))}
-                placeholder="YYYY-MM-DD" keyboardType="numbers-and-punctuation" />
-              <Text style={styles.small}>Current app date: {item.sourceInputDate || "not set"}.
-                Record the source in the note below before saving.</Text>
+                onChangeText={value => { setItemDates(previous => ({ ...previous, [item.key]: formatDateInput(value) }));
+                  setItemFeedback(previous => ({ ...previous, [item.key]: "" })); }}
+                placeholder="MM-DD-YYYY" keyboardType="numbers-and-punctuation" />
+              <Text style={styles.small}>Current app date: {item.sourceInputDate ? isoToInput(item.sourceInputDate) : "not set"}. A source note is required to save a new date.</Text>
             </>}
+            {item.status !== "completed" && item.status !== "not_applicable" && editableDate(item) && <Text style={styles.label}>Where did you verify this date? (required to save)</Text>}
+            {item.key.startsWith("company:") && OWNER_COMPLETION_IDS.includes(item.key.slice(8)) && item.status !== "completed" && item.status !== "not_applicable" && <>
+              <Text style={styles.label}>Completion date (MM-DD-YYYY)</Text>
+              <TextInput style={styles.input} value={completionDates[item.key] || isoToInput(currentDate)}
+                onChangeText={value => setCompletionDates(previous => ({ ...previous, [item.key]: formatDateInput(value) }))}
+                placeholder="MM-DD-YYYY" keyboardType="numbers-and-punctuation" />
+              <Text style={styles.help}>Confirm the filing or renewal first. Mark complete advances recurring deadlines or closes one-time BOC-3, just as it does in the customer view.</Text>
+            </>}
+            <Text style={styles.label}>Work note or verification source (required for dates, completion, and work logs)</Text>
             <TextInput style={styles.input} value={itemNotes[item.key] || ""}
-              onChangeText={value => setItemNotes(previous => ({ ...previous, [item.key]: value }))}
-              placeholder="Note what you sent or what needs follow-up" multiline />
+              onChangeText={value => { setItemNotes(previous => ({ ...previous, [item.key]: value }));
+                setItemFeedback(previous => ({ ...previous, [item.key]: "" })); }}
+              placeholder={item.key.endsWith(":dq") || OWNER_COMPLETION_IDS.includes(item.key.slice(8)) ? "Document or source confirming this update" : editableDate(item) ? "Source of verified date, such as the carrier's document" : "Note what you sent or what needs follow-up"} multiline />
+            {item.key.endsWith(":dq") && DQ_CHECKS.map(check => {
+              const current = item.dqChecks?.[check.field] ?? (check.status ? "missing" : false);
+              const next = check.status ? current === "missing" ? "on_file" : current === "on_file" ? "not_applicable" : "missing" : !current;
+              const label = check.status ? String(current).replaceAll("_", " ") : current === true ? "On file" : "Missing";
+              return <View key={check.field} style={styles.row}>
+                <Text style={styles.small}>{check.label}: {label}</Text>
+                <Button label={check.status ? "Change status" : current === true ? "Mark missing" : "Confirm on file"} subtle
+                  disabled={!!busyItem || detail.coverage.status !== "active"}
+                  onPress={() => void updateDq(item, check.field, next)} />
+              </View>;
+            })}
             <View style={styles.row}>
-              {detail.coverage.status === "active" && editableDate(item) &&
+              {detail.coverage.status === "active" && item.status !== "completed" && item.status !== "not_applicable" && editableDate(item) &&
                 <Button label="Save verified date" disabled={!!busyItem}
                   onPress={() => void saveDeadline(item)} />}
               {guideUrl(item.key) && <Button label="Open public guide" subtle
                 onPress={() => { const url = guideUrl(item.key); if (url) void Linking.openURL(url); }} />}
-              <Button label="Log instructions I sent" subtle disabled={!!busyItem || detail.coverage.status !== "active"}
+              {item.key.startsWith("company:") && OWNER_COMPLETION_IDS.includes(item.key.slice(8)) && item.status !== "completed" && item.status !== "not_applicable" &&
+                <Button label="Mark complete" disabled={!!busyItem || detail.coverage.status !== "active"}
+                  onPress={() => void completeCompany(item)} />}
+              {item.key.startsWith("company:") && !item.key.startsWith("custom:") &&
+                <Button label={item.status === "not_applicable" ? "Start tracking again" : "This requirement does not apply"} subtle
+                  disabled={!!busyItem || detail.coverage.status !== "active"}
+                  onPress={() => void setCompanyApplicable(item, item.status === "not_applicable")} />}
+              <Button label="Log instructions I sent" subtle disabled={!!busyItem || detail.coverage.status !== "active" || item.status === "completed" || item.status === "not_applicable"}
                 onPress={() => void record(item, "instructions_sent")} />
-              <Button label="Log waiting on customer" subtle disabled={!!busyItem || detail.coverage.status !== "active"}
+              <Button label="Log waiting on customer" subtle disabled={!!busyItem || detail.coverage.status !== "active" || item.status === "completed" || item.status === "not_applicable"}
                 onPress={() => void record(item, "waiting_on_customer")} />
-              <Button label="Flag for follow-up" subtle disabled={!!busyItem || detail.coverage.status !== "active"}
+              <Button label="Flag for follow-up" subtle disabled={!!busyItem || detail.coverage.status !== "active" || item.status === "completed" || item.status === "not_applicable"}
                 onPress={() => void record(item, "follow_up_due")} />
             </View>
+            {(() => {
+              const records = detail.completionHistory?.find(row => row.itemKey === item.key)?.records || [];
+              return <View>
+                <Text style={styles.label}>Completion history ({records.length})</Text>
+                {records.length === 0 && <Text style={styles.small}>No completion records yet.</Text>}
+                {records.map((record, index) => <View key={record.id} style={styles.row}>
+                  <Text style={styles.small}>{record.completionDate || "Date not recorded"} · {record.previousDueDate || "—"} → {record.nextDueDate || "—"}</Text>
+                  <Button label="Delete" subtle disabled={!!busyItem} onPress={() => deleteCompletion(item, record, index === 0)} />
+                </View>)}
+              </View>;
+            })()}
+            {!!itemFeedback[item.key] && <Text style={styles.small} accessibilityRole="alert">{itemFeedback[item.key]}</Text>}
+            </>}
           </View>)}
         </View>;
       })}
-      {detail.items.filter(item => matchesQueue(item, queueFilter)).length === 0
-        && !(detail.pendingCustom.length > 0 && (queueFilter === "all" || queueFilter === "needsInfo"))
-        && <Text style={styles.help}>No items for this company in the selected list.</Text>}
       <Text style={styles.subheading}>Action history</Text>
       <Text style={styles.help}>Each entry is saved with the item, your note, and the time. This history records your work; it does not confirm an email was delivered.</Text>
       {detail.history.length === 0 && <Text style={styles.small}>No action recorded yet.</Text>}
@@ -757,10 +995,21 @@ export default function OwnerManaged() {
         </Pressable>)}</View>
       <Text style={styles.label}>Effective date (YYYY-MM-DD)</Text>
       <TextInput style={styles.input} value={effectiveDate} onChangeText={setEffectiveDate} />
-      <Text style={styles.label}>Customer agreement reference</Text>
-      <TextInput style={styles.input} value={consentReference} onChangeText={setConsentReference}
-        placeholder="For example: email agreement dated Oct 27" />
-      <Text style={styles.help}>Keep the agreement itself in your normal business records. This field records where to find it.</Text>
+      <Text style={styles.label}>Customer acceptance record</Text>
+      <Text style={styles.help}>Starting paid coverage records the customer's accepted quote ID and acceptance time automatically. Review the paid quote and scope above before starting. Keep any separate signed agreement in your normal business records.</Text>
+      {!!detail?.coverage.consentReference && <Text selectable style={styles.small}>{detail.coverage.consentReference}</Text>}
+      {detail?.coverage.status === "active" && !detail.stagingDemo &&
+        !detail.coverage.consentReference?.startsWith("Customer accepted quote ") &&
+        <Button label="Attach customer's accepted quote reference" subtle disabled={working}
+          onPress={() => void (async () => {
+            setWorking(true);
+            try {
+              await call("attachAcceptedManagedQuoteReference", { carrierId: detail.carrierId });
+              await open(detail.carrierId);
+              setMessage("The accepted quote ID and time are now in the coverage audit record.");
+            } catch (error) { setMessage(errorText(error)); }
+            finally { setWorking(false); }
+          })()} />}
       {detail?.stagingDemo && <Text style={styles.help}>Demo company: this sample coverage has no customer payment or agreement. Review its queue without changing its setup.</Text>}
       {detail?.coverage.status === "active" && !detail.stagingDemo && <Text style={styles.help}>Managed coverage is already active. The customer paid through Stripe before it started. This screen does not charge the customer again.</Text>}
       <View style={styles.row}>
@@ -836,6 +1085,8 @@ const styles = StyleSheet.create({
   totals: { color: "#27500A", fontWeight: "700", lineHeight: 22, marginBottom: 10 },
   account: { paddingVertical: 14, borderTopWidth: 1, borderColor: "#E5E3DA" },
   accountTitle: { color: "#1A1915", fontWeight: "800", fontSize: 16, marginBottom: 4 },
+  overview: { backgroundColor: "#F2F7EB", borderRadius: 10, padding: 14, marginBottom: 14 },
+  urgency: { fontSize: 12, fontWeight: "800", letterSpacing: 0.6, marginBottom: 5 },
   small: { color: "#5F5D57", fontSize: 13, lineHeight: 19 },
   item: { padding: 14, borderWidth: 1, borderColor: "#E5E3DA", borderRadius: 10, marginBottom: 9 },
   contactBox: { padding: 12, borderWidth: 1, borderColor: "#E5E3DA", borderRadius: 10,
