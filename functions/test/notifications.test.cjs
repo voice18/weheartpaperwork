@@ -42,6 +42,20 @@ test("a changed due date starts a new reminder occurrence", () => {
   assert.equal(getAlertDecision(5, "2026-07-31", oldState, "ifta-quarterly").alertType, "5_days");
 });
 
+test("a sent reminder does not repeat for the same deadline", () => {
+  const dueDate = "2026-12-31";
+  const fifteen = getAlertDecision(15, dueDate, null);
+  assert.equal(getAlertDecision(15, dueDate, fifteen.state), null);
+
+  const five = getAlertDecision(5, dueDate, fifteen.state);
+  assert.equal(five.alertType, "5_days");
+  assert.equal(getAlertDecision(5, dueDate, five.state), null);
+
+  const today = getAlertDecision(0, dueDate, five.state);
+  assert.equal(today.alertType, "due_today");
+  assert.equal(getAlertDecision(0, dueDate, today.state), null);
+});
+
 test("fleet notification inventory matches every fleet deadline field", () => {
   assert.deepEqual(
     VEHICLE_NOTIFICATION_DEADLINES.map(item => item.field).sort(),
