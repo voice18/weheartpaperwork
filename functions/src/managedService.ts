@@ -495,6 +495,10 @@ function completionHistoryPath(carrierId: string, key: string): string | null {
 }
 export const deleteManagedComplianceHistoryRecord = onCall({ region: "us-central1" }, async request => {
   const actor = owner(request);
+  // Old open owner tabs used a native confirmation that could submit after dismissal.
+  // Require the explicit confirmation emitted only by the current on-page control.
+  if (request.data?.confirmation !== "DELETE_COMPLETION_RECORD")
+    throw new HttpsError("failed-precondition", "Refresh owner tools before deleting completion history.");
   const carrierId = identifier(request.data?.carrierId);
   const itemKey = typeof request.data?.itemKey === "string" ? request.data.itemKey : "";
   const recordId = identifier(request.data?.recordId);

@@ -597,6 +597,7 @@ export default function OwnerManaged() {
     try {
       const result = await call<{ restoredDeadline: boolean }>("deleteManagedComplianceHistoryRecord", {
         carrierId: detail.carrierId, itemKey: item.key, recordId: record.id,
+        confirmation: "DELETE_COMPLETION_RECORD",
       });
       await open(detail.carrierId);
       setExpandedItems(previous => ({ ...previous, [item.key]: true }));
