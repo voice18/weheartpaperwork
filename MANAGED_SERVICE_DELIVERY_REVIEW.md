@@ -1,5 +1,7 @@
 # Managed support delivery review — staging, October 30, 2026
 
+Historical planning note: the $13 managed Driver examples below were superseded by the $10 rate. Use the current prices, evidence, and release gates in `MANAGED_SERVICE_RELEASE_MAP.md` and `MANAGED_SERVICE_ISOLATION_AUDIT.md`.
+
 ## Price and time budget
 
 These are gross revenue budgets at a target of $50 per hour of direct work. They do not include Stripe fees, taxes, software costs, unsold time, or customer support outside the defined scope.
