@@ -819,7 +819,7 @@ const handleChangePassword = () => {
   async function endManagedSupport() {
     if (endingManaged || managedBilling?.cancelAtPeriodEnd) return;
     const title = "End managed support?";
-    const detail = "Only hands-on managed support and its charge will end at the close of the current paid period. Your app subscription, dashboard, records, and reminders will continue.";
+    const detail = `Only hands-on managed support and its charge will end at the close of the current paid period. Your ${billing?.status === "trialing" ? "app trial" : "app subscription"}, dashboard, records, and reminders will continue.`;
     const confirmed = Platform.OS === "web"
       ? window.confirm(`${title}\n\n${detail}`)
       : await new Promise<boolean>(resolve => Alert.alert(title, detail, [
@@ -832,8 +832,9 @@ const handleChangePassword = () => {
       const result = await httpsCallable<Record<string, never>, { cancelAtMillis: number }>(
         functions, "endMyManagedSupport")({});
       const date = new Date(result.data.cancelAtMillis).toLocaleDateString();
-      if (Platform.OS === "web") window.alert(`Managed support ends ${date}. Your app subscription, records, and reminders continue.`);
-      else Alert.alert("Managed support ending", `Managed support ends ${date}. Your app subscription, records, and reminders continue.`);
+      const accessLabel = billing?.status === "trialing" ? "app trial" : "app subscription";
+      if (Platform.OS === "web") window.alert(`Managed support ends ${date}. Your ${accessLabel}, records, and reminders continue.`);
+      else Alert.alert("Managed support ending", `Managed support ends ${date}. Your ${accessLabel}, records, and reminders continue.`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : "Please try again.";
       if (Platform.OS === "web") window.alert(`Could not end managed support: ${detail}`);
@@ -1373,16 +1374,22 @@ const trialEndLabel = (() => {
             />
           )}
 
+      {billingStatus === "trialing" && !appEndScheduled &&
+        <SettingsRow label="App charge during trial" value="$0.00" />}
+      <SettingsRow
+        label={billingStatus === "trialing" ? "Estimated app price after trial" : "Estimated app monthly price"}
+        value={estimatedMonthlyAmount}
+      />
+      {billingStatus === "trialing" && managedBilling && ["active", "trialing"].includes(managedBilling.status || "") &&
+        <Text style={{ paddingHorizontal: 16, paddingBottom: 16, color: "#555", fontSize: 13, lineHeight: 19 }}>
+          The free trial covers app access only. Managed support has a separate paid charge.
+        </Text>}
+
       {Platform.OS === "web" && (
         <>
         <SettingsRow
           label="Active drivers"
           value={String(activeDriverCount)}
-        />
-
-        <SettingsRow
-          label="Estimated app monthly price"
-          value={estimatedMonthlyAmount}
         />
 
         <SettingsRow
@@ -1425,10 +1432,12 @@ const trialEndLabel = (() => {
           : "Not active"} />
         {managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
           Number.isFinite(managedBilling.monthlyAmountCents) && <SettingsRow
-          label="Managed monthly charge" value={`$${((managedBilling.monthlyAmountCents || 0) / 100).toFixed(2)}`} />}
+          label="Managed support monthly charge" value={`$${((managedBilling.monthlyAmountCents || 0) / 100).toFixed(2)}`} />}
         {managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
           Number.isFinite(managedBilling.monthlyAmountCents) && <SettingsRow
-          label={managedBilling.cancelAtPeriodEnd ? "Current app + managed monthly total" : "Estimated app + managed monthly total"}
+          label={billingStatus === "trialing"
+            ? "Estimated app + managed after trial"
+            : managedBilling.cancelAtPeriodEnd ? "Current app + managed monthly total" : "Estimated app + managed monthly total"}
           value={`$${((estimatedMonthlyAmountCents + (managedBilling.monthlyAmountCents || 0)) / 100).toFixed(2)}`} />}
         {managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
           managedBilling.cancelAtPeriodEnd && !appEndScheduled && <SettingsRow
@@ -1442,7 +1451,9 @@ const trialEndLabel = (() => {
             ? "Both app access and managed support are scheduled to end. Your account and records are not deleted."
             : managedBilling?.status === "canceled" && managedRequestStatus === "requested"
               ? "Your previous managed plan has ended. Your new request is being reviewed for a fresh quote. Your app subscription and dashboard remain active. No managed charge has restarted."
-            : "Managed support is optional hands-on help with its own charge. It may share one Stripe subscription with app access when you chose both at signup. Ending managed support keeps your app subscription, dashboard, records, and reminders available."}
+            : billingStatus === "trialing"
+              ? "Managed support is billed during your app trial. The combined amount above is an estimate after the app trial ends, assuming the same active units and managed scope. Ending managed support keeps your app trial, dashboard, records, and reminders available."
+              : "Managed support is optional hands-on help with its own charge. It may share one Stripe subscription with app access when you chose both at signup. Ending managed support keeps your app subscription, dashboard, records, and reminders available."}
         </Text>
         {managedBilling?.status === "canceled" && managedRequestStatus === "requested" &&
           <SettingsRow label="New managed request" value="Received · awaiting quote"
@@ -1457,7 +1468,7 @@ const trialEndLabel = (() => {
           onPress={() => router.push("/(app)/managed-tracking" as any)} />}
         {!!managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
           !managedBilling.cancelAtPeriodEnd && !appEndScheduled && <SettingsRow label="End managed support only"
-            value={endingManaged ? "Scheduling…" : "Keep app access"} showDivider={false}
+            value={endingManaged ? "Scheduling…" : billingStatus === "trialing" ? "Keep app trial and dashboard" : "Keep app access"} showDivider={false}
             onPress={endingManaged ? undefined : () => { void endManagedSupport(); }} />}
         {Platform.OS === "web" && !!managedBilling && ["active", "trialing", "past_due"].includes(managedBilling.status || "") &&
           !appEndScheduled && <SettingsRow label="End all services"
